@@ -1,0 +1,84 @@
+
+import React, { useRef, useEffect, useState } from 'react';
+
+interface MediaContainerProps {
+  videoUrl?: string;
+  photoUrl: string;
+  isActive: boolean;
+  isSubscribed: boolean;
+  onSwipeUp?: () => void;
+}
+
+const MediaContainer: React.FC<MediaContainerProps> = ({ 
+  videoUrl, 
+  photoUrl, 
+  isActive, 
+  isSubscribed,
+  onSwipeUp 
+}) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const touchStartY = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (isSubscribed && videoRef.current) {
+      if (isActive) {
+        videoRef.current.play().catch(() => {});
+      } else {
+        videoRef.current.pause();
+        videoRef.current.currentTime = 0;
+      }
+    }
+  }, [isActive, isSubscribed]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartY.current === null) return;
+    const touchEndY = e.changedTouches[0].clientY;
+    const deltaY = touchStartY.current - touchEndY;
+    if (deltaY > 50 && onSwipeUp) onSwipeUp();
+    touchStartY.current = null;
+  };
+
+  return (
+    <div 
+      className="relative h-full w-full bg-black flex items-center justify-center overflow-hidden"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      {!isLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 z-10">
+           <div className="w-8 h-8 border-2 border-zinc-700 border-t-orange-600 rounded-full animate-spin" />
+        </div>
+      )}
+
+      {isSubscribed && videoUrl ? (
+        <video
+          ref={videoRef}
+          src={videoUrl}
+          className={`h-full w-full object-cover transition-opacity duration-500 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+          loop
+          muted
+          playsInline
+          onLoadedData={() => setIsLoaded(true)}
+        />
+      ) : (
+        <img
+          src={photoUrl}
+          className={`h-full w-full object-cover transition-all duration-700 ${isLoaded ? 'opacity-100' : 'opacity-0'} ${isActive && isLoaded ? 'animate-ken-burns' : ''}`}
+          onLoad={() => setIsLoaded(true)}
+          alt="Real Dish"
+        />
+      )}
+      
+      {/* Visual improvement: stronger gradients for better text legibility */}
+      <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/50 via-black/10 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
+    </div>
+  );
+};
+
+export default MediaContainer;

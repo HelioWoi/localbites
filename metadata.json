@@ -1,0 +1,8 @@
+{
+  "name": "Local Bites",
+  "description": "A mobile-first food decision engine using short videos and Google Maps data to help you decide what to eat nearby instantly.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera"
+  ]
+}

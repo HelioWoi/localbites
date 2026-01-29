@@ -1,0 +1,460 @@
+
+import React, { useState, useRef, useEffect } from 'react';
+import { Restaurant, Dish, Review } from '../types';
+import { ChevronLeft, Globe, MapPin, Navigation, Bookmark, PlayCircle, Camera, X, Crown, Play, Pause, Volume2, VolumeX, Star, ChevronRight, ChevronUp, ExternalLink } from 'lucide-react';
+
+interface RestaurantProfileProps {
+  restaurant: Restaurant;
+  onBack: () => void;
+  isSaved: boolean;
+  onToggleSave: () => void;
+}
+
+const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBack, isSaved, onToggleSave }) => {
+  const [showVideoReels, setShowVideoReels] = useState(false);
+  const [activeVideoIndex, setActiveVideoIndex] = useState(0);
+  const [swipeHintCounts, setSwipeHintCounts] = useState<number[]>([]);
+  const [isMuted, setIsMuted] = useState(true);
+  const videoReelsRef = useRef<HTMLDivElement>(null);
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+  
+  // Reviews Reels state
+  const [showReviewsReel, setShowReviewsReel] = useState(false);
+  const [activeReviewIndex, setActiveReviewIndex] = useState(0);
+  const [reviewSwipeCount, setReviewSwipeCount] = useState(0);
+  const reviewsScrollRef = useRef<HTMLDivElement>(null);
+  
+  // Expandable text state
+  const [expandedVideoText, setExpandedVideoText] = useState(false);
+  const [expandedReviewText, setExpandedReviewText] = useState(false);
+
+  const dishesWithVideo = restaurant.dishes.filter(d => d.videoUrl);
+
+  const sortedReviews = restaurant.reviews 
+    ? [...restaurant.reviews].sort((a, b) => b.time - a.time).filter(r => r.photoUrl)
+    : [];
+
+  // Initialize swipe hint counts for all videos
+  useEffect(() => {
+    if (showVideoReels && swipeHintCounts.length !== dishesWithVideo.length) {
+      setSwipeHintCounts(new Array(dishesWithVideo.length).fill(0));
+    }
+  }, [showVideoReels, dishesWithVideo.length]);
+
+  // No auto-scroll for videos - manual swipe only (like Instagram)
+
+  // Handle scroll to detect active video
+  const handleVideoScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const container = e.currentTarget;
+    const index = Math.round(container.scrollTop / container.clientHeight);
+    if (index !== activeVideoIndex) {
+      setActiveVideoIndex(index);
+      // Play the new active video, pause others
+      videoRefs.current.forEach((video, i) => {
+        if (video) {
+          if (i === index) {
+            video.play();
+          } else {
+            video.pause();
+          }
+        }
+      });
+    }
+  };
+
+  const openVideoReels = (startIndex: number) => {
+    setActiveVideoIndex(startIndex);
+    setSwipeHintCounts(new Array(dishesWithVideo.length).fill(0));
+    setShowVideoReels(true);
+  };
+
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
+    videoRefs.current.forEach(video => {
+      if (video) video.muted = !isMuted;
+    });
+  };
+
+  // Handle review scroll
+  const handleReviewScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const container = e.currentTarget;
+    const index = Math.round(container.scrollTop / container.clientHeight);
+    if (index !== activeReviewIndex) {
+      setActiveReviewIndex(index);
+      setReviewSwipeCount(0); // Reset counter when scrolling
+    }
+  };
+
+  // No auto-scroll for reviews - manual swipe only (like Instagram)
+
+  // Google Reviews URL
+  const googleReviewsUrl = `${restaurant.googleMapsUrl}&review=true`;
+
+  return (
+    <div className="h-screen w-full bg-white flex flex-col profile-scroll">
+      {/* Video Reels Modal - scroll vertical like TikTok/Reels */}
+      {showVideoReels && dishesWithVideo.length > 0 && (
+        <div className="fixed inset-0 z-50 bg-black">
+          {/* Header - always visible */}
+          <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/60 to-transparent z-10">
+            <div className="flex items-center justify-between">
+              <button onClick={() => setShowVideoReels(false)} className="p-3 bg-white/20 backdrop-blur-md rounded-2xl text-white active:scale-90 transition-transform">
+                <X size={24} />
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="px-3 py-1.5 bg-white/20 backdrop-blur-md rounded-full">
+                  <span className="text-white text-xs font-bold">{activeVideoIndex + 1} / {dishesWithVideo.length}</span>
+                </div>
+                <button onClick={toggleMute} className="p-3 bg-white/20 backdrop-blur-md rounded-2xl text-white active:scale-90 transition-transform">
+                  {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Scrollable video container */}
+          <div 
+            ref={videoReelsRef}
+            className="h-full w-full snap-y snap-mandatory overflow-y-scroll"
+            onScroll={handleVideoScroll}
+            style={{ scrollSnapType: 'y mandatory' }}
+          >
+            {dishesWithVideo.map((dish, idx) => (
+              <div key={dish.id} className="h-screen w-full snap-start relative flex items-center justify-center">
+                <video
+                  ref={el => videoRefs.current[idx] = el}
+                  src={dish.videoUrl}
+                  className="w-full h-full object-cover"
+                  autoPlay={idx === 0}
+                  loop
+                  muted={isMuted}
+                  playsInline
+                />
+                
+                {/* Bottom info + expandable text like Instagram Reels */}
+                <div 
+                  className={`absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/90 via-black/60 to-transparent transition-all duration-300 ${expandedVideoText && idx === activeVideoIndex ? 'pb-20' : ''}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div 
+                    className="cursor-pointer"
+                    onClick={() => setExpandedVideoText(!expandedVideoText)}
+                  >
+                    <h3 className="text-xl font-black text-white mb-1">{dish.name}</h3>
+                    <p className={`text-white/80 font-medium transition-all duration-300 ${expandedVideoText && idx === activeVideoIndex ? '' : 'line-clamp-2'}`}>
+                      {dish.description}
+                    </p>
+                    {dish.description && dish.description.length > 60 && (
+                      <button className="text-white/50 text-xs font-bold mt-1">
+                        {expandedVideoText && idx === activeVideoIndex ? 'less' : 'more'}
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Swipe hint - shows on all videos except last */}
+                  {idx < dishesWithVideo.length - 1 && idx === activeVideoIndex && !expandedVideoText && (
+                    <div className="flex flex-col items-center animate-bounce mt-4">
+                      <ChevronUp className="w-6 h-6 text-white/70" />
+                      <span className="text-white/70 text-xs font-medium">Swipe for more</span>
+                    </div>
+                  )}
+                  
+                  {/* Last video indicator */}
+                  {idx === dishesWithVideo.length - 1 && idx === activeVideoIndex && !expandedVideoText && (
+                    <div className="flex flex-col items-center mt-4">
+                      <span className="text-white/50 text-xs font-medium">Last video</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Progress dots on right side */}
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-10">
+            {dishesWithVideo.map((_, i) => (
+              <button 
+                key={i} 
+                onClick={() => {
+                  if (videoReelsRef.current) {
+                    videoReelsRef.current.scrollTo({ top: i * window.innerHeight, behavior: 'smooth' });
+                  }
+                }}
+                className={`w-2 rounded-full transition-all ${i === activeVideoIndex ? 'bg-white h-6' : 'bg-white/40 h-2'}`} 
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Reviews Reels Modal */}
+      {showReviewsReel && sortedReviews.length > 0 && (
+        <div className="fixed inset-0 z-50 bg-black">
+          <div 
+            ref={reviewsScrollRef}
+            className="h-full w-full snap-y snap-mandatory overflow-y-scroll"
+            onScroll={handleReviewScroll}
+            style={{ scrollSnapType: 'y mandatory' }}
+          >
+            {sortedReviews.map((review, idx) => (
+              <div key={review.id} className="h-screen w-full snap-start relative overflow-hidden">
+                <img 
+                  src={review.photoUrl} 
+                  className={`w-full h-full object-cover transition-transform duration-[8000ms] ease-out ${idx === activeReviewIndex ? 'scale-110' : 'scale-100'}`}
+                  alt="Customer photo"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40" />
+                
+                {/* Header */}
+                <div className="absolute top-0 left-0 right-0 p-6">
+                  <div className="flex items-center justify-between">
+                    <button onClick={() => setShowReviewsReel(false)} className="p-3 bg-white/20 backdrop-blur-md rounded-2xl text-white active:scale-90 transition-transform">
+                      <X size={24} />
+                    </button>
+                    <div className="flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-md rounded-full">
+                      <Star size={14} className="text-amber-400" fill="currentColor" />
+                      <span className="text-white text-sm font-bold">{restaurant.rating}</span>
+                      <span className="text-white/60 text-xs">({restaurant.totalReviews} reviews)</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Review content at bottom - expandable text like Instagram Reels */}
+                <div className={`absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/90 via-black/60 to-transparent transition-all duration-300 ${expandedReviewText && idx === activeReviewIndex ? 'pb-20' : ''}`}>
+                  <div className="flex items-center gap-3 mb-3">
+                    {review.authorPhotoUrl ? (
+                      <img src={review.authorPhotoUrl} className="w-10 h-10 rounded-full object-cover border-2 border-white" alt={review.authorName} />
+                    ) : (
+                      <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                        {review.authorName.charAt(0)}
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-white font-bold text-sm">{review.authorName}</p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-0.5">
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} size={10} className={i < review.rating ? "text-amber-400" : "text-white/30"} fill="currentColor" />
+                          ))}
+                        </div>
+                        <span className="text-white/60 text-[10px]">{review.relativeTimeDescription}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Expandable review text */}
+                  <div 
+                    className="cursor-pointer"
+                    onClick={() => setExpandedReviewText(!expandedReviewText)}
+                  >
+                    <p className={`text-white font-medium leading-relaxed transition-all duration-300 ${expandedReviewText && idx === activeReviewIndex ? '' : 'line-clamp-2'}`}>
+                      "{review.text}"
+                    </p>
+                    {review.text.length > 80 && (
+                      <button className="text-white/50 text-xs font-bold mt-1">
+                        {expandedReviewText && idx === activeReviewIndex ? 'less' : 'more'}
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Link to see full review on Google - only when expanded */}
+                  {expandedReviewText && idx === activeReviewIndex && (
+                    <a 
+                      href={googleReviewsUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-white/70 text-xs font-medium hover:text-white transition-colors mt-3"
+                    >
+                      <span>See full review on Google</span>
+                      <ExternalLink size={12} />
+                    </a>
+                  )}
+                  
+                  {/* Swipe hint - shows on all reviews except last */}
+                  {idx < sortedReviews.length - 1 && idx === activeReviewIndex && !expandedReviewText && (
+                    <div className="mt-4 flex flex-col items-center animate-bounce">
+                      <ChevronUp className="w-6 h-6 text-white/60" />
+                      <span className="text-white/60 text-xs font-medium">Swipe for more</span>
+                    </div>
+                  )}
+                  
+                  {/* Last review indicator */}
+                  {idx === sortedReviews.length - 1 && idx === activeReviewIndex && !expandedReviewText && (
+                    <div className="mt-4 flex flex-col items-center">
+                      <span className="text-white/50 text-xs font-medium">Last review</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Progress dots */}
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-2">
+                  {sortedReviews.map((_, i) => (
+                    <div key={i} className={`w-1.5 h-1.5 rounded-full transition-all ${i === activeReviewIndex ? 'bg-white h-4' : 'bg-white/40'}`} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="relative h-[40vh] shrink-0">
+        <img src={restaurant.mainPhotoUrl} className="w-full h-full object-cover" alt={restaurant.name} />
+        <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-black/20" />
+        <div className="absolute top-14 left-6 right-6 flex justify-between">
+          <button onClick={onBack} className="p-3 bg-white/90 backdrop-blur-md rounded-2xl text-zinc-900 shadow-xl active:scale-90 transition-transform"><ChevronLeft/></button>
+          <div className="flex gap-2">
+            {restaurant.isSubscribed && (
+              <div className="w-11 h-11 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full shadow-xl flex items-center justify-center">
+                <Crown size={18} fill="currentColor" />
+              </div>
+            )}
+            <button onClick={onToggleSave} className={`p-3 backdrop-blur-md rounded-2xl shadow-xl transition-all active:scale-90 ${isSaved ? 'bg-orange-500 text-white' : 'bg-white/90 text-zinc-900'}`}>
+              <Bookmark fill={isSaved ? "currentColor" : "none"} />
+            </button>
+          </div>
+        </div>
+        <div className="absolute bottom-8 left-6 right-6">
+          <div className="flex gap-2 mb-2 flex-wrap">
+            <span className="px-2 py-0.5 bg-emerald-500 text-white rounded text-[10px] font-black uppercase tracking-widest">Open</span>
+            <span className="px-2 py-0.5 bg-zinc-100 text-zinc-500 rounded text-[10px] font-black uppercase tracking-widest">{restaurant.priceLevel}</span>
+            {restaurant.isSubscribed && (
+              <span className="px-2 py-0.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+                <PlayCircle size={10} /> {restaurant.dishes.filter(d => d.videoUrl).length} Videos
+              </span>
+            )}
+          </div>
+          <h1 className="text-4xl font-black text-zinc-900 tracking-tighter mb-1 leading-none">{restaurant.name}</h1>
+          <p className="text-zinc-500 font-bold">{restaurant.cuisine} • {restaurant.distance}</p>
+        </div>
+      </div>
+
+      <div className="p-6 space-y-6 flex-1 bg-white rounded-t-[40px] -mt-10 relative z-10 shadow-2xl">
+        
+        {/* MENU VIDEOS - First thing user sees */}
+        {restaurant.isSubscribed && (
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-black tracking-tight">Menu Videos</h2>
+              <span className="flex items-center gap-1 text-orange-500 text-[10px] font-black uppercase tracking-widest">
+                <PlayCircle size={14}/> Tap to watch
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              {dishesWithVideo.map((dish, index) => (
+                <button 
+                  key={dish.id} 
+                  className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-50 group text-left"
+                  onClick={() => openVideoReels(index)}
+                >
+                  <img src={dish.thumbnailUrl || restaurant.mainPhotoUrl} className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" alt={dish.name} />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-3">
+                    <p className="text-white font-bold text-sm mb-0.5">{dish.name}</p>
+                    {dish.description && <p className="text-white/60 text-[11px] line-clamp-1">{dish.description}</p>}
+                  </div>
+                  <div className="absolute top-2 right-2 w-9 h-9 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center">
+                    <PlayCircle size={18} className="text-white" fill="currentColor" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Quick action buttons */}
+        <div className="flex gap-3">
+          <a href={restaurant.googleMapsUrl} target="_blank" className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white font-bold py-4 rounded-2xl shadow-lg active:scale-95 transition-all">
+            <Navigation size={16} fill="currentColor" /> Directions
+          </a>
+          {restaurant.website && (
+            <a href={restaurant.website} target="_blank" className="flex-1 flex items-center justify-center gap-2 bg-zinc-100 text-zinc-900 font-bold py-4 rounded-2xl active:scale-95 transition-all">
+              <Globe size={16} /> Website
+            </a>
+          )}
+        </div>
+
+        {/* REVIEWS - Opens Reviews Reels modal */}
+        {(restaurant.rating || sortedReviews.length > 0) && (
+          <button 
+            onClick={() => sortedReviews.length > 0 && setShowReviewsReel(true)}
+            className="w-full p-4 bg-zinc-50 rounded-2xl border border-zinc-100 flex items-center justify-between active:scale-[0.98] transition-transform"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                <Star size={18} className="text-amber-500" fill="currentColor" />
+              </div>
+              <div className="text-left">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-black text-zinc-900">{restaurant.rating || '4.5'}</span>
+                  <div className="flex items-center gap-0.5">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} size={10} className={i < Math.floor(restaurant.rating || 4.5) ? "text-amber-500" : "text-zinc-200"} fill="currentColor" />
+                    ))}
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-500">{restaurant.totalReviews || sortedReviews.length} reviews • {sortedReviews.length} with photos</p>
+              </div>
+            </div>
+            {sortedReviews.length > 0 && (
+              <div className="flex items-center gap-2">
+                <div className="flex -space-x-2">
+                  {sortedReviews.slice(0, 3).map((r) => (
+                    <img key={r.id} src={r.photoUrl} className="w-8 h-8 rounded-lg object-cover border-2 border-white" alt="" />
+                  ))}
+                </div>
+                <ChevronRight size={20} className="text-zinc-400" />
+              </div>
+            )}
+          </button>
+        )}
+
+        {/* Non-subscriber menu preview */}
+        {!restaurant.isSubscribed && (
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-black tracking-tight">Menu Preview</h2>
+              <span className="flex items-center gap-1 text-zinc-400 text-[10px] font-black uppercase tracking-widest">
+                <Camera size={14}/> Photos
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              {restaurant.dishes.slice(0, 4).map((dish) => (
+                <div key={dish.id} className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-50">
+                  <img src={dish.thumbnailUrl || restaurant.mainPhotoUrl} className="w-full h-full object-cover" alt={dish.name} />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-3">
+                    <p className="text-white font-bold text-sm">{dish.name}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 p-5 bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-100">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center shrink-0">
+                  <Crown size={16} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-orange-900 font-bold text-sm mb-1">Own this restaurant?</p>
+                  <p className="text-orange-700 text-xs mb-3">Add videos and attract more customers.</p>
+                  <button className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-[9px] uppercase tracking-widest rounded-lg active:scale-95 transition-transform">
+                    Become a Partner →
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Location */}
+        <div className="bg-zinc-50 rounded-2xl p-4 flex items-center gap-3">
+          <MapPin size={20} className="text-orange-500 shrink-0" />
+          <p className="text-sm font-medium text-zinc-700">{restaurant.address}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default RestaurantProfile;
