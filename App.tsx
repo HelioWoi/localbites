@@ -245,7 +245,7 @@ const App: React.FC = () => {
         ) : restaurants.length > 0 ? (
           restaurants.map((res, i) => (
             <div key={res.id} className="snap-item">
-              <div className={`video-card shadow-none rounded-none md:rounded-[40px] border-none bg-zinc-50 transition-all duration-500 ease-out transform-gpu ${activeRestaurantIndex === i ? 'opacity-100 scale-100' : 'opacity-80 scale-[0.97]'}`}>
+              <div className={`video-card shadow-none rounded-none border-none bg-black transition-all duration-500 ease-out transform-gpu ${activeRestaurantIndex === i ? 'opacity-100 scale-100' : 'opacity-80 scale-[0.97]'}`}>
                 <MediaContainer 
                   videoUrl={res.dishes[0]?.videoUrl} 
                   photoUrl={res.mainPhotoUrl}
