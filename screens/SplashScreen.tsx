@@ -18,9 +18,9 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   }, [onFinish]);
 
   return (
-    <div className="h-full w-full flex flex-col items-center justify-center bg-zinc-50 text-zinc-900 overflow-hidden">
+    <div className="h-screen w-full flex flex-col items-center justify-center bg-zinc-50 text-zinc-900 overflow-hidden">
       {/* Centered animated logo */}
-      <div className="flex flex-col items-center justify-center">
+      <div className="flex flex-col items-center justify-center -mt-20">
         <div className={`relative transition-all duration-700 ease-out ${stage >= 1 ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}>
           <div className={`w-24 h-24 bg-gradient-to-br from-orange-500 to-orange-600 rounded-[28px] flex items-center justify-center shadow-2xl shadow-orange-500/30 ${stage >= 1 ? 'animate-pulse-glow' : ''}`}>
             <Utensils className={`w-10 h-10 text-white transition-transform duration-500 ${stage >= 2 ? 'rotate-0' : '-rotate-12'}`} strokeWidth={2.5} />

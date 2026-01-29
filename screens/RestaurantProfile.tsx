@@ -298,63 +298,54 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         </div>
       )}
 
-      <div className="relative h-[40vh] shrink-0">
+      <div className="relative h-[45vh] shrink-0">
         <img src={restaurant.mainPhotoUrl} className="w-full h-full object-cover" alt={restaurant.name} />
-        <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
+        
+        {/* Header buttons */}
         <div className="absolute top-14 left-6 right-6 flex justify-between">
-          <button onClick={onBack} className="p-3 bg-white/90 backdrop-blur-md rounded-2xl text-zinc-900 shadow-xl active:scale-90 transition-transform"><ChevronLeft/></button>
-          <div className="flex gap-2">
+          <button onClick={onBack} className="p-3 bg-black/20 backdrop-blur-md rounded-full text-white active:scale-90 transition-transform">
+            <ChevronLeft size={24}/>
+          </button>
+          <div className="flex gap-3">
             {restaurant.isSubscribed && (
-              <div className="w-11 h-11 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full shadow-xl flex items-center justify-center">
+              <div className="w-11 h-11 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full flex items-center justify-center">
                 <Crown size={18} fill="currentColor" />
               </div>
             )}
-            <button onClick={onToggleSave} className={`p-3 backdrop-blur-md rounded-2xl shadow-xl transition-all active:scale-90 ${isSaved ? 'bg-orange-500 text-white' : 'bg-white/90 text-zinc-900'}`}>
-              <Bookmark fill={isSaved ? "currentColor" : "none"} />
+            <button onClick={onToggleSave} className={`p-3 backdrop-blur-md rounded-full transition-all active:scale-90 ${isSaved ? 'bg-orange-500 text-white' : 'bg-black/20 text-white'}`}>
+              <Bookmark size={20} fill={isSaved ? "currentColor" : "none"} />
             </button>
           </div>
         </div>
-        <div className="absolute bottom-8 left-6 right-6">
-          <div className="flex gap-2 mb-2 flex-wrap">
-            <span className="px-2 py-0.5 bg-emerald-500 text-white rounded text-[10px] font-black uppercase tracking-widest">Open</span>
-            <span className="px-2 py-0.5 bg-zinc-100 text-zinc-500 rounded text-[10px] font-black uppercase tracking-widest">{restaurant.priceLevel}</span>
-            {restaurant.isSubscribed && (
-              <span className="px-2 py-0.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
-                <PlayCircle size={10} /> {restaurant.dishes.filter(d => d.videoUrl).length} Videos
-              </span>
-            )}
-          </div>
-          <h1 className="text-4xl font-black text-zinc-900 tracking-tighter mb-1 leading-none">{restaurant.name}</h1>
-          <p className="text-zinc-500 font-bold">{restaurant.cuisine} • {restaurant.distance}</p>
+        
+        {/* Restaurant info overlay */}
+        <div className="absolute bottom-6 left-6 right-6">
+          <h1 className="text-3xl font-black text-white tracking-tight mb-1 drop-shadow-lg">{restaurant.name}</h1>
+          <p className="text-white/70 text-sm font-medium">{restaurant.cuisine} • {restaurant.distance} • {restaurant.priceLevel}</p>
         </div>
       </div>
 
-      <div className="p-6 space-y-6 flex-1 bg-white rounded-t-[40px] -mt-10 relative z-10 shadow-2xl">
+      <div className="p-6 space-y-5 flex-1 bg-white rounded-t-[32px] -mt-6 relative z-10">
         
-        {/* MENU VIDEOS - First thing user sees */}
+        {/* MENU VIDEOS - Clean grid */}
         {restaurant.isSubscribed && (
           <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-black tracking-tight">Menu Videos</h2>
-              <span className="flex items-center gap-1 text-orange-500 text-[10px] font-black uppercase tracking-widest">
-                <PlayCircle size={14}/> Tap to watch
-              </span>
-            </div>
+            <h2 className="text-lg font-bold text-zinc-900 mb-3">Menu Videos</h2>
             
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2">
               {dishesWithVideo.map((dish, index) => (
                 <button 
                   key={dish.id} 
-                  className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-50 group text-left"
+                  className="relative aspect-square rounded-xl overflow-hidden bg-zinc-100 group text-left"
                   onClick={() => openVideoReels(index)}
                 >
                   <img src={dish.thumbnailUrl || restaurant.mainPhotoUrl} className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" alt={dish.name} />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-3">
-                    <p className="text-white font-bold text-sm mb-0.5">{dish.name}</p>
-                    {dish.description && <p className="text-white/60 text-[11px] line-clamp-1">{dish.description}</p>}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-2.5">
+                    <p className="text-white font-semibold text-xs">{dish.name}</p>
                   </div>
-                  <div className="absolute top-2 right-2 w-9 h-9 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center">
-                    <PlayCircle size={18} className="text-white" fill="currentColor" />
+                  <div className="absolute top-2 right-2 w-7 h-7 bg-black/30 backdrop-blur-sm rounded-full flex items-center justify-center">
+                    <PlayCircle size={14} className="text-white" fill="currentColor" />
                   </div>
                 </button>
               ))}
@@ -362,48 +353,35 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
           </section>
         )}
 
-        {/* Quick action buttons */}
-        <div className="flex gap-3">
-          <a href={restaurant.googleMapsUrl} target="_blank" className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white font-bold py-4 rounded-2xl shadow-lg active:scale-95 transition-all">
-            <Navigation size={16} fill="currentColor" /> Directions
+        {/* Quick action buttons - Compact */}
+        <div className="flex gap-2">
+          <a href={restaurant.googleMapsUrl} target="_blank" className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white font-semibold py-3 rounded-xl text-sm active:scale-95 transition-all">
+            <Navigation size={14} fill="currentColor" /> Directions
           </a>
           {restaurant.website && (
-            <a href={restaurant.website} target="_blank" className="flex-1 flex items-center justify-center gap-2 bg-zinc-100 text-zinc-900 font-bold py-4 rounded-2xl active:scale-95 transition-all">
-              <Globe size={16} /> Website
+            <a href={restaurant.website} target="_blank" className="flex-1 flex items-center justify-center gap-2 bg-zinc-100 text-zinc-700 font-semibold py-3 rounded-xl text-sm active:scale-95 transition-all">
+              <Globe size={14} /> Website
             </a>
           )}
         </div>
 
-        {/* REVIEWS - Opens Reviews Reels modal */}
+        {/* REVIEWS - Simple row */}
         {(restaurant.rating || sortedReviews.length > 0) && (
           <button 
             onClick={() => sortedReviews.length > 0 && setShowReviewsReel(true)}
-            className="w-full p-4 bg-zinc-50 rounded-2xl border border-zinc-100 flex items-center justify-between active:scale-[0.98] transition-transform"
+            className="w-full flex items-center justify-between py-3 active:opacity-70 transition-opacity"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
-                <Star size={18} className="text-amber-500" fill="currentColor" />
+              <div className="flex items-center gap-1">
+                <Star size={16} className="text-amber-500" fill="currentColor" />
+                <span className="text-base font-bold text-zinc-900">{restaurant.rating || '4.5'}</span>
               </div>
-              <div className="text-left">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-black text-zinc-900">{restaurant.rating || '4.5'}</span>
-                  <div className="flex items-center gap-0.5">
-                    {[...Array(5)].map((_, i) => (
-                      <Star key={i} size={10} className={i < Math.floor(restaurant.rating || 4.5) ? "text-amber-500" : "text-zinc-200"} fill="currentColor" />
-                    ))}
-                  </div>
-                </div>
-                <p className="text-xs text-zinc-500">{restaurant.totalReviews || sortedReviews.length} reviews • {sortedReviews.length} with photos</p>
-              </div>
+              <span className="text-zinc-400 text-sm">({restaurant.totalReviews || sortedReviews.length} reviews)</span>
             </div>
             {sortedReviews.length > 0 && (
-              <div className="flex items-center gap-2">
-                <div className="flex -space-x-2">
-                  {sortedReviews.slice(0, 3).map((r) => (
-                    <img key={r.id} src={r.photoUrl} className="w-8 h-8 rounded-lg object-cover border-2 border-white" alt="" />
-                  ))}
-                </div>
-                <ChevronRight size={20} className="text-zinc-400" />
+              <div className="flex items-center gap-1 text-orange-500">
+                <span className="text-xs font-semibold">View photos</span>
+                <ChevronRight size={16} />
               </div>
             )}
           </button>

@@ -1,5 +1,6 @@
 
 import { Restaurant, UserLocation, Review } from "../types";
+import { getRestaurantsFromSupabase, hasSupabaseData } from "./supabaseService";
 
 const DEMO_RESTAURANTS: Omit<Restaurant, 'id'>[] = [
   {
@@ -120,6 +121,34 @@ export async function getNearbyRestaurants(
 ): Promise<Restaurant[]> {
   console.log('[LocalBites] Fetching restaurants for:', location.name);
   
+  // Try to fetch from Supabase first
+  try {
+    const hasData = await hasSupabaseData();
+    if (hasData) {
+      console.log('[LocalBites] Using Supabase data');
+      let results = await getRestaurantsFromSupabase();
+      
+      if (filters?.cuisine && filters.cuisine !== 'All') {
+        results = results.filter(r => 
+          r.cuisine.toLowerCase().includes(filters.cuisine!.toLowerCase())
+        );
+      }
+
+      if (filters?.price) {
+        results = results.filter(r => r.priceLevel === filters.price);
+      }
+
+      if (results.length > 0) {
+        console.log('[LocalBites] Returning', results.length, 'restaurants from Supabase');
+        return results;
+      }
+    }
+  } catch (error) {
+    console.error('[LocalBites] Supabase error, falling back to demo data:', error);
+  }
+
+  // Fallback to demo data
+  console.log('[LocalBites] Using demo data');
   await new Promise(resolve => setTimeout(resolve, 800));
 
   let results = DEMO_RESTAURANTS.map((r, i) => ({

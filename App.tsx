@@ -5,13 +5,22 @@ import SplashScreen from './screens/SplashScreen';
 import LocationSelector from './screens/LocationSelector';
 import RestaurantProfile from './screens/RestaurantProfile';
 import AdminDashboard from './screens/AdminDashboard';
+import PartnerPortal from './screens/partner/PartnerPortal';
 import MediaContainer from './components/MediaContainer';
 import FloatingFilters from './components/FloatingFilters';
 import { getNearbyRestaurants } from './services/geminiService';
 import { CUISINES, PRICES } from './constants';
 import { Store, Bookmark, Quote, ExternalLink, Info, Loader2, X, ArrowRight, Globe, MapPin, ChevronUp, Crown, PlayCircle, Heart } from 'lucide-react';
 
+// Check if we're on the partner route
+const isPartnerRoute = window.location.pathname === '/partner' || window.location.pathname.startsWith('/partner');
+
 const App: React.FC = () => {
+  // If on partner route, render Partner Portal
+  if (isPartnerRoute) {
+    return <PartnerPortal />;
+  }
+
   const [state, setState] = useState<AppState>('SPLASH');
   const [location, setLocation] = useState<UserLocation | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -152,9 +161,9 @@ const App: React.FC = () => {
             <button onClick={() => setShowSaved(true)} className="w-10 h-10 bg-white/90 backdrop-blur-md border border-zinc-100 rounded-full flex items-center justify-center text-zinc-900 shadow-sm active:scale-90 transition-transform">
               <Bookmark size={18} fill={savedIds.size > 0 ? "black" : "none"} />
             </button>
-            <button onClick={() => setState('ADMIN')} className="w-10 h-10 bg-white/90 backdrop-blur-md border border-zinc-100 rounded-full flex items-center justify-center text-zinc-900 shadow-sm active:scale-90 transition-transform">
+            <a href="/partner" className="w-10 h-10 bg-white/90 backdrop-blur-md border border-zinc-100 rounded-full flex items-center justify-center text-zinc-900 shadow-sm active:scale-90 transition-transform">
               <Store size={18} />
-            </button>
+            </a>
           </div>
         </div>
       </div>
@@ -311,38 +320,33 @@ const App: React.FC = () => {
                     </div>
                   )}
 
-                  {/* INFO AT BOTTOM */}
-                  <div className={`absolute bottom-32 left-8 right-8 transition-all duration-500 ${showDishInfo ? 'opacity-0 translate-y-4' : 'opacity-100'}`}>
-                    <div className={`flex items-center gap-2 mb-3 flex-wrap ${activeRestaurantIndex === i ? 'animate-fade-in-up' : ''}`}>
-                       <span className="px-2 py-0.5 bg-emerald-500 text-white rounded text-[9px] font-black uppercase tracking-wider shadow-sm">Open Now</span>
-                       <span className="px-2 py-0.5 bg-white/90 backdrop-blur-sm text-zinc-900 rounded text-[9px] font-black uppercase tracking-wider shadow-sm">{res.distance}</span>
-                       <span className="px-2 py-0.5 bg-white/70 backdrop-blur-sm text-zinc-700 rounded text-[9px] font-black uppercase tracking-wider shadow-sm">{res.cuisine}</span>
+                  {/* INFO AT BOTTOM - Simplified */}
+                  <div className={`absolute bottom-0 left-0 right-0 p-6 pb-8 transition-all duration-500 ${showDishInfo ? 'opacity-0 translate-y-4' : 'opacity-100'}`}>
+                    <div className="flex items-center gap-2 mb-3">
+                       <span className="text-white/60 text-xs font-semibold">{res.cuisine}</span>
+                       <span className="text-white/40">•</span>
+                       <span className="text-white/60 text-xs font-semibold">{res.distance}</span>
                        {res.isSubscribed && (
-                         <span className="px-2 py-0.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded text-[9px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1">
-                           <PlayCircle size={10} /> Videos
-                         </span>
+                         <>
+                           <span className="text-white/40">•</span>
+                           <span className="text-orange-400 text-xs font-semibold flex items-center gap-1">
+                             <PlayCircle size={12} fill="currentColor" /> Videos
+                           </span>
+                         </>
                        )}
                     </div>
-                    <h3 className={`text-4xl font-black text-white drop-shadow-lg mb-1 tracking-tighter leading-none ${activeRestaurantIndex === i ? 'animate-fade-in-up animation-delay-100' : ''}`}>{res.name}</h3>
-                    <p className={`text-white/80 text-sm font-semibold drop-shadow-sm ${activeRestaurantIndex === i ? 'animate-fade-in-up animation-delay-200' : ''}`}>
-                      {res.isSubscribed ? 'Tap to watch menu videos' : 'Tap to see details'} • Double-tap to save
+                    <h3 className="text-3xl font-black text-white drop-shadow-lg mb-2 tracking-tight leading-none">{res.name}</h3>
+                    <p className="text-white/50 text-xs font-medium">
+                      Tap for details • Double-tap to save
                     </p>
+                    
+                    {/* Swipe indicator */}
+                    {i < restaurants.length - 1 && activeRestaurantIndex === i && (
+                      <div className="mt-4 flex items-center justify-center">
+                        <ChevronUp className="w-5 h-5 text-white/40 animate-bounce" />
+                      </div>
+                    )}
                   </div>
-
-                  {/* SWIPE HINT - shows on all cards except last */}
-                  {i < restaurants.length - 1 && activeRestaurantIndex === i && !showDishInfo && (
-                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none animate-bounce">
-                      <ChevronUp className="w-6 h-6 text-white/70" />
-                      <span className="text-[10px] font-bold text-white/70 uppercase tracking-widest">Swipe for more</span>
-                    </div>
-                  )}
-                  
-                  {/* Last restaurant indicator */}
-                  {i === restaurants.length - 1 && activeRestaurantIndex === i && !showDishInfo && (
-                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none">
-                      <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Last restaurant</span>
-                    </div>
-                  )}
 
                   {/* DETAILED MODAL */}
                   {showDishInfo && activeRestaurantIndex === i && (
