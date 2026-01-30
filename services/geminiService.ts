@@ -1,119 +1,7 @@
 
 import { Restaurant, UserLocation, Review } from "../types";
-import { getRestaurantsFromSupabase, hasSupabaseData } from "./supabaseService";
-
-const DEMO_RESTAURANTS: Omit<Restaurant, 'id'>[] = [
-  {
-    name: "The Wharf Tavern",
-    cuisine: "Seafood",
-    priceLevel: "$$",
-    distance: "0.3 km",
-    isOpen: true,
-    rating: 4.6,
-    totalReviews: 847,
-    address: "123 Esplanade, Mooloolaba QLD",
-    googleMapsUrl: "https://maps.google.com/?q=The+Wharf+Tavern+Mooloolaba",
-    website: "https://wharftavern.com.au",
-    isSubscribed: true,
-    reviews: [
-      { id: "r1", authorName: "Sarah M.", authorPhotoUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop", rating: 5, text: "Best fish and chips on the Sunshine Coast! The view is unbeatable.", relativeTimeDescription: "2 days ago", time: Date.now() - 2 * 24 * 60 * 60 * 1000, photoUrl: "https://images.unsplash.com/photo-1579888944880-d98341245702?q=80&w=800&auto=format&fit=crop" },
-      { id: "r2", authorName: "James K.", authorPhotoUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop", rating: 5, text: "Fresh seafood, cold beers, and sunset views. What more could you want?", relativeTimeDescription: "1 week ago", time: Date.now() - 7 * 24 * 60 * 60 * 1000, photoUrl: "https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?q=80&w=800&auto=format&fit=crop" },
-      { id: "r3", authorName: "Emma L.", authorPhotoUrl: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop", rating: 4, text: "We come here every time we visit Mooloolaba. Never disappoints!", relativeTimeDescription: "2 weeks ago", time: Date.now() - 14 * 24 * 60 * 60 * 1000, photoUrl: "https://images.unsplash.com/photo-1606731219412-bb0d4db6a366?q=80&w=800&auto=format&fit=crop" },
-      { id: "r4", authorName: "Michael T.", authorPhotoUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop", rating: 5, text: "The grilled prawns were absolutely divine. Staff were lovely too.", relativeTimeDescription: "3 weeks ago", time: Date.now() - 21 * 24 * 60 * 60 * 1000, photoUrl: "https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?q=80&w=800&auto=format&fit=crop" },
-      { id: "r5", authorName: "Lisa W.", authorPhotoUrl: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop", rating: 5, text: "Amazing atmosphere and the seafood platter was incredible!", relativeTimeDescription: "1 month ago", time: Date.now() - 30 * 24 * 60 * 60 * 1000, photoUrl: "https://images.unsplash.com/photo-1559737558-2f5a35f4523b?q=80&w=800&auto=format&fit=crop" },
-    ],
-    reviewSnippets: [
-      "Best fish and chips on the Sunshine Coast! The view is unbeatable.",
-      "Fresh seafood, cold beers, and sunset views. What more could you want?",
-      "We come here every time we visit Mooloolaba. Never disappoints!"
-    ],
-    mainPhotoUrl: "https://images.unsplash.com/photo-1559339352-11d035aa65de?q=80&w=1074&auto=format&fit=crop",
-    dishes: [
-      { id: "d1a", name: "Fish & Chips", description: "Beer-battered barramundi with hand-cut chips", thumbnailUrl: "https://images.unsplash.com/photo-1579888944880-d98341245702?q=80&w=500&auto=format&fit=crop", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" },
-      { id: "d1b", name: "Grilled Prawns", description: "Tiger prawns with garlic butter", thumbnailUrl: "https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?q=80&w=500&auto=format&fit=crop", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4" },
-      { id: "d1c", name: "Oysters Natural", description: "Fresh Sydney rock oysters", thumbnailUrl: "https://images.unsplash.com/photo-1606731219412-bb0d4db6a366?q=80&w=500&auto=format&fit=crop", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" },
-      { id: "d1d", name: "Seafood Platter", description: "Chef's selection for two", thumbnailUrl: "https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?q=80&w=500&auto=format&fit=crop", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4" },
-      { id: "d1e", name: "Lobster Thermidor", description: "Classic French preparation with creamy sauce", thumbnailUrl: "https://images.unsplash.com/photo-1559737558-2f5a35f4523b?q=80&w=500&auto=format&fit=crop", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4" }
-    ]
-  },
-  {
-    name: "Spice Jar",
-    cuisine: "Thai",
-    priceLevel: "$",
-    distance: "0.5 km",
-    isOpen: true,
-    address: "45 Brisbane Rd, Mooloolaba QLD",
-    googleMapsUrl: "https://maps.google.com/?q=Spice+Jar+Mooloolaba",
-    website: "",
-    isSubscribed: false,
-    reviewSnippets: [
-      "Authentic Thai flavours! The Pad Thai is incredible.",
-      "Quick service, generous portions, and very affordable.",
-      "Hidden gem! The green curry is the best I've had outside Thailand."
-    ],
-    mainPhotoUrl: "https://images.unsplash.com/photo-1569562211093-4ed0d0758f12?q=80&w=1170&auto=format&fit=crop",
-    dishes: [{ id: "d2", name: "Pad Thai", description: "Classic stir-fried rice noodles with prawns", thumbnailUrl: "https://images.unsplash.com/photo-1559314809-0d155014e29e?q=80&w=500&auto=format&fit=crop" }]
-  },
-  {
-    name: "Bella Venezia",
-    cuisine: "Italian",
-    priceLevel: "$$$",
-    distance: "0.8 km",
-    isOpen: true,
-    address: "78 Ocean St, Mooloolaba QLD",
-    googleMapsUrl: "https://maps.google.com/?q=Bella+Venezia+Mooloolaba",
-    website: "https://bellavenezia.com.au",
-    isSubscribed: true,
-    reviewSnippets: [
-      "The homemade pasta is to die for! Romantic atmosphere too.",
-      "Finally, real Italian food in Mooloolaba. The tiramisu is perfection.",
-      "A bit pricey but worth every dollar. Book ahead!"
-    ],
-    mainPhotoUrl: "https://images.unsplash.com/photo-1595295333158-4742f28fbd85?q=80&w=1160&auto=format&fit=crop",
-    dishes: [
-      { id: "d3a", name: "Spaghetti Carbonara", description: "Traditional Roman pasta with guanciale", thumbnailUrl: "https://images.unsplash.com/photo-1612874742237-6526221588e3?q=80&w=500&auto=format&fit=crop", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" },
-      { id: "d3b", name: "Margherita Pizza", description: "Wood-fired with San Marzano tomatoes", thumbnailUrl: "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?q=80&w=500&auto=format&fit=crop", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4" },
-      { id: "d3c", name: "Tiramisu", description: "Classic Italian dessert", thumbnailUrl: "https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?q=80&w=500&auto=format&fit=crop" },
-      { id: "d3d", name: "Bruschetta", description: "Toasted bread with fresh tomatoes", thumbnailUrl: "https://images.unsplash.com/photo-1572695157366-5e585ab2b69f?q=80&w=500&auto=format&fit=crop" }
-    ]
-  },
-  {
-    name: "Sunrise Café",
-    cuisine: "Breakfast",
-    priceLevel: "$$",
-    distance: "0.2 km",
-    isOpen: true,
-    address: "12 First Ave, Mooloolaba QLD",
-    googleMapsUrl: "https://maps.google.com/?q=Sunrise+Cafe+Mooloolaba",
-    website: "",
-    isSubscribed: false,
-    reviewSnippets: [
-      "Best brekkie spot! The avocado smash is legendary.",
-      "Great coffee and even better vibes. Perfect start to the day.",
-      "Friendly staff, beachside location, delicious food. 10/10!"
-    ],
-    mainPhotoUrl: "https://images.unsplash.com/photo-1525351484163-7529414344d8?q=80&w=1160&auto=format&fit=crop",
-    dishes: [{ id: "d4", name: "Avo Smash", description: "Smashed avocado on sourdough with poached eggs", thumbnailUrl: "https://images.unsplash.com/photo-1541519227354-08fa5d50c44d?q=80&w=500&auto=format&fit=crop" }]
-  },
-  {
-    name: "Sushi Train Express",
-    cuisine: "Japanese",
-    priceLevel: "$$",
-    distance: "0.6 km",
-    isOpen: true,
-    address: "99 Mooloolaba Esplanade, QLD",
-    googleMapsUrl: "https://maps.google.com/?q=Sushi+Train+Mooloolaba",
-    website: "",
-    isSubscribed: false,
-    reviewSnippets: [
-      "Fresh sushi at great prices! The salmon nigiri melts in your mouth.",
-      "Fun for the whole family. Kids love watching the train go by.",
-      "Quick, tasty, and affordable. Our go-to for a casual dinner."
-    ],
-    mainPhotoUrl: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?q=80&w=1170&auto=format&fit=crop",
-    dishes: [{ id: "d5", name: "Salmon Nigiri", description: "Fresh Atlantic salmon on seasoned rice", thumbnailUrl: "https://images.unsplash.com/photo-1553621042-f6e147245754?q=80&w=500&auto=format&fit=crop" }]
-  }
-];
+import { getAllRestaurants, hasSupabaseData } from "./supabaseService";
+import { searchNearbyRestaurants as searchGooglePlaces, getPlaceDetails } from "./googlePlacesProxy";
 
 export async function getNearbyRestaurants(
   location: UserLocation, 
@@ -121,41 +9,72 @@ export async function getNearbyRestaurants(
 ): Promise<Restaurant[]> {
   console.log('[LocalBites] Fetching restaurants for:', location.name);
   
-  // Try to fetch from Supabase first
+  // 1. First, get partner restaurants from Supabase (they have priority)
+  let partnerRestaurants: Restaurant[] = [];
   try {
     const hasData = await hasSupabaseData();
     if (hasData) {
-      console.log('[LocalBites] Using Supabase data');
-      let results = await getRestaurantsFromSupabase();
-      
-      if (filters?.cuisine && filters.cuisine !== 'All') {
-        results = results.filter(r => 
-          r.cuisine.toLowerCase().includes(filters.cuisine!.toLowerCase())
-        );
-      }
-
-      if (filters?.price) {
-        results = results.filter(r => r.priceLevel === filters.price);
-      }
-
-      if (results.length > 0) {
-        console.log('[LocalBites] Returning', results.length, 'restaurants from Supabase');
-        return results;
-      }
+      console.log('[LocalBites] Loading partner restaurants from Supabase');
+      partnerRestaurants = await getAllRestaurants();
+      console.log('[LocalBites] Found', partnerRestaurants.length, 'partner restaurants');
     }
   } catch (error) {
-    console.error('[LocalBites] Supabase error, falling back to demo data:', error);
+    console.error('[LocalBites] Supabase error:', error);
   }
 
-  // Fallback to demo data
-  console.log('[LocalBites] Using demo data');
-  await new Promise(resolve => setTimeout(resolve, 800));
+  // 2. Then, get Google Places restaurants
+  let googleRestaurants: Restaurant[] = [];
+  if (location.lat && location.lng) {
+    try {
+      const radius = location.radius || 5000; // Default 5km
+      console.log('[LocalBites] Searching Google Places with radius:', radius / 1000, 'km');
+      const googlePlaces = await searchGooglePlaces(location.lat, location.lng, radius);
+      
+      // Convert Google Places to Restaurant format
+      googleRestaurants = googlePlaces.map(place => ({
+        id: place.id,
+        name: place.name,
+        cuisine: place.cuisine,
+        priceLevel: place.priceLevel,
+        distance: place.distance,
+        isOpen: place.isOpen ?? true,
+        rating: place.rating,
+        totalReviews: place.totalReviews,
+        address: place.address,
+        phone: place.phone,
+        website: place.website,
+        googleMapsUrl: place.googleMapsUrl,
+        mainPhotoUrl: place.photoUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800',
+        isSubscribed: false, // Google restaurants don't have video content
+        dishes: [],
+        reviews: [],
+      }));
+      
+      console.log('[LocalBites] Found', googleRestaurants.length, 'Google restaurants');
+    } catch (error) {
+      console.error('[LocalBites] Google Places error:', error);
+    }
+  }
 
-  let results = DEMO_RESTAURANTS.map((r, i) => ({
-    ...r,
-    id: `res-${i}-${Date.now()}`
-  }));
+  // 3. Merge results: Partners first, then Google (avoiding duplicates)
+  const partnerNames = new Set(partnerRestaurants.map(r => r.name.toLowerCase()));
+  const filteredGoogleRestaurants = googleRestaurants.filter(
+    r => !partnerNames.has(r.name.toLowerCase())
+  );
 
+  let results = [...partnerRestaurants, ...filteredGoogleRestaurants];
+
+  // 4. Sort by distance (closest first)
+  results.sort((a, b) => {
+    const distA = parseFloat(a.distance.replace(/[^\d.]/g, '')) || 0;
+    const distB = parseFloat(b.distance.replace(/[^\d.]/g, '')) || 0;
+    // Convert km to m if needed for comparison
+    const distAMeters = a.distance.includes('km') ? distA * 1000 : distA;
+    const distBMeters = b.distance.includes('km') ? distB * 1000 : distB;
+    return distAMeters - distBMeters;
+  });
+
+  // 5. Apply filters
   if (filters?.cuisine && filters.cuisine !== 'All') {
     results = results.filter(r => 
       r.cuisine.toLowerCase().includes(filters.cuisine!.toLowerCase())
@@ -166,13 +85,58 @@ export async function getNearbyRestaurants(
     results = results.filter(r => r.priceLevel === filters.price);
   }
 
-  if (results.length === 0) {
-    results = DEMO_RESTAURANTS.slice(0, 3).map((r, i) => ({
-      ...r,
-      id: `res-fallback-${i}-${Date.now()}`
-    }));
+  if (filters?.openNow) {
+    results = results.filter(r => r.isOpen);
   }
 
-  console.log('[LocalBites] Returning', results.length, 'restaurants');
+  // 6. No fallback to demo data - only show real results
+  if (results.length === 0) {
+    console.log('[LocalBites] No results found');
+  }
+
+  console.log('[LocalBites] Returning', results.length, 'total restaurants');
   return results;
+}
+
+// Fetch detailed info for a specific restaurant (with reviews)
+export async function getRestaurantDetails(placeId: string): Promise<Restaurant | null> {
+  try {
+    const details = await getPlaceDetails(placeId);
+    if (!details) return null;
+
+    return {
+      id: details.place.id,
+      name: details.place.name,
+      cuisine: details.place.cuisine,
+      priceLevel: details.place.priceLevel,
+      distance: details.place.distance,
+      isOpen: details.place.isOpen ?? true,
+      rating: details.place.rating,
+      totalReviews: details.place.totalReviews,
+      address: details.place.address,
+      phone: details.place.phone,
+      website: details.place.website,
+      googleMapsUrl: details.place.googleMapsUrl,
+      mainPhotoUrl: details.place.photoUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800',
+      isSubscribed: false,
+      dishes: details.photos.map((url, i) => ({
+        id: `photo-${i}`,
+        name: `Photo ${i + 1}`,
+        thumbnailUrl: url,
+      })),
+      reviews: details.reviews.map((r, i) => ({
+        id: `review-${i}`,
+        authorName: r.authorName,
+        authorPhotoUrl: r.authorPhotoUrl,
+        rating: r.rating,
+        text: r.text,
+        relativeTimeDescription: r.relativeTimeDescription,
+        time: r.time,
+        photoUrl: undefined,
+      })),
+    };
+  } catch (error) {
+    console.error('[LocalBites] Error getting restaurant details:', error);
+    return null;
+  }
 }

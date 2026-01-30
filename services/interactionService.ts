@@ -197,6 +197,52 @@ export const getAllRestaurantStats = async (restaurantIds: string[]): Promise<Ma
   }
 };
 
+// Get likes count for a restaurant directly from likes table
+export const getLikesCount = async (restaurantId: string): Promise<number> => {
+  try {
+    const { count, error } = await supabase
+      .from('likes')
+      .select('*', { count: 'exact', head: true })
+      .eq('restaurant_id', restaurantId);
+
+    if (error) {
+      console.error('Get likes count error:', error);
+      return 0;
+    }
+    return count || 0;
+  } catch (error) {
+    console.error('Get likes count error:', error);
+    return 0;
+  }
+};
+
+// Get all likes counts at once
+export const getAllLikesCounts = async (restaurantIds: string[]): Promise<Map<string, number>> => {
+  try {
+    const { data, error } = await supabase
+      .from('likes')
+      .select('restaurant_id')
+      .in('restaurant_id', restaurantIds);
+
+    if (error) {
+      console.error('Get all likes counts error:', error);
+      return new Map();
+    }
+
+    // Count likes per restaurant
+    const countsMap = new Map<string, number>();
+    restaurantIds.forEach(id => countsMap.set(id, 0));
+    data?.forEach(like => {
+      const current = countsMap.get(like.restaurant_id) || 0;
+      countsMap.set(like.restaurant_id, current + 1);
+    });
+    return countsMap;
+  } catch (error) {
+    console.error('Get all likes counts error:', error);
+    return new Map();
+  }
+};
+
 // Track view (for analytics)
 export const trackView = async (restaurantId: string): Promise<void> => {
   try {

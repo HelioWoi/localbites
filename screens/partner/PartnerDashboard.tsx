@@ -3,7 +3,7 @@ import {
   LogOut, Plus, Play, Trash2, Eye, Heart, MapPin,
   Loader2, X, Upload, Check, Settings, BarChart3,
   Video, Crown, AlertCircle, ChevronRight, Calendar,
-  TrendingUp, Clock, Edit2, Save, QrCode, Copy, ExternalLink, Menu
+  TrendingUp, Clock, Edit2, Save, QrCode, Copy, ExternalLink, Menu, Camera, Image
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { PartnerUser } from './PartnerPortal';
@@ -40,7 +40,9 @@ interface PartnerData {
   slug?: string;
   cuisine?: string;
   address?: string;
+  phone?: string;
   logo_url?: string;
+  photo_url?: string;
   website?: string;
 }
 
@@ -75,25 +77,30 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const [newCategory, setNewCategory] = useState('');
   
   // Upload state
-  const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
-  const [dishName, setDishName] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Video preview state
+  const [previewVideo, setPreviewVideo] = useState<string | null>(null);
 
   // Settings state
   const [editingRestaurant, setEditingRestaurant] = useState(false);
-  const [restaurantForm, setRestaurantForm] = useState({ name: '', cuisine: '', address: '' });
+  const [restaurantForm, setRestaurantForm] = useState({ name: '', cuisine: '', address: '', phone: '', website: '' });
+  
+  // Photo upload state
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   // Trial calculation
   const trialDaysLeft = user.trial_ends_at 
     ? Math.max(0, Math.ceil((new Date(user.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
   const isTrialActive = user.plan === 'trial' && trialDaysLeft > 0;
-  const maxVideos = user.plan === 'pro' ? 5 : 2;
+  const maxVideos = user.plan === 'pro' ? Infinity : 5;
 
   useEffect(() => {
     console.log('PartnerDashboard mounted, loading data...');
@@ -112,19 +119,48 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
       console.log('Partner loaded:', partner, partnerError);
 
-      if (partner) {
-        setPartnerData(partner);
+      let currentPartner = partner;
+
+      // If no partner exists, create one
+      if (!currentPartner) {
+        console.log('No partner found, creating one...');
+        const trialEnds = new Date();
+        trialEnds.setDate(trialEnds.getDate() + 14);
+
+        const { data: newPartner, error: createError } = await supabase
+          .from('partners')
+          .insert({
+            user_id: user.id,
+            email: user.email,
+            plan: 'trial',
+            trial_ends_at: trialEnds.toISOString(),
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Error creating partner:', createError);
+        } else {
+          console.log('Partner created:', newPartner);
+          currentPartner = newPartner;
+        }
+      }
+
+      if (currentPartner) {
+        setPartnerData(currentPartner);
         setRestaurantForm({ 
-          name: partner.restaurant_name || '', 
-          cuisine: partner.cuisine || '', 
-          address: partner.address || '' 
+          name: currentPartner.restaurant_name || '', 
+          cuisine: currentPartner.cuisine || '', 
+          address: currentPartner.address || '',
+          phone: currentPartner.phone || '',
+          website: currentPartner.website || ''
         });
 
         // Load menu items
         const { data: items, error: itemsError } = await supabase
           .from('menu_items')
           .select('*')
-          .eq('partner_id', partner.id)
+          .eq('partner_id', currentPartner.id)
           .order('category')
           .order('sort_order');
 
@@ -254,16 +290,31 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     if (!partnerData) return;
 
     try {
-      await supabase
+      // Generate slug from restaurant name
+      const slug = restaurantForm.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+
+      const { error } = await supabase
         .from('partners')
         .update({
           restaurant_name: restaurantForm.name,
           cuisine: restaurantForm.cuisine,
           address: restaurantForm.address,
+          phone: restaurantForm.phone,
+          website: restaurantForm.website,
+          slug: slug,
         })
         .eq('id', partnerData.id);
 
-      setPartnerData({ ...partnerData, restaurant_name: restaurantForm.name, cuisine: restaurantForm.cuisine, address: restaurantForm.address });
+      if (error) {
+        console.error('Save error:', error);
+        alert('Error saving: ' + error.message);
+        return;
+      }
+
+      setPartnerData({ ...partnerData, restaurant_name: restaurantForm.name, cuisine: restaurantForm.cuisine, address: restaurantForm.address, phone: restaurantForm.phone, website: restaurantForm.website, slug });
       setEditingRestaurant(false);
     } catch (error) {
       console.error('Save error:', error);
@@ -357,6 +408,55 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     }
   };
 
+  // Photo upload handler
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !partnerData) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    // Validate file size (2MB max)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Image must be less than 2MB');
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+
+    try {
+      const fileName = `${partnerData.id}/photo-${Date.now()}.${file.name.split('.').pop()}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('menu-videos')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('menu-videos')
+        .getPublicUrl(fileName);
+
+      // Update partner with photo URL
+      const { error: updateError } = await supabase
+        .from('partners')
+        .update({ photo_url: publicUrl })
+        .eq('id', partnerData.id);
+
+      if (updateError) throw updateError;
+
+      setPartnerData({ ...partnerData, photo_url: publicUrl });
+    } catch (error: any) {
+      console.error('Photo upload error:', error);
+      alert('Upload failed: ' + error.message);
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
   const copyMenuLink = () => {
     if (partnerData?.slug) {
       const url = `${window.location.origin}/r/${partnerData.slug}`;
@@ -374,7 +474,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50">
+    <div className="min-h-screen bg-zinc-50 partner-portal">
       {/* Header */}
       <header className="bg-white border-b border-zinc-200 sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
@@ -383,9 +483,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
                 <span className="text-white text-xs font-bold">LB</span>
               </div>
-              <div className="hidden sm:block">
-                <p className="text-sm font-semibold text-zinc-900">{restaurant?.name || 'Your Restaurant'}</p>
-                <p className="text-xs text-zinc-500">{restaurant?.cuisine || 'Partner Portal'}</p>
+              <div>
+                <p className="text-sm font-semibold text-zinc-900">
+                  Welcome, {user.email?.split('@')[0] || 'Partner'}
+                </p>
+                <p className="text-xs text-zinc-500">{partnerData?.restaurant_name || 'Partner Portal'}</p>
               </div>
             </div>
 
@@ -472,7 +574,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       </div>
 
       {/* Content */}
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 pb-20">
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
@@ -526,19 +628,23 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-zinc-900">Your Videos</h3>
                 <button
-                  onClick={() => setActiveTab('videos')}
+                  onClick={() => setActiveTab('menu')}
                   className="text-xs text-orange-500 font-semibold flex items-center gap-1 hover:underline"
                 >
                   View all <ChevronRight size={14} />
                 </button>
               </div>
-              {videos.length > 0 ? (
+              {menuItems.length > 0 ? (
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                  {videos.slice(0, 4).map((video) => (
-                    <div key={video.id} className="relative aspect-square bg-zinc-100 rounded-lg overflow-hidden">
-                      <video src={video.video_url} className="w-full h-full object-cover" />
+                  {menuItems.slice(0, 4).map((item) => (
+                    <div 
+                      key={item.id} 
+                      className="relative aspect-square bg-zinc-100 rounded-lg overflow-hidden cursor-pointer"
+                      onClick={() => setPreviewVideo(item.video_url)}
+                    >
+                      <video src={item.video_url} className="w-full h-full object-cover" muted />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-2">
-                        <p className="text-white text-xs font-medium truncate">{video.name}</p>
+                        <p className="text-white text-xs font-medium truncate">{item.name}</p>
                       </div>
                       <div className="absolute top-2 left-2 w-6 h-6 bg-black/40 rounded-full flex items-center justify-center">
                         <Play size={10} className="text-white" fill="currentColor" />
@@ -566,33 +672,36 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         {activeTab === 'menu' && (
           <div className="space-y-6">
             {/* QR Code Link Section */}
-            <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl p-6 text-white">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-lg font-bold mb-1">Your Menu Link</h2>
-                  <p className="text-white/80 text-sm mb-4">Share this link or QR code with your customers</p>
+            <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl p-5 text-white">
+              <div className="flex items-start gap-4">
+                {/* QR Code - Left */}
+                <div className="w-20 h-20 bg-white rounded-xl flex items-center justify-center flex-shrink-0">
+                  <QrCode size={52} className="text-orange-500" />
+                </div>
+                
+                {/* Content - Right */}
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-base font-bold mb-1">Your Menu Link</h2>
+                  <p className="text-white/80 text-xs mb-3">Share this link or QR code with your customers</p>
                   {partnerData?.slug ? (
                     <div className="flex items-center gap-2">
-                      <code className="bg-white/20 px-3 py-2 rounded-lg text-sm font-mono">
+                      <code className="bg-white/20 px-2 py-1.5 rounded-lg text-xs font-mono truncate flex-1">
                         {window.location.origin}/r/{partnerData.slug}
                       </code>
-                      <button onClick={copyMenuLink} className="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors">
-                        <Copy size={16} />
+                      <button onClick={copyMenuLink} className="p-1.5 bg-white/20 rounded-lg hover:bg-white/30 transition-colors flex-shrink-0">
+                        <Copy size={14} />
                       </button>
                       <a 
                         href={`/r/${partnerData.slug}`} 
                         target="_blank" 
-                        className="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
+                        className="p-1.5 bg-white/20 rounded-lg hover:bg-white/30 transition-colors flex-shrink-0"
                       >
-                        <ExternalLink size={16} />
+                        <ExternalLink size={14} />
                       </a>
                     </div>
                   ) : (
-                    <p className="text-white/60 text-sm">Save your restaurant name in Settings to get your link</p>
+                    <p className="text-white/60 text-xs">Save your restaurant name in Settings to get your link</p>
                   )}
-                </div>
-                <div className="w-20 h-20 bg-white rounded-xl flex items-center justify-center">
-                  <QrCode size={48} className="text-orange-500" />
                 </div>
               </div>
             </div>
@@ -624,16 +733,22 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                     <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
                       {menuItems.filter(i => i.category === category).map(item => (
                         <div key={item.id} className="relative group">
-                          <div className="aspect-[9/16] bg-zinc-100 rounded-xl overflow-hidden">
-                            <video src={item.video_url} className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <button
-                                onClick={() => handleDeleteMenuItem(item.id)}
-                                className="p-2 bg-red-500 rounded-full text-white hover:bg-red-600"
-                              >
-                                <Trash2 size={16} />
-                              </button>
+                          <div 
+                            className="aspect-[9/16] bg-zinc-100 rounded-xl overflow-hidden cursor-pointer"
+                            onClick={() => setPreviewVideo(item.video_url)}
+                          >
+                            <video src={item.video_url} className="w-full h-full object-cover" muted />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-12 h-12 bg-black/50 rounded-full flex items-center justify-center">
+                                <Play size={20} className="text-white ml-1" fill="white" />
+                              </div>
                             </div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteMenuItem(item.id); }}
+                              className="absolute top-2 right-2 p-2 bg-red-500 rounded-full text-white hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                             <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
                               <p className="text-white font-semibold text-sm truncate">{item.name}</p>
                               {item.price && <p className="text-white/70 text-xs">${item.price.toFixed(2)}</p>}
@@ -733,21 +848,53 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             <div className="bg-white rounded-xl border border-zinc-200 p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-zinc-900">Restaurant Information</h3>
-                {!editingRestaurant ? (
+                {!editingRestaurant && (
                   <button
                     onClick={() => setEditingRestaurant(true)}
                     className="text-xs text-orange-500 font-semibold flex items-center gap-1 hover:underline"
                   >
                     <Edit2 size={12} /> Edit
                   </button>
-                ) : (
-                  <button
-                    onClick={handleSaveRestaurant}
-                    className="text-xs text-emerald-600 font-semibold flex items-center gap-1 hover:underline"
-                  >
-                    <Save size={12} /> Save
-                  </button>
                 )}
+              </div>
+
+              {/* Restaurant Photo */}
+              <div className="mb-6">
+                <label className="block text-xs font-medium text-zinc-500 mb-2">Restaurant Photo</label>
+                <div className="flex items-center gap-4">
+                  <div className="relative w-24 h-24 bg-zinc-100 rounded-xl overflow-hidden flex-shrink-0">
+                    {partnerData?.photo_url ? (
+                      <img src={partnerData.photo_url} alt="Restaurant" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Image size={32} className="text-zinc-300" />
+                      </div>
+                    )}
+                    {isUploadingPhoto && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <Loader2 size={24} className="text-white animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => photoInputRef.current?.click()}
+                      disabled={isUploadingPhoto}
+                      className="px-4 py-2 bg-zinc-100 text-zinc-700 text-sm font-medium rounded-lg hover:bg-zinc-200 transition-colors flex items-center gap-2"
+                    >
+                      <Camera size={16} />
+                      {partnerData?.photo_url ? 'Change Photo' : 'Upload Photo'}
+                    </button>
+                    <p className="text-xs text-zinc-400 mt-1">Max 2MB. JPG, PNG</p>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-4">
@@ -761,7 +908,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                       className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
                   ) : (
-                    <p className="text-sm text-zinc-900">{restaurant?.name || '-'}</p>
+                    <p className="text-sm text-zinc-900">{partnerData?.restaurant_name || '-'}</p>
                   )}
                 </div>
                 <div>
@@ -774,7 +921,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                       className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
                   ) : (
-                    <p className="text-sm text-zinc-900">{restaurant?.cuisine || '-'}</p>
+                    <p className="text-sm text-zinc-900">{partnerData?.cuisine || '-'}</p>
                   )}
                 </div>
                 <div>
@@ -787,10 +934,57 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                       className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
                   ) : (
-                    <p className="text-sm text-zinc-900">{restaurant?.address || '-'}</p>
+                    <p className="text-sm text-zinc-900">{partnerData?.address || '-'}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1">Phone</label>
+                  {editingRestaurant ? (
+                    <input
+                      type="tel"
+                      value={restaurantForm.phone}
+                      onChange={(e) => setRestaurantForm({ ...restaurantForm, phone: e.target.value })}
+                      placeholder="+61 4XX XXX XXX"
+                      className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                  ) : (
+                    <p className="text-sm text-zinc-900">{partnerData?.phone || '-'}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1">Website</label>
+                  {editingRestaurant ? (
+                    <input
+                      type="url"
+                      value={restaurantForm.website}
+                      onChange={(e) => setRestaurantForm({ ...restaurantForm, website: e.target.value })}
+                      placeholder="https://www.example.com"
+                      className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                  ) : (
+                    <p className="text-sm text-zinc-900">{partnerData?.website || '-'}</p>
                   )}
                 </div>
               </div>
+
+              {/* Save Button */}
+              {editingRestaurant && (
+                <div className="flex gap-3 mt-6 pt-4 border-t border-zinc-100">
+                  <button
+                    onClick={() => setEditingRestaurant(false)}
+                    className="flex-1 py-3 border border-zinc-200 text-zinc-700 font-semibold rounded-xl hover:bg-zinc-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveRestaurant}
+                    className="flex-1 py-3 bg-orange-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-orange-600 transition-colors"
+                  >
+                    <Save size={18} />
+                    Save Changes
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Subscription */}
@@ -820,11 +1014,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               {/* Plan comparison */}
               <div className="mt-4 grid grid-cols-2 gap-4">
                 <div className={`p-4 rounded-lg border ${user.plan === 'trial' ? 'border-orange-200 bg-orange-50' : 'border-zinc-200'}`}>
-                  <p className="font-semibold text-zinc-900 mb-2">Trial</p>
+                  <p className="font-semibold text-zinc-900 mb-2">Free</p>
                   <ul className="text-xs text-zinc-600 space-y-1">
-                    <li>• Unlimited videos</li>
+                    <li>• Up to 5 videos</li>
                     <li>• Basic stats</li>
-                    <li>• 14 days free</li>
+                    <li>• 14 days trial</li>
                   </ul>
                 </div>
                 <div className={`p-4 rounded-lg border ${user.plan === 'pro' ? 'border-amber-300 bg-amber-50' : 'border-zinc-200'}`}>
@@ -1052,6 +1246,28 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Video Preview Modal */}
+      {previewVideo && (
+        <div 
+          className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"
+          onClick={() => setPreviewVideo(null)}
+        >
+          <button 
+            onClick={() => setPreviewVideo(null)}
+            className="absolute top-4 right-4 p-2 text-white hover:bg-white/20 rounded-full"
+          >
+            <X size={24} />
+          </button>
+          <video 
+            src={previewVideo} 
+            className="max-w-full max-h-[80vh] rounded-xl" 
+            controls 
+            autoPlay
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>

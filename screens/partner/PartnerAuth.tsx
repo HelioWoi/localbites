@@ -268,7 +268,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
             <div className="mt-6 p-4 bg-orange-50 rounded-xl border border-orange-100">
               <p className="text-sm text-orange-800 font-medium mb-2">🎉 14-day free trial includes:</p>
               <ul className="text-sm text-orange-700 space-y-1">
-                <li>• Upload up to 2 menu videos</li>
+                <li>• Upload up to 5 menu videos</li>
                 <li>• Basic analytics dashboard</li>
                 <li>• Appear in LocalBites feed</li>
                 <li>• No credit card required</li>

@@ -20,6 +20,7 @@ export interface Restaurant {
   rating?: number;
   totalReviews?: number;
   address: string;
+  phone?: string;
   website?: string;
   googleMapsUrl: string;
   dishes: Dish[];
@@ -42,6 +43,7 @@ export interface UserLocation {
   lat: number;
   lng: number;
   name?: string;
+  radius?: number; // Search radius in meters (default 5000)
 }
 
 export type AppState = 'SPLASH' | 'LOCATION_SELECTOR' | 'FEED' | 'PROFILE' | 'ADMIN' | 'FAVORITES';

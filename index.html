@@ -22,6 +22,14 @@
             overflow-y: auto !important;
             -webkit-overflow-scrolling: touch;
         }
+        .partner-portal {
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch;
+            height: 100vh;
+        }
+        .partner-portal body {
+            overflow: auto !important;
+        }
         /* Hide scrollbars */
         ::-webkit-scrollbar {
             display: none;
@@ -30,12 +38,14 @@
             scroll-snap-type: y mandatory;
             overflow-y: scroll;
             height: 100vh;
+            height: 100dvh;
             width: 100vw;
             background-color: #000000;
         }
         .snap-item {
             scroll-snap-align: start;
             height: 100vh;
+            height: 100dvh;
             width: 100vw;
             display: flex;
             align-items: center;

@@ -118,3 +118,64 @@ export async function hasSupabaseData(): Promise<boolean> {
 
   return (count || 0) > 0;
 }
+
+// Fetch partner restaurants (from partners table with menu_items)
+export async function getPartnerRestaurants(): Promise<Restaurant[]> {
+  const { data: partners, error } = await supabase
+    .from('partners')
+    .select(`
+      *,
+      menu_items (*)
+    `)
+    .not('restaurant_name', 'is', null)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching partner restaurants:', error);
+    return [];
+  }
+
+  // Transform partner data to Restaurant format
+  return (partners || [])
+    .filter(p => p.restaurant_name && p.menu_items && p.menu_items.length > 0)
+    .map(p => ({
+      id: p.id,
+      name: p.restaurant_name,
+      cuisine: p.cuisine || 'Various',
+      priceLevel: '$$',
+      rating: 4.5,
+      totalReviews: 0,
+      address: p.address || '',
+      phone: p.phone || '',
+      distance: '0.5 km',
+      mainPhotoUrl: p.photo_url || p.menu_items[0]?.video_url || '',
+      googleMapsUrl: p.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address)}` : '',
+      website: p.website || '',
+      isSubscribed: true,
+      isOpen: true,
+      isPartner: true,
+      slug: p.slug,
+      dishes: (p.menu_items || []).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description || '',
+        thumbnailUrl: item.video_url,
+        videoUrl: item.video_url,
+        price: item.price,
+        category: item.category,
+      })),
+      reviews: [],
+      reviewSnippets: [],
+    }));
+}
+
+// Get all restaurants (both regular and partner)
+export async function getAllRestaurants(): Promise<Restaurant[]> {
+  const [regularRestaurants, partnerRestaurants] = await Promise.all([
+    getRestaurantsFromSupabase(),
+    getPartnerRestaurants(),
+  ]);
+
+  // Combine and return, with partner restaurants first (they're paying!)
+  return [...partnerRestaurants, ...regularRestaurants];
+}

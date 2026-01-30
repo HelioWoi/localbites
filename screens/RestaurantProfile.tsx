@@ -1,7 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Restaurant, Dish, Review } from '../types';
-import { ChevronLeft, Globe, MapPin, Navigation, Bookmark, PlayCircle, Camera, X, Crown, Play, Pause, Volume2, VolumeX, Star, ChevronRight, ChevronUp, ExternalLink, Home, Search, MessageSquare, Filter, Clock } from 'lucide-react';
+import { ChevronLeft, Globe, MapPin, Navigation, Bookmark, PlayCircle, Camera, X, Crown, Play, Pause, Volume2, VolumeX, Star, ChevronRight, ChevronUp, ExternalLink, Home, Search, MessageSquare, Filter, Clock, Heart, Trash2, Phone } from 'lucide-react';
+import { getPlaceDetails } from '../services/googlePlacesProxy';
 
 interface RestaurantProfileProps {
   restaurant: Restaurant;
@@ -9,9 +10,24 @@ interface RestaurantProfileProps {
   isSaved: boolean;
   onToggleSave: () => void;
   openReviews?: boolean;
+  onNavigateToPartner?: () => void;
 }
 
-const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBack, isSaved, onToggleSave, openReviews = false }) => {
+// Helper to get/set saved dishes from localStorage
+const getSavedDishes = (restaurantId: string): Set<string> => {
+  try {
+    const saved = localStorage.getItem(`saved_dishes_${restaurantId}`);
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  } catch {
+    return new Set();
+  }
+};
+
+const saveDishesToStorage = (restaurantId: string, dishIds: Set<string>) => {
+  localStorage.setItem(`saved_dishes_${restaurantId}`, JSON.stringify([...dishIds]));
+};
+
+const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBack, isSaved, onToggleSave, openReviews = false, onNavigateToPartner }) => {
   const [showVideoReels, setShowVideoReels] = useState(false);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [swipeHintCounts, setSwipeHintCounts] = useState<number[]>([]);
@@ -28,12 +44,61 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   // Expandable text state
   const [expandedVideoText, setExpandedVideoText] = useState(false);
   const [expandedReviewText, setExpandedReviewText] = useState(false);
+  
+  // Saved dishes state
+  const [savedDishIds, setSavedDishIds] = useState<Set<string>>(() => getSavedDishes(restaurant.id));
+  
+  // Google reviews state (for non-partner restaurants)
+  const [googleReviews, setGoogleReviews] = useState<Review[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
 
   const dishesWithVideo = restaurant.dishes.filter(d => d.videoUrl);
+  const savedDishes = restaurant.dishes.filter(d => savedDishIds.has(d.id));
+  
+  // Load Google reviews for non-partner restaurants
+  useEffect(() => {
+    const loadGoogleReviews = async () => {
+      // Only load if it's a Google restaurant (id starts with "places/") and has no reviews
+      if (restaurant.id.startsWith('places/') && (!restaurant.reviews || restaurant.reviews.length === 0)) {
+        setLoadingReviews(true);
+        try {
+          const details = await getPlaceDetails(restaurant.id);
+          if (details?.reviews) {
+            setGoogleReviews(details.reviews.map((r, i) => ({
+              id: `google-${i}`,
+              authorName: r.authorName,
+              authorPhotoUrl: r.authorPhotoUrl,
+              rating: r.rating,
+              text: r.text,
+              relativeTimeDescription: r.relativeTimeDescription,
+              time: r.time,
+            })));
+          }
+        } catch (error) {
+          console.error('Error loading Google reviews:', error);
+        } finally {
+          setLoadingReviews(false);
+        }
+      }
+    };
+    loadGoogleReviews();
+  }, [restaurant.id]);
+  
+  // Toggle save dish
+  const toggleSaveDish = (dishId: string) => {
+    const newSaved = new Set(savedDishIds);
+    if (newSaved.has(dishId)) {
+      newSaved.delete(dishId);
+    } else {
+      newSaved.add(dishId);
+    }
+    setSavedDishIds(newSaved);
+    saveDishesToStorage(restaurant.id, newSaved);
+  };
 
-  const sortedReviews = restaurant.reviews 
-    ? [...restaurant.reviews].sort((a, b) => b.time - a.time).filter(r => r.photoUrl)
-    : [];
+  // Combine restaurant reviews with Google reviews
+  const allReviews = [...(restaurant.reviews || []), ...googleReviews];
+  const sortedReviews = allReviews.sort((a, b) => b.time - a.time);
 
   // Initialize swipe hint counts for all videos
   useEffect(() => {
@@ -99,17 +164,12 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
           {/* Header - always visible */}
           <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/60 to-transparent z-10">
             <div className="flex items-center justify-between">
-              <button onClick={() => setShowVideoReels(false)} className="p-3 bg-white/20 backdrop-blur-md rounded-2xl text-white active:scale-90 transition-transform">
+              <button onClick={() => setShowVideoReels(false)} className="p-3 bg-white/10 backdrop-blur-sm rounded-2xl text-white active:scale-90 transition-transform">
                 <X size={24} />
               </button>
-              <div className="flex items-center gap-3">
-                <div className="px-3 py-1.5 bg-white/20 backdrop-blur-md rounded-full">
-                  <span className="text-white text-xs font-bold">{activeVideoIndex + 1} / {dishesWithVideo.length}</span>
-                </div>
-                <button onClick={toggleMute} className="p-3 bg-white/20 backdrop-blur-md rounded-2xl text-white active:scale-90 transition-transform">
-                  {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
-                </button>
-              </div>
+              <button onClick={toggleMute} className="p-3 bg-white/10 backdrop-blur-sm rounded-2xl text-white active:scale-90 transition-transform">
+                {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+              </button>
             </div>
           </div>
 
@@ -131,6 +191,24 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                   muted={isMuted}
                   playsInline
                 />
+                
+                {/* Right side action buttons */}
+                <div className="absolute right-4 bottom-40 flex flex-col items-center gap-4 z-20">
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleSaveDish(dish.id);
+                    }}
+                    className="flex flex-col items-center gap-1"
+                  >
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${savedDishIds.has(dish.id) ? 'bg-orange-500' : 'bg-white/20 backdrop-blur-md'}`}>
+                      <Bookmark size={24} className={savedDishIds.has(dish.id) ? "text-white fill-white" : "text-white"} />
+                    </div>
+                    <span className="text-white text-[10px] font-medium">
+                      {savedDishIds.has(dish.id) ? 'Saved' : 'Save'}
+                    </span>
+                  </button>
+                </div>
                 
                 {/* Bottom info + expandable text like Instagram Reels */}
                 <div 
@@ -168,21 +246,6 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                   )}
                 </div>
               </div>
-            ))}
-          </div>
-
-          {/* Progress dots on right side */}
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-10">
-            {dishesWithVideo.map((_, i) => (
-              <button 
-                key={i} 
-                onClick={() => {
-                  if (videoReelsRef.current) {
-                    videoReelsRef.current.scrollTo({ top: i * window.innerHeight, behavior: 'smooth' });
-                  }
-                }}
-                className={`w-2 rounded-full transition-all ${i === activeVideoIndex ? 'bg-white h-6' : 'bg-white/40 h-2'}`} 
-              />
             ))}
           </div>
         </div>
@@ -341,7 +404,17 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                   className="relative aspect-square rounded-xl overflow-hidden bg-zinc-100 group text-left"
                   onClick={() => openVideoReels(index)}
                 >
-                  <img src={dish.thumbnailUrl || restaurant.mainPhotoUrl} className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" alt={dish.name} />
+                  {dish.videoUrl ? (
+                    <video 
+                      src={dish.videoUrl} 
+                      className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" 
+                      muted 
+                      playsInline
+                      preload="metadata"
+                    />
+                  ) : (
+                    <img src={dish.thumbnailUrl || restaurant.mainPhotoUrl} className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" alt={dish.name} />
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-2.5">
                     <p className="text-white font-semibold text-xs">{dish.name}</p>
                   </div>
@@ -352,6 +425,62 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
               ))}
             </div>
           </section>
+        )}
+
+        {/* Your Picks - Card style */}
+        {savedDishes.length > 0 && (
+          <button 
+            onClick={() => {
+              // Open reels starting from first saved dish
+              const firstSavedIndex = dishesWithVideo.findIndex(d => savedDishIds.has(d.id));
+              if (firstSavedIndex >= 0) {
+                openVideoReels(firstSavedIndex);
+              }
+            }}
+            className="w-full bg-white rounded-2xl border border-zinc-200 p-4 flex items-center justify-between active:bg-zinc-50 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <Bookmark size={20} className="text-orange-500" fill="currentColor" />
+              <span className="text-base font-bold text-zinc-900">Your Picks</span>
+              <span className="text-sm text-orange-500 font-medium">({savedDishes.length})</span>
+            </div>
+            <div className="flex items-center gap-1 text-orange-500">
+              <span className="text-xs font-semibold">See more</span>
+              <ChevronRight size={16} />
+            </div>
+          </button>
+        )}
+
+        {/* REVIEWS - Card style */}
+        {(restaurant.rating || sortedReviews.length > 0) && (
+          <button 
+            onClick={() => sortedReviews.length > 0 && setShowReviewsReel(true)}
+            className="w-full bg-white rounded-2xl border border-zinc-200 p-4 flex items-center justify-between active:bg-zinc-50 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <Star size={20} className="text-amber-500" fill="currentColor" />
+              <span className="text-base font-bold text-zinc-900">{restaurant.rating || '4.5'}</span>
+              <span className="text-sm text-zinc-400">({restaurant.totalReviews || sortedReviews.length} reviews)</span>
+            </div>
+            {sortedReviews.length > 0 && (
+              <div className="flex items-center gap-1 text-orange-500">
+                <span className="text-xs font-semibold">See more</span>
+                <ChevronRight size={16} />
+              </div>
+            )}
+          </button>
+        )}
+
+        {/* Phone - Card style */}
+        {restaurant.phone && (
+          <a 
+            href={`tel:${restaurant.phone}`}
+            className="w-full bg-white rounded-2xl border border-zinc-200 p-4 flex items-center gap-3 active:bg-zinc-50 transition-colors"
+          >
+            <Phone size={20} className="text-orange-500 flex-shrink-0" />
+            <p className="text-sm font-medium text-zinc-700 flex-1">{restaurant.phone}</p>
+            <ChevronRight size={16} className="text-zinc-400" />
+          </a>
         )}
 
         {/* Quick action buttons - Compact */}
@@ -365,28 +494,6 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
             </a>
           )}
         </div>
-
-        {/* REVIEWS - Simple row */}
-        {(restaurant.rating || sortedReviews.length > 0) && (
-          <button 
-            onClick={() => sortedReviews.length > 0 && setShowReviewsReel(true)}
-            className="w-full flex items-center justify-between py-3 active:opacity-70 transition-opacity"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1">
-                <Star size={16} className="text-amber-500" fill="currentColor" />
-                <span className="text-base font-bold text-zinc-900">{restaurant.rating || '4.5'}</span>
-              </div>
-              <span className="text-zinc-400 text-sm">({restaurant.totalReviews || sortedReviews.length} reviews)</span>
-            </div>
-            {sortedReviews.length > 0 && (
-              <div className="flex items-center gap-1 text-orange-500">
-                <span className="text-xs font-semibold">View photos</span>
-                <ChevronRight size={16} />
-              </div>
-            )}
-          </button>
-        )}
 
         {/* Non-subscriber menu preview */}
         {!restaurant.isSubscribed && (
@@ -417,7 +524,10 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                 <div>
                   <p className="text-orange-900 font-bold text-sm mb-1">Own this restaurant?</p>
                   <p className="text-orange-700 text-xs mb-3">Add videos and attract more customers.</p>
-                  <button className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-[9px] uppercase tracking-widest rounded-lg active:scale-95 transition-transform">
+                  <button 
+                    onClick={() => onNavigateToPartner?.()}
+                    className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-[9px] uppercase tracking-widest rounded-lg active:scale-95 transition-transform"
+                  >
                     Become a Partner →
                   </button>
                 </div>
@@ -426,12 +536,13 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
           </section>
         )}
 
-        {/* Location */}
-        <div className="bg-zinc-50 rounded-2xl p-4 flex items-center gap-3">
-          <MapPin size={20} className="text-orange-500 shrink-0" />
-          <p className="text-sm font-medium text-zinc-700">{restaurant.address}</p>
+        {/* Disclaimer */}
+        <div className="py-4 px-2">
+          <p className="text-[10px] text-zinc-400 text-center leading-relaxed">
+            LocalBites is an independent discovery platform. We do not represent, endorse, or guarantee any restaurant. All information is provided for convenience only. Please verify details directly with the establishment.
+          </p>
         </div>
-        
+
         {/* Spacer for bottom nav */}
         <div className="h-24" />
       </div>
@@ -446,14 +557,14 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
             <Search size={24} />
           </button>
           <button onClick={() => setShowReviewsReel(true)} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
-            <MessageSquare size={24} />
+            <img src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon%20review.png" alt="Reviews" className="w-6 h-6 opacity-60 hover:opacity-100" />
           </button>
           <button className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
             <Filter size={24} />
           </button>
-          <div className="px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 bg-green-500 text-white">
+          <div className={`px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 ${restaurant.isOpen ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
             <Clock size={14} />
-            OPEN
+            {restaurant.isOpen ? 'OPEN' : 'CLOSED'}
           </div>
         </div>
       </div>

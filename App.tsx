@@ -10,7 +10,7 @@ import RestaurantMenuLoader from './components/RestaurantMenuLoader';
 import MediaContainer from './components/MediaContainer';
 import FloatingFilters from './components/FloatingFilters';
 import { getNearbyRestaurants } from './services/geminiService';
-import { likeRestaurant, unlikeRestaurant, saveRestaurant, unsaveRestaurant, getUserLikes, getUserSaves } from './services/interactionService';
+import { likeRestaurant, unlikeRestaurant, saveRestaurant, unsaveRestaurant, getUserLikes, getUserSaves, getAllLikesCounts } from './services/interactionService';
 import { CUISINES, PRICES } from './constants';
 import { Home, Search, MessageSquare, Filter, Bookmark, ExternalLink, Info, Loader2, X, ArrowRight, Globe, MapPin, ChevronUp, Crown, PlayCircle, Heart, Star, Clock } from 'lucide-react';
 
@@ -51,6 +51,7 @@ const App: React.FC = () => {
   const [showReviewsFeed, setShowReviewsFeed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [openProfileReviews, setOpenProfileReviews] = useState(false);
+  const [likesCounts, setLikesCounts] = useState<Map<string, number>>(new Map());
   const lastTapRef = useRef<{ id: string; time: number } | null>(null);
   
   const feedRef = useRef<HTMLDivElement>(null);
@@ -104,6 +105,13 @@ const App: React.FC = () => {
       setRestaurants(data);
       setActiveRestaurantIndex(0);
       if (feedRef.current) feedRef.current.scrollTo({ top: 0 });
+      
+      // Load likes counts for all restaurants
+      if (data.length > 0) {
+        const ids = data.map(r => r.id);
+        const counts = await getAllLikesCounts(ids);
+        setLikesCounts(counts);
+      }
     } catch (e: any) {
       const message = typeof e?.message === 'string' && e.message.trim().length > 0
         ? e.message
@@ -161,6 +169,7 @@ const App: React.FC = () => {
            setSavedIds(next);
         }}
         openReviews={openProfileReviews}
+        onNavigateToPartner={() => setState('ADMIN')}
       />
     );
   }
@@ -183,7 +192,7 @@ const App: React.FC = () => {
                <span className="text-[10px] font-black text-white">LB</span>
             </button>
             <div className="flex flex-col">
-              <span className="text-[8px] font-bold text-white/50 uppercase tracking-widest">Near</span>
+              <span className="text-[8px] font-bold text-white/50 uppercase tracking-widest">Within 5km</span>
               <span className="text-sm font-bold text-white leading-none">{location?.name || 'Your Area'}</span>
             </div>
           </div>
@@ -206,7 +215,7 @@ const App: React.FC = () => {
             <Search size={24} />
           </button>
           <button onClick={() => setShowReviewsFeed(true)} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
-            <MessageSquare size={24} />
+            <img src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon%20review.png" alt="Reviews" className="w-6 h-6 opacity-60 hover:opacity-100" />
           </button>
           <button onClick={() => setShowFilterModal('cuisine')} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
             <Filter size={24} />
@@ -353,20 +362,27 @@ const App: React.FC = () => {
                       onClick={async (e) => {
                         e.stopPropagation();
                         const next = new Set(likedIds);
+                        const newCounts = new Map(likesCounts);
+                        const currentCount = newCounts.get(res.id) || 0;
+                        
                         if (next.has(res.id)) {
                           next.delete(res.id);
                           setLikedIds(next);
+                          newCounts.set(res.id, Math.max(0, currentCount - 1));
+                          setLikesCounts(newCounts);
                           await unlikeRestaurant(res.id);
                         } else {
                           next.add(res.id);
                           setLikedIds(next);
+                          newCounts.set(res.id, currentCount + 1);
+                          setLikesCounts(newCounts);
                           await likeRestaurant(res.id);
                         }
                       }}
                       className="flex flex-col items-center gap-1"
                     >
                       <Heart size={28} className={likedIds.has(res.id) ? "text-red-500 fill-red-500" : "text-white"} />
-                      <span className="text-white text-xs font-bold">{res.totalReviews ? Math.floor(res.totalReviews * 8.2) + (likedIds.has(res.id) ? 1 : 0) : 0}</span>
+                      <span className="text-white text-xs font-bold">{likesCounts.get(res.id) || 0}</span>
                     </button>
                     
                     {/* Reviews button with count - opens restaurant reviews */}
@@ -379,7 +395,7 @@ const App: React.FC = () => {
                       }}
                       className="flex flex-col items-center gap-1"
                     >
-                      <img src="/media/icon review.png" alt="Reviews" className="w-7 h-7" />
+                      <img src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon%20review.png" alt="Reviews" className="w-7 h-7" />
                       <span className="text-white text-xs font-bold">{res.totalReviews || 0}</span>
                     </button>
                     
