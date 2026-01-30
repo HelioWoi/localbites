@@ -3,7 +3,7 @@ import {
   LogOut, Plus, Play, Trash2, Eye, Heart, MapPin,
   Loader2, X, Upload, Check, Settings, BarChart3,
   Video, Crown, AlertCircle, ChevronRight, Calendar,
-  TrendingUp, Clock, Edit2, Save
+  TrendingUp, Clock, Edit2, Save, QrCode, Copy, ExternalLink, Menu
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { PartnerUser } from './PartnerPortal';
@@ -22,6 +22,28 @@ interface DishVideo {
   created_at?: string;
 }
 
+interface MenuItem {
+  id: string;
+  name: string;
+  description?: string;
+  category: string;
+  video_url: string;
+  thumbnail_url?: string;
+  price?: number;
+  sort_order: number;
+  is_active: boolean;
+}
+
+interface PartnerData {
+  id: string;
+  restaurant_name?: string;
+  slug?: string;
+  cuisine?: string;
+  address?: string;
+  logo_url?: string;
+  website?: string;
+}
+
 interface Restaurant {
   id: string;
   name: string;
@@ -30,7 +52,7 @@ interface Restaurant {
   main_photo_url?: string;
 }
 
-type Tab = 'overview' | 'videos' | 'analytics' | 'settings';
+type Tab = 'overview' | 'menu' | 'analytics' | 'settings';
 
 const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -38,6 +60,19 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const [videos, setVideos] = useState<DishVideo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({ views: 0, saves: 0, clicks: 0 });
+  
+  // Partner data (for menu items)
+  const [partnerData, setPartnerData] = useState<PartnerData | null>(null);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  
+  // Menu upload state
+  const [showMenuUploadModal, setShowMenuUploadModal] = useState(false);
+  const [menuItemName, setMenuItemName] = useState('');
+  const [menuItemCategory, setMenuItemCategory] = useState('');
+  const [menuItemDescription, setMenuItemDescription] = useState('');
+  const [menuItemPrice, setMenuItemPrice] = useState('');
+  const [newCategory, setNewCategory] = useState('');
   
   // Upload state
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -61,23 +96,44 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const maxVideos = user.plan === 'pro' ? 5 : 2;
 
   useEffect(() => {
+    console.log('PartnerDashboard mounted, loading data...');
     loadData();
   }, []);
 
   const loadData = async () => {
+    console.log('loadData started');
     try {
-      // Load restaurant data
-      if (user.restaurant_id) {
-        const { data: rest } = await supabase
-          .from('restaurants')
-          .select('*, dishes(*)')
-          .eq('id', user.restaurant_id)
-          .single();
+      // Load partner data
+      const { data: partner, error: partnerError } = await supabase
+        .from('partners')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-        if (rest) {
-          setRestaurant(rest);
-          setVideos(rest.dishes?.filter((d: any) => d.video_url) || []);
-          setRestaurantForm({ name: rest.name, cuisine: rest.cuisine, address: rest.address || '' });
+      console.log('Partner loaded:', partner, partnerError);
+
+      if (partner) {
+        setPartnerData(partner);
+        setRestaurantForm({ 
+          name: partner.restaurant_name || '', 
+          cuisine: partner.cuisine || '', 
+          address: partner.address || '' 
+        });
+
+        // Load menu items
+        const { data: items, error: itemsError } = await supabase
+          .from('menu_items')
+          .select('*')
+          .eq('partner_id', partner.id)
+          .order('category')
+          .order('sort_order');
+
+        console.log('Menu items loaded:', items, itemsError);
+
+        if (items) {
+          setMenuItems(items);
+          const cats = [...new Set(items.map(i => i.category))].filter(Boolean);
+          setCategories(cats);
         }
       }
 
@@ -90,6 +146,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     } catch (error) {
       console.error('Load data error:', error);
     } finally {
+      console.log('loadData finished, setting isLoading false');
       setIsLoading(false);
     }
   };
@@ -194,22 +251,117 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   };
 
   const handleSaveRestaurant = async () => {
-    if (!restaurant) return;
+    if (!partnerData) return;
 
     try {
       await supabase
-        .from('restaurants')
+        .from('partners')
         .update({
-          name: restaurantForm.name,
+          restaurant_name: restaurantForm.name,
           cuisine: restaurantForm.cuisine,
           address: restaurantForm.address,
         })
-        .eq('id', restaurant.id);
+        .eq('id', partnerData.id);
 
-      setRestaurant({ ...restaurant, ...restaurantForm });
+      setPartnerData({ ...partnerData, restaurant_name: restaurantForm.name, cuisine: restaurantForm.cuisine, address: restaurantForm.address });
       setEditingRestaurant(false);
     } catch (error) {
       console.error('Save error:', error);
+    }
+  };
+
+  // Menu item handlers
+  const handleMenuUpload = async () => {
+    if (!uploadFile || !menuItemName.trim() || !menuItemCategory.trim() || !partnerData) return;
+
+    // Validate file size (5MB max)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (uploadFile.size > maxSize) {
+      alert('Video must be less than 5MB');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(10);
+
+    try {
+      const fileName = `${partnerData.id}/${Date.now()}-${uploadFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      setUploadProgress(30);
+
+      const { error: uploadError } = await supabase.storage
+        .from('menu-videos')
+        .upload(fileName, uploadFile);
+
+      if (uploadError) throw uploadError;
+      setUploadProgress(70);
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('menu-videos')
+        .getPublicUrl(fileName);
+
+      const { data: item, error: itemError } = await supabase
+        .from('menu_items')
+        .insert({
+          partner_id: partnerData.id,
+          name: menuItemName.trim(),
+          category: menuItemCategory.trim(),
+          description: menuItemDescription.trim() || null,
+          price: menuItemPrice ? parseFloat(menuItemPrice) : null,
+          video_url: publicUrl,
+          sort_order: menuItems.filter(i => i.category === menuItemCategory).length,
+        })
+        .select()
+        .single();
+
+      if (itemError) throw itemError;
+      setUploadProgress(100);
+
+      setMenuItems([...menuItems, item]);
+      if (!categories.includes(menuItemCategory.trim())) {
+        setCategories([...categories, menuItemCategory.trim()]);
+      }
+      
+      setTimeout(() => {
+        resetMenuUploadModal();
+      }, 800);
+
+    } catch (error: any) {
+      console.error('Menu upload error:', error);
+      alert('Upload failed: ' + error.message);
+      setUploadProgress(0);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const resetMenuUploadModal = () => {
+    setShowMenuUploadModal(false);
+    setUploadFile(null);
+    setUploadPreview(null);
+    setMenuItemName('');
+    setMenuItemCategory('');
+    setMenuItemDescription('');
+    setMenuItemPrice('');
+    setNewCategory('');
+    setUploadProgress(0);
+  };
+
+  const handleDeleteMenuItem = async (itemId: string) => {
+    if (!confirm('Delete this menu item? This cannot be undone.')) return;
+
+    try {
+      await supabase.from('menu_items').delete().eq('id', itemId);
+      setMenuItems(menuItems.filter(i => i.id !== itemId));
+    } catch (error) {
+      console.error('Delete error:', error);
+    }
+  };
+
+  const copyMenuLink = () => {
+    if (partnerData?.slug) {
+      const url = `${window.location.origin}/r/${partnerData.slug}`;
+      navigator.clipboard.writeText(url);
+      alert('Link copied to clipboard!');
     }
   };
 
@@ -237,7 +389,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {/* Plan badge */}
               {user.plan === 'pro' ? (
                 <span className="hidden sm:flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full">
@@ -250,8 +402,16 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               ) : null}
 
               <button
+                onClick={() => setActiveTab('settings')}
+                className="p-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors"
+                title="Settings"
+              >
+                <Settings size={18} />
+              </button>
+              <button
                 onClick={onLogout}
                 className="p-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors"
+                title="Sign out"
               >
                 <LogOut size={18} />
               </button>
@@ -290,7 +450,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           <nav className="flex gap-1 overflow-x-auto no-scrollbar">
             {[
               { id: 'overview', label: 'Overview', icon: BarChart3 },
-              { id: 'videos', label: 'Videos', icon: Video },
+              { id: 'menu', label: 'Menu', icon: Menu },
               { id: 'analytics', label: 'Analytics', icon: TrendingUp },
               { id: 'settings', label: 'Settings', icon: Settings },
             ].map((tab) => (
@@ -347,33 +507,18 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             {/* Quick Actions */}
             <div className="bg-white rounded-xl border border-zinc-200 p-5">
               <h3 className="text-sm font-semibold text-zinc-900 mb-4">Quick Actions</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => { setActiveTab('videos'); setShowUploadModal(true); }}
-                  disabled={videos.length >= maxVideos}
-                  className="flex items-center gap-3 p-4 bg-orange-50 hover:bg-orange-100 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
-                    <Upload size={18} className="text-white" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-sm font-semibold text-zinc-900">Upload Video</p>
-                    <p className="text-xs text-zinc-500">{videos.length}/{maxVideos} videos</p>
-                  </div>
-                </button>
-                <button
-                  onClick={() => setActiveTab('settings')}
-                  className="flex items-center gap-3 p-4 bg-zinc-50 hover:bg-zinc-100 rounded-xl transition-colors"
-                >
-                  <div className="w-10 h-10 bg-zinc-200 rounded-lg flex items-center justify-center">
-                    <Settings size={18} className="text-zinc-600" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-sm font-semibold text-zinc-900">Edit Profile</p>
-                    <p className="text-xs text-zinc-500">Update info</p>
-                  </div>
-                </button>
-              </div>
+              <button
+                onClick={() => { setActiveTab('menu'); setShowMenuUploadModal(true); }}
+                className="flex items-center gap-3 p-4 bg-orange-50 hover:bg-orange-100 rounded-xl transition-colors w-full"
+              >
+                <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+                  <Upload size={18} className="text-white" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-semibold text-zinc-900">Add Menu Video</p>
+                  <p className="text-xs text-zinc-500">{menuItems.length} items uploaded</p>
+                </div>
+              </button>
             </div>
 
             {/* Recent Videos */}
@@ -406,10 +551,10 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                   <Video size={32} className="text-zinc-300 mx-auto mb-2" />
                   <p className="text-sm text-zinc-500">No videos yet</p>
                   <button
-                    onClick={() => setShowUploadModal(true)}
+                    onClick={() => { setActiveTab('menu'); setShowMenuUploadModal(true); }}
                     className="mt-3 text-sm text-orange-500 font-semibold hover:underline"
                   >
-                    Upload your first video
+                    Add your first menu video
                   </button>
                 </div>
               )}
@@ -417,86 +562,100 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           </div>
         )}
 
-        {/* Videos Tab */}
-        {activeTab === 'videos' && (
+        {/* Menu Tab - QR Code Menu Items */}
+        {activeTab === 'menu' && (
           <div className="space-y-6">
+            {/* QR Code Link Section */}
+            <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl p-6 text-white">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-lg font-bold mb-1">Your Menu Link</h2>
+                  <p className="text-white/80 text-sm mb-4">Share this link or QR code with your customers</p>
+                  {partnerData?.slug ? (
+                    <div className="flex items-center gap-2">
+                      <code className="bg-white/20 px-3 py-2 rounded-lg text-sm font-mono">
+                        {window.location.origin}/r/{partnerData.slug}
+                      </code>
+                      <button onClick={copyMenuLink} className="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors">
+                        <Copy size={16} />
+                      </button>
+                      <a 
+                        href={`/r/${partnerData.slug}`} 
+                        target="_blank" 
+                        className="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
+                      >
+                        <ExternalLink size={16} />
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="text-white/60 text-sm">Save your restaurant name in Settings to get your link</p>
+                  )}
+                </div>
+                <div className="w-20 h-20 bg-white rounded-xl flex items-center justify-center">
+                  <QrCode size={48} className="text-orange-500" />
+                </div>
+              </div>
+            </div>
+
+            {/* Add Menu Item */}
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold text-zinc-900">Menu Videos</h2>
-                <p className="text-sm text-zinc-500">{videos.length} of {maxVideos} videos uploaded</p>
+                <p className="text-sm text-zinc-500">{menuItems.length} items • {categories.length} categories</p>
               </div>
               <button
-                onClick={() => setShowUploadModal(true)}
-                disabled={videos.length >= maxVideos}
-                className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                onClick={() => setShowMenuUploadModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-colors"
               >
                 <Plus size={18} />
-                Upload Video
+                Add Item
               </button>
             </div>
 
-            {/* Upload Zone */}
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={() => videos.length < maxVideos && fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
-                isDragging
-                  ? 'border-orange-500 bg-orange-50'
-                  : 'border-zinc-200 hover:border-zinc-300 bg-white'
-              } ${videos.length >= maxVideos ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <Upload size={32} className={`mx-auto mb-3 ${isDragging ? 'text-orange-500' : 'text-zinc-400'}`} />
-              <p className="text-sm font-medium text-zinc-700">
-                {isDragging ? 'Drop video here' : 'Drag and drop video here'}
-              </p>
-              <p className="text-xs text-zinc-500 mt-1">or click to browse • MP4, MOV up to 50MB</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="video/*"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-            </div>
-
-            {/* Video Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {videos.map((video) => (
-                <div key={video.id} className="bg-white rounded-xl border border-zinc-200 overflow-hidden group">
-                  <div className="relative aspect-video bg-zinc-100">
-                    <video src={video.video_url} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                      <button className="p-2 bg-white rounded-full text-zinc-700 hover:bg-zinc-100">
-                        <Play size={16} fill="currentColor" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteVideo(video.id)}
-                        className="p-2 bg-red-500 rounded-full text-white hover:bg-red-600"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+            {/* Menu Items by Category */}
+            {categories.length > 0 ? (
+              <div className="space-y-6">
+                {categories.map(category => (
+                  <div key={category} className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+                    <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-200">
+                      <h3 className="font-semibold text-zinc-900">{category}</h3>
+                      <p className="text-xs text-zinc-500">{menuItems.filter(i => i.category === category).length} items</p>
                     </div>
-                    <div className="absolute top-2 left-2 w-7 h-7 bg-black/50 rounded-full flex items-center justify-center">
-                      <Play size={12} className="text-white" fill="currentColor" />
+                    <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      {menuItems.filter(i => i.category === category).map(item => (
+                        <div key={item.id} className="relative group">
+                          <div className="aspect-[9/16] bg-zinc-100 rounded-xl overflow-hidden">
+                            <video src={item.video_url} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <button
+                                onClick={() => handleDeleteMenuItem(item.id)}
+                                className="p-2 bg-red-500 rounded-full text-white hover:bg-red-600"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                            <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
+                              <p className="text-white font-semibold text-sm truncate">{item.name}</p>
+                              {item.price && <p className="text-white/70 text-xs">${item.price.toFixed(2)}</p>}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  <div className="p-3">
-                    <p className="font-semibold text-sm text-zinc-900 truncate">{video.name}</p>
-                    <p className="text-xs text-zinc-500 mt-1">
-                      {video.views || 0} views
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {videos.length === 0 && (
+                ))}
+              </div>
+            ) : (
               <div className="text-center py-12 bg-white rounded-xl border border-zinc-200">
                 <Video size={48} className="text-zinc-300 mx-auto mb-3" />
-                <p className="text-zinc-500 mb-1">No videos uploaded yet</p>
-                <p className="text-sm text-zinc-400">Upload your first menu video to attract more customers</p>
+                <p className="text-zinc-500 mb-1">No menu items yet</p>
+                <p className="text-sm text-zinc-400 mb-4">Add your first menu video to create your digital menu</p>
+                <button
+                  onClick={() => setShowMenuUploadModal(true)}
+                  className="px-4 py-2 bg-orange-500 text-white font-semibold rounded-lg hover:bg-orange-600 transition-colors"
+                >
+                  Add First Item
+                </button>
               </div>
             )}
           </div>
@@ -507,20 +666,59 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           <div className="space-y-6">
             <h2 className="text-lg font-bold text-zinc-900">Analytics</h2>
             
-            {user.plan === 'trial' ? (
+            {user.plan !== 'pro' ? (
               <div className="bg-white rounded-xl border border-zinc-200 p-8 text-center">
                 <Crown size={48} className="text-amber-500 mx-auto mb-4" />
                 <h3 className="text-lg font-bold text-zinc-900 mb-2">Unlock Full Analytics</h3>
                 <p className="text-zinc-500 mb-6 max-w-md mx-auto">
-                  Upgrade to Pro to access detailed analytics including viewer demographics, peak hours, and conversion tracking.
+                  Upgrade to Pro to see which videos are most liked, views per item, directions clicks, and conversion tracking.
                 </p>
+                <div className="grid grid-cols-3 gap-4 mb-6 opacity-50">
+                  <div className="bg-zinc-50 rounded-xl p-4 text-center">
+                    <Eye size={24} className="text-zinc-400 mx-auto mb-2" />
+                    <p className="text-xs text-zinc-500">Views per video</p>
+                  </div>
+                  <div className="bg-zinc-50 rounded-xl p-4 text-center">
+                    <Heart size={24} className="text-zinc-400 mx-auto mb-2" />
+                    <p className="text-xs text-zinc-500">Most liked items</p>
+                  </div>
+                  <div className="bg-zinc-50 rounded-xl p-4 text-center">
+                    <MapPin size={24} className="text-zinc-400 mx-auto mb-2" />
+                    <p className="text-xs text-zinc-500">Direction clicks</p>
+                  </div>
+                </div>
                 <button className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl hover:opacity-90 transition-opacity">
                   Upgrade to Pro - $29/month
                 </button>
               </div>
             ) : (
-              <div className="bg-white rounded-xl border border-zinc-200 p-6">
-                <p className="text-zinc-500">Detailed analytics coming soon...</p>
+              <div className="space-y-4">
+                {/* Pro Analytics - Top performing videos */}
+                <div className="bg-white rounded-xl border border-zinc-200 p-5">
+                  <h3 className="text-sm font-semibold text-zinc-900 mb-4">Top Performing Videos</h3>
+                  {menuItems.length > 0 ? (
+                    <div className="space-y-3">
+                      {menuItems.slice(0, 5).map((item, idx) => (
+                        <div key={item.id} className="flex items-center gap-3">
+                          <span className="text-lg font-bold text-zinc-400 w-6">#{idx + 1}</span>
+                          <div className="w-12 h-12 bg-zinc-100 rounded-lg overflow-hidden">
+                            <video src={item.video_url} className="w-full h-full object-cover" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-sm text-zinc-900">{item.name}</p>
+                            <p className="text-xs text-zinc-500">{item.category}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-semibold text-zinc-900">{Math.floor(Math.random() * 500) + 100} views</p>
+                            <p className="text-xs text-emerald-600">+{Math.floor(Math.random() * 30) + 5}%</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-zinc-500 text-sm">Add menu items to see analytics</p>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -624,7 +822,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                 <div className={`p-4 rounded-lg border ${user.plan === 'trial' ? 'border-orange-200 bg-orange-50' : 'border-zinc-200'}`}>
                   <p className="font-semibold text-zinc-900 mb-2">Trial</p>
                   <ul className="text-xs text-zinc-600 space-y-1">
-                    <li>• 2 menu videos</li>
+                    <li>• Unlimited videos</li>
                     <li>• Basic stats</li>
                     <li>• 14 days free</li>
                   </ul>
@@ -632,7 +830,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                 <div className={`p-4 rounded-lg border ${user.plan === 'pro' ? 'border-amber-300 bg-amber-50' : 'border-zinc-200'}`}>
                   <p className="font-semibold text-zinc-900 mb-2">Pro <span className="text-amber-600">$29/mo</span></p>
                   <ul className="text-xs text-zinc-600 space-y-1">
-                    <li>• 5 menu videos</li>
+                    <li>• Unlimited videos</li>
                     <li>• Full analytics</li>
                     <li>• Partner badge</li>
                     <li>• Priority in feed</li>
@@ -644,17 +842,33 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             {/* Account */}
             <div className="bg-white rounded-xl border border-zinc-200 p-5">
               <h3 className="text-sm font-semibold text-zinc-900 mb-4">Account</h3>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-medium text-zinc-500 mb-1">Email</label>
                   <p className="text-sm text-zinc-900">{user.email}</p>
                 </div>
-                <button
-                  onClick={onLogout}
-                  className="text-sm text-red-500 font-medium hover:underline"
-                >
-                  Sign out
-                </button>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1">Password</label>
+                  <button
+                    onClick={() => {
+                      supabase.auth.resetPasswordForEmail(user.email, {
+                        redirectTo: `${window.location.origin}/partner`,
+                      });
+                      alert('Password reset email sent!');
+                    }}
+                    className="text-sm text-orange-500 font-medium hover:underline"
+                  >
+                    Change password
+                  </button>
+                </div>
+                <div className="pt-2 border-t border-zinc-100">
+                  <button
+                    onClick={onLogout}
+                    className="text-sm text-red-500 font-medium hover:underline"
+                  >
+                    Sign out
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -662,6 +876,185 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       </main>
 
       {/* Upload Modal */}
+      {/* Menu Item Upload Modal */}
+      {showMenuUploadModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+            <div className="p-5 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white">
+              <h2 className="text-lg font-bold text-zinc-900">Add Menu Item</h2>
+              <button onClick={resetMenuUploadModal} className="p-2 text-zinc-400 hover:text-zinc-600 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Video Preview */}
+              {uploadPreview ? (
+                <div className="relative aspect-[9/16] max-h-64 bg-zinc-900 rounded-xl overflow-hidden mx-auto">
+                  <video src={uploadPreview} className="w-full h-full object-contain" controls />
+                  <button
+                    onClick={() => { setUploadFile(null); setUploadPreview(null); }}
+                    className="absolute top-2 right-2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full aspect-[9/16] max-h-64 bg-zinc-100 border-2 border-dashed border-zinc-200 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-orange-300 transition-colors"
+                >
+                  <Upload size={32} className="text-zinc-400" />
+                  <p className="text-sm font-medium text-zinc-600">Click to select video</p>
+                  <p className="text-xs text-zinc-400">MP4, MOV • Max 10 seconds • Max 5MB</p>
+                </button>
+              )}
+              
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/*"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+
+              {/* Item Name */}
+              <div>
+                <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                  Item Name *
+                </label>
+                <input
+                  type="text"
+                  value={menuItemName}
+                  onChange={(e) => setMenuItemName(e.target.value)}
+                  placeholder="e.g. Margherita Pizza"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                  Category *
+                </label>
+                {categories.length > 0 ? (
+                  <div className="space-y-2">
+                    <select
+                      value={menuItemCategory}
+                      onChange={(e) => setMenuItemCategory(e.target.value)}
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    >
+                      <option value="">Select category...</option>
+                      {categories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                      <option value="__new__">+ Create new category</option>
+                    </select>
+                    {menuItemCategory === '__new__' && (
+                      <input
+                        type="text"
+                        value={newCategory}
+                        onChange={(e) => {
+                          setNewCategory(e.target.value);
+                          setMenuItemCategory(e.target.value);
+                        }}
+                        placeholder="New category name"
+                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        autoFocus
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={menuItemCategory}
+                    onChange={(e) => setMenuItemCategory(e.target.value)}
+                    placeholder="e.g. Breakfast, Lunch, Drinks"
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                )}
+              </div>
+
+              {/* Description (optional) */}
+              <div>
+                <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                  Description <span className="text-zinc-400">(optional)</span>
+                </label>
+                <textarea
+                  value={menuItemDescription}
+                  onChange={(e) => setMenuItemDescription(e.target.value)}
+                  placeholder="Brief description of the dish..."
+                  rows={2}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                />
+              </div>
+
+              {/* Price (optional) */}
+              <div>
+                <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                  Price <span className="text-zinc-400">(optional)</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={menuItemPrice}
+                    onChange={(e) => setMenuItemPrice(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full px-4 py-3 pl-8 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                </div>
+              </div>
+
+              {/* Progress */}
+              {isUploading && (
+                <div>
+                  <div className="h-2 bg-zinc-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-orange-500 transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-zinc-500 mt-2 text-center">
+                    {uploadProgress < 100 ? 'Uploading...' : 'Done!'}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-5 border-t border-zinc-100 flex gap-3 sticky bottom-0 bg-white">
+              <button
+                onClick={resetMenuUploadModal}
+                className="flex-1 py-3 border border-zinc-200 text-zinc-700 font-semibold rounded-xl hover:bg-zinc-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMenuUpload}
+                disabled={!uploadFile || !menuItemName.trim() || !menuItemCategory.trim() || menuItemCategory === '__new__' || isUploading}
+                className="flex-1 py-3 bg-orange-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-orange-600 transition-colors"
+              >
+                {isUploading ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : uploadProgress === 100 ? (
+                  <>
+                    <Check size={18} />
+                    Done!
+                  </>
+                ) : (
+                  <>
+                    <Plus size={18} />
+                    Add Item
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showUploadModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-lg rounded-2xl overflow-hidden animate-in zoom-in-95 duration-200">

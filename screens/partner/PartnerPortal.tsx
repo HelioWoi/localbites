@@ -32,71 +32,30 @@ const PartnerPortal: React.FC = () => {
   }, []);
 
   const checkSession = async () => {
+    console.log('Checking session...');
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('Session:', session);
       if (session?.user) {
         await loadUserData(session.user.id, session.user.email || '');
+      } else {
+        console.log('No session found');
       }
     } catch (error) {
       console.error('Session check error:', error);
     } finally {
+      console.log('Setting isLoading to false');
       setIsLoading(false);
     }
   };
 
   const loadUserData = async (userId: string, email: string) => {
-    try {
-      // Get partner profile
-      let { data: partner } = await supabase
-        .from('partners')
-        .select('*, restaurants(*)')
-        .eq('user_id', userId)
-        .single();
-
-      if (partner) {
-        setUser({
-          id: userId,
-          email,
-          restaurant_id: partner.restaurant_id,
-          restaurant_name: partner.restaurants?.name,
-          plan: partner.plan || 'trial',
-          trial_ends_at: partner.trial_ends_at,
-          subscription_status: partner.subscription_status,
-        });
-      } else {
-        // New user - create partner profile with trial
-        const trialEnds = new Date();
-        trialEnds.setDate(trialEnds.getDate() + 14);
-
-        const { data: newPartner } = await supabase
-          .from('partners')
-          .insert({
-            user_id: userId,
-            email,
-            plan: 'trial',
-            trial_ends_at: trialEnds.toISOString(),
-          })
-          .select()
-          .single();
-
-        if (newPartner) {
-          setUser({
-            id: userId,
-            email,
-            plan: 'trial',
-            trial_ends_at: newPartner.trial_ends_at,
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Load user error:', error);
-      // Still set basic user info
-      setUser({
-        id: userId,
-        email,
-        plan: 'trial',
-      });
-    }
+    // Set user immediately - partner data will be loaded in Dashboard
+    setUser({
+      id: userId,
+      email,
+      plan: 'trial',
+    });
   };
 
   const handleLogout = async () => {

@@ -74,9 +74,9 @@ const MediaContainer: React.FC<MediaContainerProps> = ({
         />
       )}
       
-      {/* Visual improvement: stronger gradients for better text legibility */}
-      <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/50 via-black/10 to-transparent pointer-events-none" />
-      <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
+      {/* Gradients igual ao Reviews Reel - preto esfumado */}
+      <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none" />
     </div>
   );
 };

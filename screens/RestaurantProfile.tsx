@@ -1,16 +1,17 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Restaurant, Dish, Review } from '../types';
-import { ChevronLeft, Globe, MapPin, Navigation, Bookmark, PlayCircle, Camera, X, Crown, Play, Pause, Volume2, VolumeX, Star, ChevronRight, ChevronUp, ExternalLink } from 'lucide-react';
+import { ChevronLeft, Globe, MapPin, Navigation, Bookmark, PlayCircle, Camera, X, Crown, Play, Pause, Volume2, VolumeX, Star, ChevronRight, ChevronUp, ExternalLink, Home, Search, MessageSquare, Filter, Clock } from 'lucide-react';
 
 interface RestaurantProfileProps {
   restaurant: Restaurant;
   onBack: () => void;
   isSaved: boolean;
   onToggleSave: () => void;
+  openReviews?: boolean;
 }
 
-const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBack, isSaved, onToggleSave }) => {
+const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBack, isSaved, onToggleSave, openReviews = false }) => {
   const [showVideoReels, setShowVideoReels] = useState(false);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [swipeHintCounts, setSwipeHintCounts] = useState<number[]>([]);
@@ -19,7 +20,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   
   // Reviews Reels state
-  const [showReviewsReel, setShowReviewsReel] = useState(false);
+  const [showReviewsReel, setShowReviewsReel] = useState(openReviews);
   const [activeReviewIndex, setActiveReviewIndex] = useState(0);
   const [reviewSwipeCount, setReviewSwipeCount] = useState(0);
   const reviewsScrollRef = useRef<HTMLDivElement>(null);
@@ -429,6 +430,31 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         <div className="bg-zinc-50 rounded-2xl p-4 flex items-center gap-3">
           <MapPin size={20} className="text-orange-500 shrink-0" />
           <p className="text-sm font-medium text-zinc-700">{restaurant.address}</p>
+        </div>
+        
+        {/* Spacer for bottom nav */}
+        <div className="h-24" />
+      </div>
+
+      {/* Fixed Bottom Navigation Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-lg border-t border-white/10 px-6 py-4 pb-8">
+        <div className="flex items-center justify-between max-w-md mx-auto">
+          <button onClick={onBack} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+            <Home size={24} />
+          </button>
+          <button className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+            <Search size={24} />
+          </button>
+          <button onClick={() => setShowReviewsReel(true)} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+            <MessageSquare size={24} />
+          </button>
+          <button className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+            <Filter size={24} />
+          </button>
+          <div className="px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 bg-green-500 text-white">
+            <Clock size={14} />
+            OPEN
+          </div>
         </div>
       </div>
     </div>

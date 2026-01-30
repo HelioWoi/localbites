@@ -48,18 +48,36 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
     setError('');
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password: password.trim(),
-        options: {
-          emailRedirectTo: `${window.location.origin}/partner`,
-        },
       });
 
       if (error) throw error;
-      setMode('sent');
+      
+      // If email confirmation is disabled, user is automatically logged in
+      if (data.user && data.session) {
+        // Create partner record
+        await supabase.from('partners').insert({
+          user_id: data.user.id,
+          email: email.trim(),
+          plan: 'trial',
+          trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+          subscription_status: 'active',
+        });
+        onAuthSuccess();
+      } else {
+        // Email confirmation required
+        setMode('sent');
+      }
     } catch (err: any) {
-      setError(err.message || 'Signup failed');
+      // If user already exists, try to login
+      if (err.message?.includes('already registered')) {
+        setError('Account already exists. Please sign in.');
+        setMode('login');
+      } else {
+        setError(err.message || 'Signup failed');
+      }
     } finally {
       setIsLoading(false);
     }

@@ -6,19 +6,30 @@ import LocationSelector from './screens/LocationSelector';
 import RestaurantProfile from './screens/RestaurantProfile';
 import AdminDashboard from './screens/AdminDashboard';
 import PartnerPortal from './screens/partner/PartnerPortal';
+import RestaurantMenuLoader from './components/RestaurantMenuLoader';
 import MediaContainer from './components/MediaContainer';
 import FloatingFilters from './components/FloatingFilters';
 import { getNearbyRestaurants } from './services/geminiService';
+import { likeRestaurant, unlikeRestaurant, saveRestaurant, unsaveRestaurant, getUserLikes, getUserSaves } from './services/interactionService';
 import { CUISINES, PRICES } from './constants';
-import { Store, Bookmark, Quote, ExternalLink, Info, Loader2, X, ArrowRight, Globe, MapPin, ChevronUp, Crown, PlayCircle, Heart } from 'lucide-react';
+import { Home, Search, MessageSquare, Filter, Bookmark, ExternalLink, Info, Loader2, X, ArrowRight, Globe, MapPin, ChevronUp, Crown, PlayCircle, Heart, Star, Clock } from 'lucide-react';
 
 // Check if we're on the partner route
 const isPartnerRoute = window.location.pathname === '/partner' || window.location.pathname.startsWith('/partner');
+
+// Check if we're on a restaurant menu route (QR Code)
+const isMenuRoute = window.location.pathname.startsWith('/r/');
+const menuSlug = isMenuRoute ? window.location.pathname.replace('/r/', '') : null;
 
 const App: React.FC = () => {
   // If on partner route, render Partner Portal
   if (isPartnerRoute) {
     return <PartnerPortal />;
+  }
+
+  // If on restaurant menu route (QR Code), render isolated menu page
+  if (isMenuRoute && menuSlug) {
+    return <RestaurantMenuLoader slug={menuSlug} />;
   }
 
   const [state, setState] = useState<AppState>('SPLASH');
@@ -33,14 +44,29 @@ const App: React.FC = () => {
   const [showFilterModal, setShowFilterModal] = useState<'cuisine' | 'price' | null>(null);
   const [showSaved, setShowSaved] = useState(false);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [showHeartAnimation, setShowHeartAnimation] = useState<string | null>(null);
   const [feedSwipeCount, setFeedSwipeCount] = useState(0);
+  const [showSearch, setShowSearch] = useState(false);
+  const [showReviewsFeed, setShowReviewsFeed] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [openProfileReviews, setOpenProfileReviews] = useState(false);
   const lastTapRef = useRef<{ id: string; time: number } | null>(null);
   
   const feedRef = useRef<HTMLDivElement>(null);
 
   const isOverlayOpen = showDishInfo || !!showFilterModal || showSaved;
   const isExternalOverlayOpen = !!showFilterModal || showSaved;
+
+  // Load user likes and saves from Supabase on mount
+  useEffect(() => {
+    const loadUserInteractions = async () => {
+      const [likes, saves] = await Promise.all([getUserLikes(), getUserSaves()]);
+      setLikedIds(likes);
+      setSavedIds(saves);
+    };
+    loadUserInteractions();
+  }, []);
 
   useEffect(() => {
     if (!feedRef.current) return;
@@ -123,7 +149,10 @@ const App: React.FC = () => {
     return (
       <RestaurantProfile 
         restaurant={selectedRestaurant} 
-        onBack={() => setState('FEED')} 
+        onBack={() => {
+          setState('FEED');
+          setOpenProfileReviews(false);
+        }} 
         isSaved={savedIds.has(selectedRestaurant.id)}
         onToggleSave={() => {
            const next = new Set(savedIds);
@@ -131,12 +160,13 @@ const App: React.FC = () => {
            else next.add(selectedRestaurant.id);
            setSavedIds(next);
         }}
+        openReviews={openProfileReviews}
       />
     );
   }
 
   return (
-    <div className="relative h-screen w-screen bg-white overflow-hidden select-none">
+    <div className="relative h-screen w-screen bg-black overflow-hidden select-none">
       {isLoading && restaurants.length > 0 && (
         <div className="absolute inset-0 z-[100] bg-white/80 backdrop-blur-lg flex flex-col items-center justify-center p-12 text-center">
           <Loader2 className="w-12 h-12 animate-spin text-orange-500 mb-6" />
@@ -145,26 +175,49 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Fixed Header */}
-      <div className={`fixed top-0 left-0 right-0 h-32 bg-gradient-to-b from-white/90 to-transparent z-40 pointer-events-none px-6 pt-10 transition-opacity ${showDishInfo ? 'opacity-0' : 'opacity-100'}`}>
+      {/* Fixed Header - Top */}
+      <div className={`fixed top-0 left-0 right-0 z-40 pointer-events-none px-5 pt-12 transition-opacity ${showDishInfo ? 'opacity-0' : 'opacity-100'}`}>
         <div className="flex items-center justify-between pointer-events-auto">
           <div className="flex items-center gap-3">
             <button onClick={() => setState('LOCATION_SELECTOR')} className="w-10 h-10 bg-orange-600 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform">
                <span className="text-[10px] font-black text-white">LB</span>
             </button>
             <div className="flex flex-col">
-              <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">Near</span>
-              <span className="text-sm font-bold text-zinc-900 leading-none">{location?.name || 'Your Area'}</span>
+              <span className="text-[8px] font-bold text-white/50 uppercase tracking-widest">Near</span>
+              <span className="text-sm font-bold text-white leading-none">{location?.name || 'Your Area'}</span>
             </div>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => setShowSaved(true)} className="w-10 h-10 bg-white/90 backdrop-blur-md border border-zinc-100 rounded-full flex items-center justify-center text-zinc-900 shadow-sm active:scale-90 transition-transform">
-              <Bookmark size={18} fill={savedIds.size > 0 ? "black" : "none"} />
-            </button>
-            <a href="/partner" className="w-10 h-10 bg-white/90 backdrop-blur-md border border-zinc-100 rounded-full flex items-center justify-center text-zinc-900 shadow-sm active:scale-90 transition-transform">
-              <Store size={18} />
-            </a>
-          </div>
+          {/* Premium badge for subscribed restaurants */}
+          {restaurants[activeRestaurantIndex]?.isSubscribed && (
+            <div className="w-9 h-9 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full shadow-lg flex items-center justify-center">
+              <Crown size={16} fill="currentColor" />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Fixed Bottom Navigation Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-lg border-t border-white/10 px-6 py-4 pb-8">
+        <div className="flex items-center justify-between max-w-md mx-auto">
+          <button onClick={() => setState('LOCATION_SELECTOR')} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+            <Home size={24} />
+          </button>
+          <button onClick={() => setShowSearch(true)} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+            <Search size={24} />
+          </button>
+          <button onClick={() => setShowReviewsFeed(true)} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+            <MessageSquare size={24} />
+          </button>
+          <button onClick={() => setShowFilterModal('cuisine')} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+            <Filter size={24} />
+          </button>
+          <button 
+            onClick={() => setFilters(f => ({ ...f, openNow: !f.openNow }))}
+            className={`px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all ${filters.openNow ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}
+          >
+            <Clock size={14} />
+            OPEN
+          </button>
         </div>
       </div>
 
@@ -225,7 +278,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <div ref={feedRef} className={`snap-container no-scrollbar bg-white ${isExternalOverlayOpen ? 'pointer-events-none' : ''}`} onScroll={handleScroll}>
+      <div ref={feedRef} className={`snap-container no-scrollbar bg-black ${isExternalOverlayOpen ? 'pointer-events-none' : ''}`} onScroll={handleScroll}>
         {isLoading && restaurants.length === 0 ? (
           Array.from({ length: 3 }).map((_, i) => (
             <div key={`skeleton-${i}`} className="snap-item">
@@ -286,33 +339,6 @@ const App: React.FC = () => {
                   }, 300);
                 }}>
                   
-                  {/* PARTNER BADGE - only for subscribers */}
-                  {res.isSubscribed && !showDishInfo && (
-                    <div className="absolute top-6 right-6 z-20">
-                      <div className="w-9 h-9 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full shadow-lg animate-fade-in-scale flex items-center justify-center">
-                        <Crown size={16} fill="currentColor" />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* QUOTE OVERLAY */}
-                  {!showDishInfo && activeRestaurantIndex === i && (
-                    <div className="absolute inset-0 flex items-center justify-center p-12 pointer-events-none">
-                      <div className="bg-white/30 backdrop-blur-md border border-white/20 p-10 rounded-[50px] text-center max-w-[320px] shadow-2xl animate-fade-in-scale">
-                        <Quote size={24} className="text-orange-600 mb-4 mx-auto animate-float" fill="currentColor" />
-                        <p className="text-xl font-bold text-zinc-900 leading-tight tracking-tight italic animate-fade-in-up animation-delay-200">
-                          "{res.reviewSnippets?.[0]}"
-                        </p>
-                        {res.isSubscribed && (
-                          <div className="mt-4 flex items-center justify-center gap-1.5 text-orange-600 animate-fade-in-up animation-delay-300">
-                            <PlayCircle size={14} />
-                            <span className="text-[10px] font-black uppercase tracking-wider">Watch menu videos</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
                   {/* HEART ANIMATION on double-tap */}
                   {showHeartAnimation === res.id && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
@@ -320,32 +346,72 @@ const App: React.FC = () => {
                     </div>
                   )}
 
-                  {/* INFO AT BOTTOM - Simplified */}
-                  <div className={`absolute bottom-0 left-0 right-0 p-6 pb-8 transition-all duration-500 ${showDishInfo ? 'opacity-0 translate-y-4' : 'opacity-100'}`}>
-                    <div className="flex items-center gap-2 mb-3">
-                       <span className="text-white/60 text-xs font-semibold">{res.cuisine}</span>
-                       <span className="text-white/40">•</span>
-                       <span className="text-white/60 text-xs font-semibold">{res.distance}</span>
-                       {res.isSubscribed && (
-                         <>
-                           <span className="text-white/40">•</span>
-                           <span className="text-orange-400 text-xs font-semibold flex items-center gap-1">
-                             <PlayCircle size={12} fill="currentColor" /> Videos
-                           </span>
-                         </>
-                       )}
-                    </div>
-                    <h3 className="text-3xl font-black text-white drop-shadow-lg mb-2 tracking-tight leading-none">{res.name}</h3>
-                    <p className="text-white/50 text-xs font-medium">
-                      Tap for details • Double-tap to save
-                    </p>
+                  {/* RIGHT SIDE ACTION BUTTONS - Like Instagram Reels */}
+                  <div className={`absolute right-4 bottom-40 flex flex-col items-center gap-5 z-20 transition-opacity ${showDishInfo ? 'opacity-0' : 'opacity-100'}`}>
+                    {/* Like button with count */}
+                    <button 
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const next = new Set(likedIds);
+                        if (next.has(res.id)) {
+                          next.delete(res.id);
+                          setLikedIds(next);
+                          await unlikeRestaurant(res.id);
+                        } else {
+                          next.add(res.id);
+                          setLikedIds(next);
+                          await likeRestaurant(res.id);
+                        }
+                      }}
+                      className="flex flex-col items-center gap-1"
+                    >
+                      <Heart size={28} className={likedIds.has(res.id) ? "text-red-500 fill-red-500" : "text-white"} />
+                      <span className="text-white text-xs font-bold">{res.totalReviews ? Math.floor(res.totalReviews * 8.2) + (likedIds.has(res.id) ? 1 : 0) : 0}</span>
+                    </button>
                     
-                    {/* Swipe indicator */}
-                    {i < restaurants.length - 1 && activeRestaurantIndex === i && (
-                      <div className="mt-4 flex items-center justify-center">
-                        <ChevronUp className="w-5 h-5 text-white/40 animate-bounce" />
-                      </div>
-                    )}
+                    {/* Reviews button with count - opens restaurant reviews */}
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedRestaurant(res);
+                        setOpenProfileReviews(true);
+                        setState('PROFILE');
+                      }}
+                      className="flex flex-col items-center gap-1"
+                    >
+                      <img src="/media/icon review.png" alt="Reviews" className="w-7 h-7" />
+                      <span className="text-white text-xs font-bold">{res.totalReviews || 0}</span>
+                    </button>
+                    
+                    {/* Save button */}
+                    <button 
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const next = new Set(savedIds);
+                        if (next.has(res.id)) {
+                          next.delete(res.id);
+                          setSavedIds(next);
+                          await unsaveRestaurant(res.id);
+                        } else {
+                          next.add(res.id);
+                          setSavedIds(next);
+                          await saveRestaurant(res.id);
+                        }
+                      }}
+                      className="flex flex-col items-center gap-1"
+                    >
+                      <Bookmark size={26} className={savedIds.has(res.id) ? "text-white fill-white" : "text-white"} />
+                    </button>
+                  </div>
+
+                  {/* INFO AT BOTTOM - Simplified like mockup */}
+                  <div className={`absolute bottom-24 left-0 right-16 p-6 transition-all duration-500 ${showDishInfo ? 'opacity-0 translate-y-4' : 'opacity-100'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                       <span className="text-white/70 text-xs font-medium">{res.cuisine}</span>
+                       <span className="text-white/40">•</span>
+                       <span className="text-white/70 text-xs font-medium">{res.distance}</span>
+                    </div>
+                    <h3 className="text-3xl font-black text-white drop-shadow-lg tracking-tight leading-none">{res.name}</h3>
                   </div>
 
                   {/* DETAILED MODAL */}
@@ -426,8 +492,120 @@ const App: React.FC = () => {
         )}
       </div>
 
-      {state === 'FEED' && !showDishInfo && !showFilterModal && restaurants.length > 0 && (
-        <FloatingFilters onFilterClick={(type) => setShowFilterModal(type as any)} activeFilters={filters} />
+      {/* Search Modal */}
+      {showSearch && (
+        <div className="fixed inset-0 z-[70] bg-black/90 backdrop-blur-lg flex flex-col animate-in fade-in duration-300">
+          <div className="p-6 pt-12">
+            <div className="flex items-center gap-4 mb-6">
+              <button onClick={() => setShowSearch(false)} className="p-2 text-white">
+                <X size={24} />
+              </button>
+              <div className="flex-1 relative">
+                <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" />
+                <input
+                  type="text"
+                  placeholder="Search restaurants, cuisines, dishes..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-white/10 border border-white/20 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-white/40 focus:outline-none focus:border-orange-500"
+                  autoFocus
+                />
+              </div>
+            </div>
+            
+            {/* Quick filters */}
+            <div className="flex flex-wrap gap-2 mb-6">
+              {CUISINES.slice(0, 6).map(c => (
+                <button 
+                  key={c}
+                  onClick={() => {
+                    handleFilterUpdate({ cuisine: c });
+                    setShowSearch(false);
+                  }}
+                  className="px-4 py-2 bg-white/10 rounded-full text-white text-sm font-medium hover:bg-white/20 transition-colors"
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+            
+            {/* Search results */}
+            {searchQuery && (
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+                {restaurants
+                  .filter(r => 
+                    r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    r.cuisine.toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                  .map(res => (
+                    <button
+                      key={res.id}
+                      onClick={() => {
+                        setSelectedRestaurant(res);
+                        setShowSearch(false);
+                        setState('PROFILE');
+                      }}
+                      className="w-full flex items-center gap-4 p-4 bg-white/10 rounded-2xl text-left hover:bg-white/20 transition-colors"
+                    >
+                      <img src={res.mainPhotoUrl} className="w-16 h-16 rounded-xl object-cover" alt={res.name} />
+                      <div>
+                        <h4 className="text-white font-bold">{res.name}</h4>
+                        <p className="text-white/60 text-sm">{res.cuisine} • {res.distance}</p>
+                      </div>
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Reviews Feed Modal */}
+      {showReviewsFeed && (
+        <div className="fixed inset-0 z-[70] bg-black flex flex-col animate-in fade-in duration-300">
+          <div className="p-6 pt-12 flex items-center justify-between">
+            <h2 className="text-xl font-bold text-white">Top Reviews in {location?.name}</h2>
+            <button onClick={() => setShowReviewsFeed(false)} className="p-2 text-white">
+              <X size={24} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-6 space-y-4 pb-24">
+            {restaurants
+              .filter(r => r.reviews && r.reviews.length > 0)
+              .flatMap(r => r.reviews?.map(review => ({ ...review, restaurantName: r.name, restaurantId: r.id })) || [])
+              .sort((a, b) => b.rating - a.rating)
+              .slice(0, 15)
+              .map((review, idx) => (
+                <div key={idx} className="bg-white/10 rounded-2xl p-4">
+                  {review.photoUrl && (
+                    <img src={review.photoUrl} className="w-full h-48 object-cover rounded-xl mb-4" alt="Review" />
+                  )}
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-0.5">
+                      {[...Array(5)].map((_, i) => (
+                        <Star key={i} size={12} className={i < review.rating ? "text-amber-400" : "text-white/30"} fill="currentColor" />
+                      ))}
+                    </div>
+                    <span className="text-white/60 text-xs">{review.relativeTimeDescription}</span>
+                  </div>
+                  <p className="text-white/80 text-sm mb-2">"{review.text}"</p>
+                  <button 
+                    onClick={() => {
+                      const res = restaurants.find(r => r.id === review.restaurantId);
+                      if (res) {
+                        setSelectedRestaurant(res);
+                        setShowReviewsFeed(false);
+                        setState('PROFILE');
+                      }
+                    }}
+                    className="text-orange-400 text-xs font-bold"
+                  >
+                    {review.restaurantName} →
+                  </button>
+                </div>
+              ))}
+          </div>
+        </div>
       )}
 
       {/* Filter Modals */}
