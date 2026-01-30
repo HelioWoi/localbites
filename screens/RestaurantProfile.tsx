@@ -483,6 +483,27 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
           </a>
         )}
 
+        {/* Opening Hours - Card style */}
+        {restaurant.openingHours && restaurant.openingHours.length > 0 && (
+          <div className="w-full bg-white rounded-2xl border border-zinc-200 p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <Clock size={20} className="text-orange-500 flex-shrink-0" />
+              <span className="text-base font-bold text-zinc-900">Opening Hours</span>
+            </div>
+            <div className="space-y-1.5 pl-8">
+              {restaurant.openingHours.map((hours, idx) => {
+                const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                const isToday = hours.toLowerCase().startsWith(today.toLowerCase());
+                return (
+                  <p key={idx} className={`text-sm ${isToday ? 'font-bold text-orange-600' : 'text-zinc-600'}`}>
+                    {hours}
+                  </p>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Quick action buttons - Compact */}
         <div className="flex gap-2">
           <a href={restaurant.googleMapsUrl} target="_blank" className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white font-semibold py-3 rounded-xl text-sm active:scale-95 transition-all">

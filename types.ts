@@ -29,6 +29,7 @@ export interface Restaurant {
   reviews?: Review[]; // Full review objects from Google Places API
   reviewSnippets?: string[]; // Legacy: simple text snippets
   sources?: { title: string; uri: string }[]; // Grounding sources
+  openingHours?: string[]; // e.g. ["Monday: 9:00 AM – 5:00 PM", ...]
 }
 
 export interface Dish {

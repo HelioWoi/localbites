@@ -314,6 +314,10 @@ const App: React.FC = () => {
                   isActive={activeRestaurantIndex === i && state === 'FEED' && !isLoading}
                   isSubscribed={res.isSubscribed}
                   onSwipeUp={() => feedRef.current?.scrollBy({ top: window.innerHeight, behavior: 'smooth' })}
+                  onPartialSwipeUp={() => {
+                    setSelectedRestaurant(res);
+                    setState('PROFILE');
+                  }}
                 />
                 
                 <div className="absolute inset-0 cursor-pointer" onClick={() => {
@@ -338,12 +342,8 @@ const App: React.FC = () => {
                   // Single tap - delayed to check for double tap
                   setTimeout(() => {
                     if (lastTapRef.current?.id === res.id && Date.now() - lastTapRef.current.time >= 280) {
-                      if (res.isSubscribed) {
-                        setSelectedRestaurant(res);
-                        setState('PROFILE');
-                      } else {
-                        setShowDishInfo(!showDishInfo);
-                      }
+                      setSelectedRestaurant(res);
+                      setState('PROFILE');
                     }
                   }, 300);
                 }}>
@@ -420,49 +420,30 @@ const App: React.FC = () => {
                     </button>
                   </div>
 
-                  {/* INFO AT BOTTOM - Simplified like mockup */}
+                  {/* INFO AT BOTTOM - Tap on name to see details */}
                   <div className={`absolute bottom-24 left-0 right-16 p-6 transition-all duration-500 ${showDishInfo ? 'opacity-0 translate-y-4' : 'opacity-100'}`}>
                     <div className="flex items-center gap-2 mb-2">
                        <span className="text-white/70 text-xs font-medium">{res.cuisine}</span>
                        <span className="text-white/40">•</span>
                        <span className="text-white/70 text-xs font-medium">{res.distance}</span>
                     </div>
-                    <h3 className="text-3xl font-black text-white drop-shadow-lg tracking-tight leading-none">{res.name}</h3>
-                  </div>
-
-                  {/* DETAILED MODAL */}
-                  {showDishInfo && activeRestaurantIndex === i && (
-                    <div className="absolute inset-0 flex flex-col justify-end p-6 animate-in slide-in-from-bottom-10 fade-in duration-500">
-                      <div className="bg-white/50 backdrop-blur-md rounded-[40px] p-8 shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-between mb-6">
-                          <span className="px-3 py-1 bg-zinc-100 text-zinc-500 rounded-full text-[9px] font-black uppercase tracking-widest">Google Data</span>
-                          <button onClick={() => setShowDishInfo(false)} className="p-2 bg-zinc-100 rounded-xl text-zinc-400 active:scale-90 transition-transform"><X size={20}/></button>
-                        </div>
-                        
-                        <h2 className="text-3xl font-black text-zinc-900 tracking-tighter mb-4 leading-none">{res.name}</h2>
-                        
-                        <div className="p-5 bg-zinc-50 rounded-3xl border border-zinc-100 mb-8">
-                           <p className="text-zinc-600 text-sm font-medium leading-relaxed italic mb-4">"{res.reviewSnippets?.[1] || res.reviewSnippets?.[0]}"</p>
-                           <div className="flex flex-col gap-2">
-                             <a href={res.googleMapsUrl} target="_blank" className="inline-flex items-center gap-1.5 text-orange-600 text-[10px] font-black uppercase tracking-widest font-bold hover:underline">
-                               View on Google Maps <ExternalLink size={12}/>
-                             </a>
-                             {res.website && (
-                               <a href={res.website} target="_blank" className="inline-flex items-center gap-1.5 text-zinc-500 text-[10px] font-black uppercase tracking-widest font-bold hover:underline">
-                                 Visit Official Website <Globe size={12}/>
-                               </a>
-                             )}
-                           </div>
-                        </div>
-
-                        <div className="flex gap-3">
-                          <button onClick={() => { setSelectedRestaurant(res); setState('PROFILE'); }} className="flex-1 bg-zinc-900 text-white font-bold py-5 rounded-3xl flex items-center justify-center gap-2 active:scale-95 transition-all">
-                            See More Details <ArrowRight size={18} />
-                          </button>
-                        </div>
-                      </div>
+                    <h3 
+                      className="text-3xl font-black text-white drop-shadow-lg tracking-tight leading-none cursor-pointer active:opacity-70 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedRestaurant(res);
+                        setState('PROFILE');
+                      }}
+                    >
+                      {res.name}
+                    </h3>
+                    
+                    {/* Swipe for more indicator */}
+                    <div className="flex flex-col items-center mt-4 animate-bounce" style={{ animationDuration: '2s' }}>
+                      <ChevronUp size={18} className="text-white/60" />
+                      <span className="text-white/60 text-xs font-medium">Swipe for more</span>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -548,12 +529,24 @@ const App: React.FC = () => {
             {/* Search results */}
             {searchQuery && (
               <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-                {restaurants
-                  .filter(r => 
-                    r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    r.cuisine.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
-                  .map(res => (
+                {(() => {
+                  const query = searchQuery.toLowerCase();
+                  const filtered = restaurants.filter(r => 
+                    r.name.toLowerCase().includes(query) ||
+                    r.cuisine.toLowerCase().includes(query) ||
+                    r.address?.toLowerCase().includes(query)
+                  );
+                  
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="text-center py-8">
+                        <p className="text-white/60 text-sm">No restaurants found for "{searchQuery}"</p>
+                        <p className="text-white/40 text-xs mt-2">Try searching by name or cuisine type</p>
+                      </div>
+                    );
+                  }
+                  
+                  return filtered.map(res => (
                     <button
                       key={res.id}
                       onClick={() => {
@@ -569,7 +562,8 @@ const App: React.FC = () => {
                         <p className="text-white/60 text-sm">{res.cuisine} • {res.distance}</p>
                       </div>
                     </button>
-                  ))}
+                  ));
+                })()}
               </div>
             )}
           </div>

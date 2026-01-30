@@ -7,6 +7,7 @@ interface MediaContainerProps {
   isActive: boolean;
   isSubscribed: boolean;
   onSwipeUp?: () => void;
+  onPartialSwipeUp?: () => void;
 }
 
 const MediaContainer: React.FC<MediaContainerProps> = ({ 
@@ -14,7 +15,8 @@ const MediaContainer: React.FC<MediaContainerProps> = ({
   photoUrl, 
   isActive, 
   isSubscribed,
-  onSwipeUp 
+  onSwipeUp,
+  onPartialSwipeUp
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -39,7 +41,14 @@ const MediaContainer: React.FC<MediaContainerProps> = ({
     if (touchStartY.current === null) return;
     const touchEndY = e.changedTouches[0].clientY;
     const deltaY = touchStartY.current - touchEndY;
-    if (deltaY > 50 && onSwipeUp) onSwipeUp();
+    
+    // Partial swipe (50-150px) = show details
+    // Full swipe (>150px) = next restaurant
+    if (deltaY > 150 && onSwipeUp) {
+      onSwipeUp();
+    } else if (deltaY > 50 && deltaY <= 150 && onPartialSwipeUp) {
+      onPartialSwipeUp();
+    }
     touchStartY.current = null;
   };
 

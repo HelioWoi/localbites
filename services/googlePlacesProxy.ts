@@ -13,6 +13,7 @@ interface PlaceResult {
   totalReviews?: number;
   priceLevel: string;
   isOpen?: boolean;
+  openingHours?: string[];
   photoUrl?: string;
   googleMapsUrl: string;
   cuisine: string;
@@ -21,6 +22,16 @@ interface PlaceResult {
     lat: number;
     lng: number;
   };
+  reviews?: {
+    id: string;
+    authorName: string;
+    authorPhotoUrl?: string;
+    rating: number;
+    text: string;
+    relativeTimeDescription: string;
+    time: number;
+    photoUrl?: string;
+  }[];
 }
 
 interface PlaceReview {

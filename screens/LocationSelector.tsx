@@ -3,21 +3,26 @@ import React, { useState, useEffect } from 'react';
 import { Search, Navigation, MapPin, ChevronRight, Utensils, Loader2 } from 'lucide-react';
 import { UserLocation } from '../types';
 import { getPartnerRestaurants } from '../services/supabaseService';
+import { supabase } from '../lib/supabase';
 
 interface LocationSelectorProps {
   onLocationSelect: (loc: UserLocation) => void;
 }
 
-// All Sunshine Coast regions with coordinates and images
-const ALL_REGIONS = [
-  { name: 'Mooloolaba', lat: -26.6811, lng: 153.1214, img: 'https://images.unsplash.com/photo-1590523277543-a94d2e4eb00b?auto=format&fit=crop&q=80&w=400' },
-  { name: 'Alexandra Headland', lat: -26.6667, lng: 153.1000, img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&q=80&w=400' },
-  { name: 'Maroochydore', lat: -26.6500, lng: 153.0833, img: 'https://images.unsplash.com/photo-1559128010-7c1ad6e1b6a5?auto=format&fit=crop&q=80&w=400' },
-  { name: 'Caloundra', lat: -26.7986, lng: 153.1283, img: 'https://images.unsplash.com/photo-1506953823976-52e1fdc0149a?auto=format&fit=crop&q=80&w=400' },
-  { name: 'Noosa', lat: -26.3917, lng: 153.0833, img: 'https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&q=80&w=400' },
-  { name: 'Coolum Beach', lat: -26.5333, lng: 153.0833, img: 'https://images.unsplash.com/photo-1505142468610-359e7d316be0?auto=format&fit=crop&q=80&w=400' },
-  { name: 'Buderim', lat: -26.6833, lng: 153.0500, img: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&q=80&w=400' },
-  { name: 'Nambour', lat: -26.6269, lng: 152.9594, img: 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&q=80&w=400' },
+interface NearbyRegion {
+  name: string;
+  lat: number;
+  lng: number;
+  img: string;
+  distance?: string;
+  distanceKm?: number;
+}
+
+// Default beach/location images for dynamic regions
+const DEFAULT_IMAGES = [
+  'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&q=80&w=400',
+  'https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&q=80&w=400',
+  'https://images.unsplash.com/photo-1505142468610-359e7d316be0?auto=format&fit=crop&q=80&w=400',
 ];
 
 // Calculate distance between two points in km
@@ -32,42 +37,128 @@ const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: numbe
   return R * c;
 };
 
+// Generate nearby points in different directions from user location
+const generateNearbyPoints = (lat: number, lng: number): { lat: number; lng: number; direction: string }[] => {
+  const offset = 0.03; // ~3km offset
+  return [
+    { lat: lat + offset, lng: lng, direction: 'North' },
+    { lat: lat - offset, lng: lng, direction: 'South' },
+    { lat: lat, lng: lng + offset, direction: 'East' },
+    { lat: lat, lng: lng - offset, direction: 'West' },
+    { lat: lat + offset, lng: lng + offset, direction: 'Northeast' },
+    { lat: lat - offset, lng: lng - offset, direction: 'Southwest' },
+  ];
+};
+
 const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect }) => {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [allRestaurants, setAllRestaurants] = useState<any[]>([]);
   const [selectedRadius, setSelectedRadius] = useState<5 | 10>(5);
-  const [userLat, setUserLat] = useState<number>(-26.6811); // Default to Mooloolaba
-  const [userLng, setUserLng] = useState<number>(153.1214);
+  const [userLat, setUserLat] = useState<number | null>(null);
+  const [userLng, setUserLng] = useState<number | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [nearbyRegions, setNearbyRegions] = useState<NearbyRegion[]>([]);
+  const [loadingRegions, setLoadingRegions] = useState(true);
 
-  // Get user's location on mount
+  // Get user's location on mount and fetch nearby regions
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setUserLat(pos.coords.latitude);
-          setUserLng(pos.coords.longitude);
+        async (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setUserLat(lat);
+          setUserLng(lng);
+          
+          // Fetch nearby regions using reverse geocoding
+          await fetchNearbyRegions(lat, lng);
         },
-        () => {} // Silently fail, use default
+        async () => {
+          // Use default location (Mooloolaba) if geolocation fails
+          setUserLat(-26.6811);
+          setUserLng(153.1214);
+          await fetchNearbyRegions(-26.6811, 153.1214);
+        }
       );
+    } else {
+      // Fallback if geolocation not available
+      setUserLat(-26.6811);
+      setUserLng(153.1214);
+      fetchNearbyRegions(-26.6811, 153.1214);
     }
   }, []);
 
-  // Calculate nearby regions based on user location (show 3 closest)
-  const suggestions = ALL_REGIONS
-    .map(region => ({
-      ...region,
-      distanceKm: calculateDistance(userLat, userLng, region.lat, region.lng)
-    }))
-    .sort((a, b) => a.distanceKm - b.distanceKm)
-    .slice(0, 3)
-    .map(region => ({
-      ...region,
-      distance: region.distanceKm < 1 
-        ? `${Math.round(region.distanceKm * 1000)}m` 
-        : `${Math.round(region.distanceKm)}km`
-    }));
+  // Fetch nearby regions using Google Places API via Edge Function
+  const fetchNearbyRegions = async (lat: number, lng: number) => {
+    setLoadingRegions(true);
+    try {
+      // Generate nearby points and get their locality names
+      const nearbyPoints = generateNearbyPoints(lat, lng);
+      const regions: NearbyRegion[] = [];
+      const seenNames = new Set<string>();
+
+      // Use Supabase Edge Function to get place names
+      const { data, error } = await supabase.functions.invoke('google-places', {
+        body: {
+          action: 'getNearbyLocalities',
+          lat,
+          lng,
+          points: nearbyPoints
+        }
+      });
+
+      if (!error && data?.localities && data.localities.length > 0) {
+        data.localities.forEach((locality: any, index: number) => {
+          if (!seenNames.has(locality.name) && regions.length < 3) {
+            seenNames.add(locality.name);
+            const distKm = calculateDistance(lat, lng, locality.lat, locality.lng);
+            regions.push({
+              name: locality.name,
+              lat: locality.lat,
+              lng: locality.lng,
+              img: DEFAULT_IMAGES[index % DEFAULT_IMAGES.length],
+              distanceKm: distKm,
+              distance: distKm < 1 ? `${Math.round(distKm * 1000)}m` : `${Math.round(distKm)}km`
+            });
+          }
+        });
+      }
+
+      
+      // If we couldn't get localities, create generic ones based on directions
+      if (regions.length < 3) {
+        nearbyPoints.slice(0, 3 - regions.length).forEach((point, index) => {
+          const distKm = calculateDistance(lat, lng, point.lat, point.lng);
+          regions.push({
+            name: `${point.direction} Area`,
+            lat: point.lat,
+            lng: point.lng,
+            img: DEFAULT_IMAGES[(regions.length + index) % DEFAULT_IMAGES.length],
+            distanceKm: distKm,
+            distance: `${Math.round(distKm)}km`
+          });
+        });
+      }
+
+      setNearbyRegions(regions);
+    } catch (error) {
+      console.error('Error fetching nearby regions:', error);
+      // Fallback to generic regions
+      const nearbyPoints = generateNearbyPoints(lat, lng);
+      setNearbyRegions(nearbyPoints.slice(0, 3).map((point, index) => ({
+        name: `${point.direction} Area`,
+        lat: point.lat,
+        lng: point.lng,
+        img: DEFAULT_IMAGES[index],
+        distanceKm: 3,
+        distance: '3km'
+      })));
+    }
+    setLoadingRegions(false);
+  };
+
+  const suggestions = nearbyRegions;
 
   // Load all restaurants on mount
   useEffect(() => {
@@ -293,6 +384,12 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
         <p className="text-[10px] text-zinc-400">
           ABN 33 234 268 637 • © 2026 LocalBites Australia. All rights reserved.
         </p>
+        <a 
+          href="mailto:contact@localbites.com.au" 
+          className="text-[10px] text-zinc-400/50 hover:text-orange-500 transition-colors mt-1 inline-block"
+        >
+          contact@localbites.com.au
+        </a>
       </div>
     </div>
   );

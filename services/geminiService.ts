@@ -47,7 +47,8 @@ export async function getNearbyRestaurants(
         mainPhotoUrl: place.photoUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800',
         isSubscribed: false, // Google restaurants don't have video content
         dishes: [],
-        reviews: [],
+        reviews: place.reviews || [],
+        openingHours: place.openingHours || [],
       }));
       
       console.log('[LocalBites] Found', googleRestaurants.length, 'Google restaurants');

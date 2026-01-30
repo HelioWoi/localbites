@@ -14,7 +14,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, lat, lng, radius, placeId } = await req.json();
+    const { action, lat, lng, radius, placeId, points } = await req.json();
 
     if (!GOOGLE_API_KEY) {
       throw new Error("Google Places API key not configured");
@@ -28,6 +28,9 @@ serve(async (req) => {
         break;
       case "getDetails":
         result = await getPlaceDetails(placeId);
+        break;
+      case "getNearbyLocalities":
+        result = await getNearbyLocalities(lat, lng, points);
         break;
       default:
         throw new Error("Invalid action");
@@ -65,7 +68,7 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number)
           headers: {
             "Content-Type": "application/json",
             "X-Goog-Api-Key": GOOGLE_API_KEY!,
-            "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.photos,places.location,places.types,places.websiteUri,places.nationalPhoneNumber,places.googleMapsUri",
+            "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.photos,places.location,places.types,places.websiteUri,places.nationalPhoneNumber,places.googleMapsUri,places.reviews",
           },
           body: JSON.stringify({
             includedTypes: types,
@@ -116,6 +119,7 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number)
     totalReviews: place.userRatingCount,
     priceLevel: priceLevelToString(place.priceLevel),
     isOpen: place.currentOpeningHours?.openNow,
+    openingHours: place.currentOpeningHours?.weekdayDescriptions || [],
     photoUrl: place.photos?.[0]?.name
       ? `https://places.googleapis.com/v1/${place.photos[0].name}/media?maxHeightPx=800&maxWidthPx=800&key=${GOOGLE_API_KEY}`
       : undefined,
@@ -125,6 +129,20 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number)
       lat: place.location?.latitude,
       lng: place.location?.longitude,
     },
+    reviews: (place.reviews || []).slice(0, 5).map((review: any, idx: number) => ({
+      id: `${place.id}-review-${idx}`,
+      authorName: review.authorAttribution?.displayName || "Anonymous",
+      authorPhotoUrl: review.authorAttribution?.photoUri,
+      rating: review.rating || 5,
+      text: review.text?.text || review.originalText?.text || "",
+      relativeTimeDescription: review.relativePublishTimeDescription || "Recently",
+      time: Date.now() - idx * 86400000,
+      photoUrl: place.photos?.[idx + 1]?.name
+        ? `https://places.googleapis.com/v1/${place.photos[idx + 1].name}/media?maxHeightPx=800&maxWidthPx=800&key=${GOOGLE_API_KEY}`
+        : place.photos?.[0]?.name
+          ? `https://places.googleapis.com/v1/${place.photos[0].name}/media?maxHeightPx=800&maxWidthPx=800&key=${GOOGLE_API_KEY}`
+          : undefined,
+    })),
   }));
 }
 
@@ -220,4 +238,64 @@ function extractCuisine(types?: string[]): string {
     if (cuisineMap[type]) return cuisineMap[type];
   }
   return "Restaurant";
+}
+
+// Get nearby localities using reverse geocoding
+async function getNearbyLocalities(lat: number, lng: number, points: { lat: number; lng: number; direction: string }[]) {
+  const localities: { name: string; lat: number; lng: number }[] = [];
+  const seenNames = new Set<string>();
+
+  // First, get the user's current locality
+  try {
+    const currentLocality = await reverseGeocode(lat, lng);
+    if (currentLocality && !seenNames.has(currentLocality.name)) {
+      seenNames.add(currentLocality.name);
+      localities.push(currentLocality);
+    }
+  } catch (e) {
+    console.error("Error getting current locality:", e);
+  }
+
+  // Then get localities for nearby points
+  for (const point of points) {
+    if (localities.length >= 3) break;
+    try {
+      const locality = await reverseGeocode(point.lat, point.lng);
+      if (locality && !seenNames.has(locality.name)) {
+        seenNames.add(locality.name);
+        localities.push(locality);
+      }
+    } catch (e) {
+      console.error("Error getting locality for point:", e);
+    }
+  }
+
+  return { localities };
+}
+
+// Reverse geocode a point to get locality name
+async function reverseGeocode(lat: number, lng: number): Promise<{ name: string; lat: number; lng: number } | null> {
+  const response = await fetch(
+    `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}&result_type=locality|sublocality|neighborhood`
+  );
+
+  if (!response.ok) return null;
+
+  const data = await response.json();
+  if (data.results && data.results.length > 0) {
+    const result = data.results[0];
+    // Extract locality name from address components
+    for (const component of result.address_components) {
+      if (component.types.includes('locality') || 
+          component.types.includes('sublocality') || 
+          component.types.includes('neighborhood')) {
+        return {
+          name: component.long_name,
+          lat: result.geometry.location.lat,
+          lng: result.geometry.location.lng
+        };
+      }
+    }
+  }
+  return null;
 }
