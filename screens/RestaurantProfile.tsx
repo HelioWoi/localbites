@@ -545,12 +545,14 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                 <div>
                   <p className="text-orange-900 font-bold text-sm mb-1">Own this restaurant?</p>
                   <p className="text-orange-700 text-xs mb-3">Add videos and attract more customers.</p>
-                  <button 
-                    onClick={() => onNavigateToPartner?.()}
-                    className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-[9px] uppercase tracking-widest rounded-lg active:scale-95 transition-transform"
+                  <a 
+                    href="https://www.localbites.com.au/partner"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-[9px] uppercase tracking-widest rounded-lg active:scale-95 transition-transform"
                   >
                     Become a Partner →
-                  </button>
+                  </a>
                 </div>
               </div>
             </div>

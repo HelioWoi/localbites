@@ -275,25 +275,53 @@ async function getNearbyLocalities(lat: number, lng: number, points: { lat: numb
 
 // Reverse geocode a point to get locality name
 async function reverseGeocode(lat: number, lng: number): Promise<{ name: string; lat: number; lng: number } | null> {
-  const response = await fetch(
+  // Try with result_type filter first
+  let response = await fetch(
     `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}&result_type=locality|sublocality|neighborhood`
   );
 
-  if (!response.ok) return null;
+  let data = await response.json();
+  
+  // If no results, try without filter
+  if (!data.results || data.results.length === 0) {
+    response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}`
+    );
+    data = await response.json();
+  }
 
-  const data = await response.json();
   if (data.results && data.results.length > 0) {
-    const result = data.results[0];
-    // Extract locality name from address components
-    for (const component of result.address_components) {
-      if (component.types.includes('locality') || 
-          component.types.includes('sublocality') || 
-          component.types.includes('neighborhood')) {
-        return {
-          name: component.long_name,
-          lat: result.geometry.location.lat,
-          lng: result.geometry.location.lng
-        };
+    // Try to find locality/sublocality in any result
+    for (const result of data.results) {
+      for (const component of result.address_components) {
+        if (component.types.includes('locality') || 
+            component.types.includes('sublocality') || 
+            component.types.includes('sublocality_level_1') ||
+            component.types.includes('neighborhood')) {
+          return {
+            name: component.long_name,
+            lat: result.geometry.location.lat,
+            lng: result.geometry.location.lng
+          };
+        }
+      }
+    }
+    
+    // Fallback: use the first address component that looks like a place name
+    const firstResult = data.results[0];
+    if (firstResult.address_components && firstResult.address_components.length > 0) {
+      // Skip street numbers and routes, get the first meaningful name
+      for (const component of firstResult.address_components) {
+        if (!component.types.includes('street_number') && 
+            !component.types.includes('route') &&
+            !component.types.includes('postal_code') &&
+            !component.types.includes('country')) {
+          return {
+            name: component.long_name,
+            lat: firstResult.geometry.location.lat,
+            lng: firstResult.geometry.location.lng
+          };
+        }
       }
     }
   }
