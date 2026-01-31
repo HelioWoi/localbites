@@ -18,11 +18,12 @@ interface NearbyRegion {
   distanceKm?: number;
 }
 
-// Default beach/location images for dynamic regions
+// Default beach/location images for dynamic regions (4 images for 4 directions)
 const DEFAULT_IMAGES = [
   'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&q=80&w=400',
   'https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&q=80&w=400',
   'https://images.unsplash.com/photo-1505142468610-359e7d316be0?auto=format&fit=crop&q=80&w=400',
+  'https://images.unsplash.com/photo-1473116763249-2faaef81ccda?auto=format&fit=crop&q=80&w=400',
 ];
 
 // Calculate distance between two points in km
@@ -110,7 +111,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
 
       if (!error && data?.localities && data.localities.length > 0) {
         data.localities.forEach((locality: any, index: number) => {
-          if (!seenNames.has(locality.name) && regions.length < 3) {
+          if (!seenNames.has(locality.name) && regions.length < 4) {
             seenNames.add(locality.name);
             const distKm = calculateDistance(lat, lng, locality.lat, locality.lng);
             regions.push({
@@ -127,8 +128,8 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
 
       
       // If we couldn't get localities, create generic ones based on directions
-      if (regions.length < 3) {
-        nearbyPoints.slice(0, 3 - regions.length).forEach((point, index) => {
+      if (regions.length < 4) {
+        nearbyPoints.slice(0, 4 - regions.length).forEach((point, index) => {
           const distKm = calculateDistance(lat, lng, point.lat, point.lng);
           regions.push({
             name: `${point.direction} Area`,
@@ -146,7 +147,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
       console.error('Error fetching nearby regions:', error);
       // Fallback to generic regions
       const nearbyPoints = generateNearbyPoints(lat, lng);
-      setNearbyRegions(nearbyPoints.slice(0, 3).map((point, index) => ({
+      setNearbyRegions(nearbyPoints.slice(0, 4).map((point, index) => ({
         name: `${point.direction} Area`,
         lat: point.lat,
         lng: point.lng,

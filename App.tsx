@@ -49,6 +49,7 @@ const App: React.FC = () => {
   const [feedSwipeCount, setFeedSwipeCount] = useState(0);
   const [showSearch, setShowSearch] = useState(false);
   const [showReviewsFeed, setShowReviewsFeed] = useState(false);
+  const [showRestaurantReviews, setShowRestaurantReviews] = useState<Restaurant | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [openProfileReviews, setOpenProfileReviews] = useState(false);
   const [likesCounts, setLikesCounts] = useState<Map<string, number>>(new Map());
@@ -154,6 +155,8 @@ const App: React.FC = () => {
   if (state === 'ADMIN') return <AdminDashboard onClose={() => setState('FEED')} />;
   
   if (state === 'PROFILE' && selectedRestaurant) {
+    console.log('[Profile] Rendering profile for:', selectedRestaurant.name);
+    
     return (
       <RestaurantProfile 
         restaurant={selectedRestaurant} 
@@ -363,20 +366,20 @@ const App: React.FC = () => {
                         e.stopPropagation();
                         const next = new Set(likedIds);
                         const newCounts = new Map(likesCounts);
-                        const currentCount = newCounts.get(res.id) || 0;
+                        const currentCount = Number(newCounts.get(res.id)) || 0;
                         
                         if (next.has(res.id)) {
                           next.delete(res.id);
                           setLikedIds(next);
                           newCounts.set(res.id, Math.max(0, currentCount - 1));
                           setLikesCounts(newCounts);
-                          await unlikeRestaurant(res.id);
+                          unlikeRestaurant(res.id);
                         } else {
                           next.add(res.id);
                           setLikedIds(next);
                           newCounts.set(res.id, currentCount + 1);
                           setLikesCounts(newCounts);
-                          await likeRestaurant(res.id);
+                          likeRestaurant(res.id);
                         }
                       }}
                       className="flex flex-col items-center gap-1"
@@ -385,13 +388,11 @@ const App: React.FC = () => {
                       <span className="text-white text-xs font-bold">{likesCounts.get(res.id) || 0}</span>
                     </button>
                     
-                    {/* Reviews button with count - opens restaurant reviews */}
+                    {/* Reviews button with count - opens restaurant reviews modal */}
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedRestaurant(res);
-                        setOpenProfileReviews(true);
-                        setState('PROFILE');
+                        setShowRestaurantReviews(res);
                       }}
                       className="flex flex-col items-center gap-1"
                     >
@@ -438,11 +439,12 @@ const App: React.FC = () => {
                       {res.name}
                     </h3>
                     
-                    {/* Swipe for more indicator */}
-                    <div className="flex flex-col items-center mt-4 animate-bounce" style={{ animationDuration: '2s' }}>
-                      <ChevronUp size={18} className="text-white/60" />
-                      <span className="text-white/60 text-xs font-medium">Swipe for more</span>
                     </div>
+                  
+                  {/* Swipe for more indicator - centered */}
+                  <div className="absolute bottom-20 left-0 right-0 flex flex-col items-center animate-bounce pointer-events-none" style={{ animationDuration: '2s' }}>
+                    <ChevronUp size={18} className="text-white/60" />
+                    <span className="text-white/60 text-xs font-medium">Swipe for more</span>
                   </div>
                 </div>
               </div>
@@ -546,20 +548,28 @@ const App: React.FC = () => {
                     );
                   }
                   
-                  return filtered.map(res => (
+                  return filtered.map(restaurant => (
                     <button
-                      key={res.id}
-                      onClick={() => {
-                        setSelectedRestaurant(res);
+                      key={restaurant.id}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Store reference before closing modal
+                        const targetRestaurant = restaurant;
                         setShowSearch(false);
-                        setState('PROFILE');
+                        setSearchQuery('');
+                        // Use requestAnimationFrame to ensure state updates properly
+                        requestAnimationFrame(() => {
+                          setSelectedRestaurant(targetRestaurant);
+                          setState('PROFILE');
+                        });
                       }}
                       className="w-full flex items-center gap-4 p-4 bg-white/10 rounded-2xl text-left hover:bg-white/20 transition-colors"
                     >
-                      <img src={res.mainPhotoUrl} className="w-16 h-16 rounded-xl object-cover" alt={res.name} />
+                      <img src={restaurant.mainPhotoUrl} className="w-16 h-16 rounded-xl object-cover" alt={restaurant.name} />
                       <div>
-                        <h4 className="text-white font-bold">{res.name}</h4>
-                        <p className="text-white/60 text-sm">{res.cuisine} • {res.distance}</p>
+                        <h4 className="text-white font-bold">{restaurant.name}</h4>
+                        <p className="text-white/60 text-sm">{restaurant.cuisine} • {restaurant.distance}</p>
                       </div>
                     </button>
                   ));
@@ -570,51 +580,235 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Reviews Feed Modal */}
+      {/* Reviews Feed Modal - Full screen swipeable feed */}
       {showReviewsFeed && (
-        <div className="fixed inset-0 z-[70] bg-black flex flex-col animate-in fade-in duration-300">
-          <div className="p-6 pt-12 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white">Top Reviews in {location?.name}</h2>
-            <button onClick={() => setShowReviewsFeed(false)} className="p-2 text-white">
-              <X size={24} />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-6 space-y-4 pb-24">
-            {restaurants
+        <div className="fixed inset-0 z-[70] bg-black">
+          {(() => {
+            const allReviews = restaurants
               .filter(r => r.reviews && r.reviews.length > 0)
-              .flatMap(r => r.reviews?.map(review => ({ ...review, restaurantName: r.name, restaurantId: r.id })) || [])
+              .flatMap(r => r.reviews?.map(review => ({ 
+                ...review, 
+                restaurantName: r.name, 
+                restaurantId: r.id, 
+                restaurantPhoto: r.mainPhotoUrl,
+                restaurantRating: r.rating,
+                restaurantTotalReviews: r.totalReviews,
+                restaurantGoogleMapsUrl: r.googleMapsUrl
+              })) || [])
               .sort((a, b) => b.rating - a.rating)
-              .slice(0, 15)
-              .map((review, idx) => (
-                <div key={idx} className="bg-white/10 rounded-2xl p-4">
-                  {review.photoUrl && (
-                    <img src={review.photoUrl} className="w-full h-48 object-cover rounded-xl mb-4" alt="Review" />
-                  )}
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="flex items-center gap-0.5">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} size={12} className={i < review.rating ? "text-amber-400" : "text-white/30"} fill="currentColor" />
-                      ))}
+              .slice(0, 15);
+            
+            return (
+              <div className="snap-container">
+                {allReviews.map((review, idx) => (
+                  <div key={idx} className="snap-item relative">
+                    {/* Full screen photo */}
+                    <img 
+                      src={review.photoUrl || review.restaurantPhoto} 
+                      className="absolute inset-0 w-full h-full object-cover" 
+                      alt="Review" 
+                    />
+                    
+                    {/* Gradient overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/30" />
+                    
+                    {/* Close button - top left */}
+                    <button 
+                      onClick={() => setShowReviewsFeed(false)} 
+                      className="absolute top-12 left-4 z-10 w-10 h-10 bg-black/50 backdrop-blur-sm rounded-full flex items-center justify-center"
+                    >
+                      <X size={20} className="text-white" />
+                    </button>
+                    
+                    {/* Rating badge - top right - clickable to Google Reviews */}
+                    <a 
+                      href={`${review.restaurantGoogleMapsUrl}#reviews`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute top-12 right-4 z-10 flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full"
+                    >
+                      <Star size={14} className="text-amber-400" fill="currentColor" />
+                      <span className="text-white font-bold text-sm">{review.restaurantRating?.toFixed(1)}</span>
+                      <span className="text-white/70 text-xs">({review.restaurantTotalReviews} reviews)</span>
+                    </a>
+                    
+                    {/* Bottom content */}
+                    <div className="absolute bottom-24 left-0 right-0 p-6">
+                      {/* Avatar and author info */}
+                      <div className="flex items-center gap-3 mb-4">
+                        {review.authorPhotoUrl ? (
+                          <img src={review.authorPhotoUrl} className="w-12 h-12 rounded-full border-2 border-white object-cover" alt={review.authorName} />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full border-2 border-white bg-orange-500 flex items-center justify-center text-white font-bold text-lg">
+                            {review.authorName?.charAt(0) || 'A'}
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-white font-bold">{review.authorName}</p>
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-0.5">
+                              {[...Array(5)].map((_, i) => (
+                                <Star key={i} size={12} className={i < review.rating ? "text-amber-400" : "text-white/30"} fill="currentColor" />
+                              ))}
+                            </div>
+                            <span className="text-white/60 text-sm">{review.relativeTimeDescription}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Review text with "more" */}
+                      <div>
+                        <p 
+                          id={`review-text-${idx}`}
+                          className="text-white text-base leading-relaxed line-clamp-2"
+                        >
+                          "{review.text}"
+                        </p>
+                        <button 
+                          onClick={() => {
+                            const el = document.getElementById(`review-text-${idx}`);
+                            if (el) {
+                              el.classList.toggle('line-clamp-2');
+                            }
+                          }}
+                          className="text-white/50 text-sm mt-1"
+                        >
+                          more
+                        </button>
+                      </div>
                     </div>
-                    <span className="text-white/60 text-xs">{review.relativeTimeDescription}</span>
+                    
+                    {/* Bottom nav bar */}
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur-lg border-t border-white/10 px-6 py-4 pb-8">
+                      <div className="flex items-center justify-between max-w-md mx-auto">
+                        <button onClick={() => setShowReviewsFeed(false)} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+                          <Home size={24} />
+                        </button>
+                        <button onClick={() => { setShowReviewsFeed(false); setShowSearch(true); }} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+                          <Search size={24} />
+                        </button>
+                        <button className="flex flex-col items-center gap-1 text-white transition-colors">
+                          <MessageSquare size={24} />
+                        </button>
+                        <button onClick={() => setShowFilterModal('cuisine')} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+                          <Filter size={24} />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            const res = restaurants.find(r => r.id === review.restaurantId);
+                            if (res?.isOpen) {
+                              window.open(res.googleMapsUrl, '_blank');
+                            }
+                          }}
+                          className="flex items-center gap-2 bg-green-500 text-white font-bold px-4 py-2 rounded-full text-sm"
+                        >
+                          <Clock size={14} />
+                          OPEN
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-white/80 text-sm mb-2">"{review.text}"</p>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Restaurant Reviews Modal - Full screen swipeable feed */}
+      {showRestaurantReviews && (
+        <div className="fixed inset-0 z-[70] bg-black">
+          {showRestaurantReviews.reviews && showRestaurantReviews.reviews.length > 0 ? (
+            <div className="snap-container">
+              {showRestaurantReviews.reviews.slice(0, 10).map((review, idx) => (
+                <div key={idx} className="snap-item relative">
+                  <img 
+                    src={review.photoUrl || showRestaurantReviews.mainPhotoUrl} 
+                    className="absolute inset-0 w-full h-full object-cover" 
+                    alt="Review" 
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/30" />
+                  
                   <button 
-                    onClick={() => {
-                      const res = restaurants.find(r => r.id === review.restaurantId);
-                      if (res) {
-                        setSelectedRestaurant(res);
-                        setShowReviewsFeed(false);
-                        setState('PROFILE');
-                      }
-                    }}
-                    className="text-orange-400 text-xs font-bold"
+                    onClick={() => setShowRestaurantReviews(null)} 
+                    className="absolute top-12 left-4 z-10 w-10 h-10 bg-black/50 backdrop-blur-sm rounded-full flex items-center justify-center"
                   >
-                    {review.restaurantName} →
+                    <X size={20} className="text-white" />
                   </button>
+                  
+                  <a 
+                    href={`${showRestaurantReviews.googleMapsUrl}#reviews`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute top-12 right-4 z-10 flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full"
+                  >
+                    <Star size={14} className="text-amber-400" fill="currentColor" />
+                    <span className="text-white font-bold text-sm">{showRestaurantReviews.rating?.toFixed(1)}</span>
+                    <span className="text-white/70 text-xs">({showRestaurantReviews.totalReviews} reviews)</span>
+                  </a>
+                  
+                  <div className="absolute bottom-24 left-0 right-0 p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      {review.authorPhotoUrl ? (
+                        <img src={review.authorPhotoUrl} className="w-12 h-12 rounded-full border-2 border-white object-cover" alt={review.authorName} />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full border-2 border-white bg-orange-500 flex items-center justify-center text-white font-bold text-lg">
+                          {review.authorName?.charAt(0) || 'A'}
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-white font-bold">{review.authorName}</p>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-0.5">
+                            {[...Array(5)].map((_, i) => (
+                              <Star key={i} size={12} className={i < review.rating ? "text-amber-400" : "text-white/30"} fill="currentColor" />
+                            ))}
+                          </div>
+                          <span className="text-white/60 text-sm">{review.relativeTimeDescription}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <p className="text-white text-base leading-relaxed line-clamp-2">"{review.text}"</p>
+                    <span className="text-white/50 text-sm mt-1">swipe for more</span>
+                  </div>
+                  
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur-lg border-t border-white/10 px-6 py-4 pb-8">
+                    <div className="flex items-center justify-between max-w-md mx-auto">
+                      <button onClick={() => setShowRestaurantReviews(null)} className="text-white/60 hover:text-white"><Home size={24} /></button>
+                      <button onClick={() => { setShowRestaurantReviews(null); setShowSearch(true); }} className="text-white/60 hover:text-white"><Search size={24} /></button>
+                      <button className="text-white"><MessageSquare size={24} /></button>
+                      <button onClick={() => setShowFilterModal('cuisine')} className="text-white/60 hover:text-white"><Filter size={24} /></button>
+                      <button 
+                        onClick={() => window.open(showRestaurantReviews.googleMapsUrl, '_blank')}
+                        className="flex items-center gap-2 bg-green-500 text-white font-bold px-4 py-2 rounded-full text-sm"
+                      >
+                        <Clock size={14} />OPEN
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ))}
-          </div>
+            </div>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center p-6">
+              <button 
+                onClick={() => setShowRestaurantReviews(null)} 
+                className="absolute top-12 left-4 z-10 w-10 h-10 bg-black/50 backdrop-blur-sm rounded-full flex items-center justify-center"
+              >
+                <X size={20} className="text-white" />
+              </button>
+              <p className="text-white/60 mb-4">No reviews available yet</p>
+              <a 
+                href={`${showRestaurantReviews.googleMapsUrl}#reviews`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-orange-400 text-sm font-bold"
+              >
+                View on Google Maps →
+              </a>
+            </div>
+          )}
         </div>
       )}
 

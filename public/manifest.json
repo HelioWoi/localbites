@@ -1,0 +1,18 @@
+{
+  "name": "LocalBites",
+  "short_name": "LocalBites",
+  "description": "Discover local restaurants through video reels",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#f97316",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

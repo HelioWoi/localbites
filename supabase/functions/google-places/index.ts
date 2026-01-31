@@ -52,8 +52,10 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number)
   // Make multiple searches to get more results (up to 60 restaurants)
   const searchTypes = [
     ["restaurant"],
-    ["cafe", "coffee_shop"],
-    ["bar", "pub"],
+    ["cafe"],
+    ["coffee_shop"],
+    ["bar"],
+    ["bakery"],
   ];
 
   const allPlaces: any[] = [];
@@ -129,7 +131,7 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number)
       lat: place.location?.latitude,
       lng: place.location?.longitude,
     },
-    reviews: (place.reviews || []).slice(0, 5).map((review: any, idx: number) => ({
+    reviews: (place.reviews || []).slice(0, 10).map((review: any, idx: number) => ({
       id: `${place.id}-review-${idx}`,
       authorName: review.authorAttribution?.displayName || "Anonymous",
       authorPhotoUrl: review.authorAttribution?.photoUri,
