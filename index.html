@@ -16,6 +16,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+    
+    <!-- Google Maps JavaScript API -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBFuwVE7Omu6N3ZV4PHJvLORP0VqNlso3E&libraries=places&callback=Function.prototype"></script>
+    
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -123,6 +137,28 @@
         .animation-delay-200 { animation-delay: 200ms; }
         .animation-delay-300 { animation-delay: 300ms; }
         .animation-delay-500 { animation-delay: 500ms; }
+        
+        /* Leaflet Map Styles */
+        .leaflet-container {
+            height: 100%;
+            width: 100%;
+            z-index: 1;
+        }
+        .custom-marker {
+            background: transparent !important;
+            border: none !important;
+        }
+        .user-location-marker {
+            background: transparent !important;
+            border: none !important;
+        }
+        .leaflet-popup-content-wrapper {
+            border-radius: 12px;
+            padding: 8px;
+        }
+        .leaflet-popup-content {
+            margin: 8px;
+        }
     </style>
 <script type="importmap">
 {

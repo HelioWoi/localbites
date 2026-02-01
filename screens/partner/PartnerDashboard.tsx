@@ -3,10 +3,11 @@ import {
   LogOut, Plus, Play, Trash2, Eye, Heart, MapPin,
   Loader2, X, Upload, Check, Settings, BarChart3,
   Video, Crown, AlertCircle, ChevronRight, Calendar,
-  TrendingUp, Clock, Edit2, Save, QrCode, Copy, ExternalLink, Menu, Camera, Image, Star
+  TrendingUp, Clock, Edit2, Save, QrCode, Copy, ExternalLink, Menu, Camera, Image, Star, CreditCard
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { PartnerUser } from './PartnerPortal';
+import SubscriptionManager from './SubscriptionManager';
 
 interface PartnerDashboardProps {
   user: PartnerUser;
@@ -55,7 +56,7 @@ interface Restaurant {
   main_photo_url?: string;
 }
 
-type Tab = 'overview' | 'menu' | 'analytics' | 'settings';
+type Tab = 'overview' | 'menu' | 'analytics' | 'subscription' | 'settings';
 
 const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -506,6 +507,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               { id: 'overview', label: 'Overview', icon: BarChart3 },
               { id: 'menu', label: 'Menu', icon: Menu },
               { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+              { id: 'subscription', label: 'Subscription', icon: CreditCard },
               { id: 'settings', label: 'Settings', icon: Settings },
             ].map((tab) => (
               <button
@@ -832,6 +834,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               </div>
             )}
           </div>
+        )}
+
+        {/* Subscription Tab */}
+        {activeTab === 'subscription' && partnerData && (
+          <SubscriptionManager partnerId={partnerData.id} partnerEmail={user.email} />
         )}
 
         {/* Settings Tab */}

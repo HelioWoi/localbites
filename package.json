@@ -11,9 +11,13 @@
   "dependencies": {
     "@google/genai": "^1.38.0",
     "@supabase/supabase-js": "^2.93.2",
+    "leaflet": "^1.9.4",
+    "leaflet.markercluster": "^1.5.3",
     "lucide-react": "^0.563.0",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "react-leaflet": "^5.0.0",
+    "react-leaflet-cluster": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

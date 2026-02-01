@@ -30,8 +30,9 @@ const BottomNav: React.FC<BottomNavProps> = ({
         <button onClick={onReviews} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
           <MessageSquare size={24} />
         </button>
-        <button onClick={onFilter} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+        <button onClick={onFilter} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors relative">
           <Filter size={24} />
+          <div className="absolute top-0 right-0 w-2 h-2 bg-orange-500 rounded-full"></div>
         </button>
         <button 
           onClick={onOpenToggle}

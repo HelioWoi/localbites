@@ -620,10 +620,11 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
             <Search size={24} />
           </button>
           <button onClick={() => setShowReviewsReel(true)} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
-            <img src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon%20review.png" alt="Reviews" className="w-6 h-6 opacity-60 hover:opacity-100" />
+            <MessageSquare size={24} />
           </button>
-          <button className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+          <button className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors relative">
             <Filter size={24} />
+            <div className="absolute top-0 right-0 w-2 h-2 bg-orange-500 rounded-full"></div>
           </button>
           <div className={`px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 ${restaurant.isOpen ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
             <Clock size={14} />

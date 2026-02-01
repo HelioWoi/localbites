@@ -68,6 +68,8 @@ const App: React.FC = () => {
   const [showRestaurantReviews, setShowRestaurantReviews] = useState<Restaurant | null>(null);
   const [modalReviews, setModalReviews] = useState<any[]>([]);
   const [loadingModalReviews, setLoadingModalReviews] = useState(false);
+  const [feedReviews, setFeedReviews] = useState<any[]>([]);
+  const [loadingFeedReviews, setLoadingFeedReviews] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [openProfileReviews, setOpenProfileReviews] = useState(false);
   const [likesCounts, setLikesCounts] = useState<Map<string, number>>(new Map());
@@ -77,6 +79,58 @@ const App: React.FC = () => {
 
   const isOverlayOpen = showDishInfo || !!showFilterModal || showSaved;
   const isExternalOverlayOpen = !!showFilterModal || showSaved;
+
+  // Load reviews when Reviews Feed opens
+  useEffect(() => {
+    if (showReviewsFeed && feedReviews.length === 0) {
+      loadTopReviews();
+    }
+  }, [showReviewsFeed]);
+
+  const loadTopReviews = async () => {
+    setLoadingFeedReviews(true);
+    try {
+      console.log('[ReviewsFeed] Loading reviews for', restaurants.length, 'restaurants');
+      
+      // Get reviews from all restaurants
+      const allReviewsPromises = restaurants
+        .filter(r => r.id && !r.isSubscribed) // Only Google restaurants have place IDs
+        .slice(0, 10) // Limit to first 10 restaurants to avoid too many API calls
+        .map(async (restaurant) => {
+          try {
+            const details = await getRestaurantDetails(restaurant.id);
+            if (details && details.reviews && details.reviews.length > 0) {
+              return details.reviews.map(review => ({
+                ...review,
+                restaurantName: restaurant.name,
+                restaurantId: restaurant.id,
+                restaurantPhoto: restaurant.mainPhotoUrl,
+                restaurantRating: restaurant.rating,
+                restaurantTotalReviews: restaurant.totalReviews,
+                restaurantGoogleMapsUrl: restaurant.googleMapsUrl
+              }));
+            }
+            return [];
+          } catch (error) {
+            console.error('[ReviewsFeed] Error loading reviews for', restaurant.name, error);
+            return [];
+          }
+        });
+
+      const reviewsArrays = await Promise.all(allReviewsPromises);
+      const allReviews = reviewsArrays
+        .flat()
+        .sort((a, b) => b.rating - a.rating)
+        .slice(0, 10);
+
+      console.log('[ReviewsFeed] Loaded', allReviews.length, 'reviews');
+      setFeedReviews(allReviews);
+    } catch (error) {
+      console.error('[ReviewsFeed] Error loading reviews:', error);
+    } finally {
+      setLoadingFeedReviews(false);
+    }
+  };
 
   // Load user likes and saves from Supabase on mount
   useEffect(() => {
@@ -361,10 +415,11 @@ const App: React.FC = () => {
             <Search size={24} />
           </button>
           <button onClick={() => setShowReviewsFeed(true)} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
-            <img src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon%20review.png" alt="Reviews" className="w-6 h-6 opacity-60 hover:opacity-100" />
+            <MessageSquare size={24} />
           </button>
-          <button onClick={() => setShowFilterModal('cuisine')} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+          <button onClick={() => setShowFilterModal('cuisine')} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors relative">
             <Filter size={24} />
+            <div className="absolute top-0 right-0 w-2 h-2 bg-orange-500 rounded-full"></div>
           </button>
           <button 
             onClick={() => setFilters(f => ({ ...f, openNow: !f.openNow }))}
@@ -814,24 +869,27 @@ const App: React.FC = () => {
       {/* Reviews Feed Modal - Full screen swipeable feed */}
       {showReviewsFeed && (
         <div className="fixed inset-0 z-[70] bg-black">
-          {(() => {
-            const allReviews = restaurants
-              .filter(r => r.reviews && r.reviews.length > 0)
-              .flatMap(r => r.reviews?.map(review => ({ 
-                ...review, 
-                restaurantName: r.name, 
-                restaurantId: r.id, 
-                restaurantPhoto: r.mainPhotoUrl,
-                restaurantRating: r.rating,
-                restaurantTotalReviews: r.totalReviews,
-                restaurantGoogleMapsUrl: r.googleMapsUrl
-              })) || [])
-              .sort((a, b) => b.rating - a.rating)
-              .slice(0, 15);
-            
-            return (
-              <div className="snap-container">
-                {allReviews.map((review, idx) => (
+          {loadingFeedReviews ? (
+            <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+              <Loader2 size={64} className="text-orange-500 animate-spin mb-4" />
+              <h2 className="text-2xl font-bold text-white mb-2">Loading Reviews...</h2>
+              <p className="text-white/60">Finding the best reviews in your area</p>
+            </div>
+          ) : feedReviews.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+              <MessageSquare size={64} className="text-white/40 mb-4" />
+              <h2 className="text-2xl font-bold text-white mb-2">No Reviews Yet</h2>
+              <p className="text-white/60">Reviews from restaurants in your area will appear here</p>
+              <button 
+                onClick={() => setShowReviewsFeed(false)}
+                className="mt-8 px-6 py-3 bg-orange-500 text-white font-bold rounded-full"
+              >
+                Back to Feed
+              </button>
+            </div>
+          ) : (
+            <div className="snap-container">
+                {feedReviews.map((review, idx) => (
                   <div key={idx} className="snap-item relative">
                     {/* Full screen photo */}
                     <img 
@@ -941,9 +999,8 @@ const App: React.FC = () => {
                     </div>
                   </div>
                 ))}
-              </div>
-            );
-          })()}
+            </div>
+          )}
         </div>
       )}
 
