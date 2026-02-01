@@ -1,11 +1,36 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const GOOGLE_API_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY");
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+// Initialize Supabase client for caching
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+// Cache duration in hours
+const PLACES_CACHE_HOURS = 6;
+const LOCALITIES_CACHE_HOURS = 168; // 7 days - localities rarely change
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Helper: Round coordinates to create cache keys (groups nearby locations)
+function getCacheKey(lat: number, lng: number, radius: number): string {
+  // Round to 2 decimal places (~1km precision)
+  const roundedLat = Math.round(lat * 100) / 100;
+  const roundedLng = Math.round(lng * 100) / 100;
+  return `places_${roundedLat}_${roundedLng}_${radius}`;
+}
+
+function getLocalityCacheKey(lat: number, lng: number): string {
+  // Round to 1 decimal place (~10km precision for localities)
+  const roundedLat = Math.round(lat * 10) / 10;
+  const roundedLng = Math.round(lng * 10) / 10;
+  return `locality_${roundedLat}_${roundedLng}`;
+}
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -49,69 +74,84 @@ serve(async (req) => {
 });
 
 async function searchNearbyRestaurants(lat: number, lng: number, radius: number) {
-  // Make multiple searches to get more results (up to 60 restaurants)
-  const searchTypes = [
-    ["restaurant"],
-    ["cafe"],
-    ["coffee_shop"],
-    ["bar"],
-    ["bakery"],
-  ];
+  const cacheKey = getCacheKey(lat, lng, radius);
+  
+  // OPTIMIZATION #2: Check cache first
+  try {
+    const { data: cached } = await supabase
+      .from('api_cache')
+      .select('data, created_at')
+      .eq('cache_key', cacheKey)
+      .single();
+    
+    if (cached) {
+      const cacheAge = (Date.now() - new Date(cached.created_at).getTime()) / (1000 * 60 * 60);
+      if (cacheAge < PLACES_CACHE_HOURS) {
+        console.log(`[Cache HIT] Returning cached places for ${cacheKey}`);
+        return cached.data;
+      }
+    }
+  } catch (e) {
+    // Cache miss or table doesn't exist - continue to API call
+    console.log(`[Cache MISS] Fetching fresh data for ${cacheKey}`);
+  }
 
+  // OPTIMIZATION #1: Single unified search instead of 5 separate calls
+  // Using "restaurant" as primary type which includes most food establishments
   const allPlaces: any[] = [];
   const seenIds = new Set<string>();
 
-  for (const types of searchTypes) {
-    try {
-      const response = await fetch(
-        "https://places.googleapis.com/v1/places:searchNearby",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Goog-Api-Key": GOOGLE_API_KEY!,
-            "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.photos,places.location,places.types,places.websiteUri,places.nationalPhoneNumber,places.googleMapsUri,places.reviews",
-          },
-          body: JSON.stringify({
-            includedTypes: types,
-            maxResultCount: 20,
-            locationRestriction: {
-              circle: {
-                center: { latitude: lat, longitude: lng },
-                radius: radius,
-              },
+  try {
+    const response = await fetch(
+      "https://places.googleapis.com/v1/places:searchNearby",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": GOOGLE_API_KEY!,
+          // Optimized fields - removed reviews from initial search (fetch on demand)
+          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.photos,places.location,places.types,places.googleMapsUri",
+        },
+        body: JSON.stringify({
+          // Single call with multiple types instead of 5 separate calls
+          includedTypes: ["restaurant", "cafe", "bar", "bakery"],
+          maxResultCount: 20,
+          locationRestriction: {
+            circle: {
+              center: { latitude: lat, longitude: lng },
+              radius: radius,
             },
-          }),
-        }
-      );
+          },
+          rankPreference: "DISTANCE",
+        }),
+      }
+    );
 
-      if (response.ok) {
-        const data = await response.json();
-        for (const place of (data.places || [])) {
-          // Filter out non-food establishments
-          const excludedTypes = [
-            'supermarket', 'grocery_store', 'convenience_store', 'gym', 
-            'fitness_center', 'gas_station', 'hotel', 'lodging', 
-            'shopping_mall', 'department_store', 'pharmacy', 'hospital',
-            'school', 'university', 'bank', 'atm', 'car_wash', 'car_repair'
-          ];
-          const placeTypes = place.types || [];
-          const isExcluded = placeTypes.some((t: string) => excludedTypes.includes(t));
-          
-          if (!seenIds.has(place.id) && !isExcluded) {
-            seenIds.add(place.id);
-            allPlaces.push(place);
-          }
+    if (response.ok) {
+      const data = await response.json();
+      for (const place of (data.places || [])) {
+        // Filter out non-food establishments
+        const excludedTypes = [
+          'supermarket', 'grocery_store', 'convenience_store', 'gym', 
+          'fitness_center', 'gas_station', 'hotel', 'lodging', 
+          'shopping_mall', 'department_store', 'pharmacy', 'hospital',
+          'school', 'university', 'bank', 'atm', 'car_wash', 'car_repair'
+        ];
+        const placeTypes = place.types || [];
+        const isExcluded = placeTypes.some((t: string) => excludedTypes.includes(t));
+        
+        if (!seenIds.has(place.id) && !isExcluded) {
+          seenIds.add(place.id);
+          allPlaces.push(place);
         }
       }
-    } catch (error) {
-      console.error("Search error for types:", types, error);
     }
+  } catch (error) {
+    console.error("Search error:", error);
   }
 
-  const data = { places: allPlaces };
-
-  return (data.places || []).map((place: any) => ({
+  // Transform places to response format
+  const result = (allPlaces || []).map((place: any) => ({
     id: place.id,
     name: place.displayName?.text || "Unknown",
     address: place.formattedAddress || "",
@@ -131,26 +171,36 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number)
       lat: place.location?.latitude,
       lng: place.location?.longitude,
     },
-    reviews: (place.reviews || []).slice(0, 10).map((review: any, idx: number) => ({
-      id: `${place.id}-review-${idx}`,
-      authorName: review.authorAttribution?.displayName || "Anonymous",
-      authorPhotoUrl: review.authorAttribution?.photoUri,
-      rating: review.rating || 5,
-      text: review.text?.text || review.originalText?.text || "",
-      relativeTimeDescription: review.relativePublishTimeDescription || "Recently",
-      time: Date.now() - idx * 86400000,
-      photoUrl: place.photos?.[idx + 1]?.name
-        ? `https://places.googleapis.com/v1/${place.photos[idx + 1].name}/media?maxHeightPx=800&maxWidthPx=800&key=${GOOGLE_API_KEY}`
-        : place.photos?.[0]?.name
-          ? `https://places.googleapis.com/v1/${place.photos[0].name}/media?maxHeightPx=800&maxWidthPx=800&key=${GOOGLE_API_KEY}`
-          : undefined,
-    })),
+    reviews: [], // Reviews now fetched on demand via getPlaceDetails to save costs
   }));
+
+  // OPTIMIZATION #2: Save to cache for future requests
+  if (result.length > 0) {
+    try {
+      await supabase
+        .from('api_cache')
+        .upsert({
+          cache_key: cacheKey,
+          data: result,
+          created_at: new Date().toISOString(),
+        }, { onConflict: 'cache_key' });
+      console.log(`[Cache SAVE] Cached ${result.length} places for ${cacheKey}`);
+    } catch (e) {
+      console.error("[Cache SAVE] Failed to cache:", e);
+    }
+  }
+
+  return result;
 }
 
 async function getPlaceDetails(placeId: string) {
+  // Handle both formats: "places/ChIJ..." and "ChIJ..."
+  const cleanPlaceId = placeId.startsWith('places/') ? placeId : `places/${placeId}`;
+  
+  console.log(`[getPlaceDetails] Fetching details for: ${cleanPlaceId}`);
+  
   const response = await fetch(
-    `https://places.googleapis.com/v1/places/${placeId}`,
+    `https://places.googleapis.com/v1/${cleanPlaceId}`,
     {
       headers: {
         "X-Goog-Api-Key": GOOGLE_API_KEY!,
@@ -159,11 +209,16 @@ async function getPlaceDetails(placeId: string) {
     }
   );
 
+  console.log(`[getPlaceDetails] Response status: ${response.status}`);
+
   if (!response.ok) {
-    throw new Error("Failed to fetch place details");
+    const errorText = await response.text();
+    console.error(`[getPlaceDetails] Error: ${errorText}`);
+    throw new Error(`Failed to fetch place details: ${response.status}`);
   }
 
   const place = await response.json();
+  console.log(`[getPlaceDetails] Found ${place.reviews?.length || 0} reviews`);
 
   return {
     place: {
@@ -242,8 +297,29 @@ function extractCuisine(types?: string[]): string {
   return "Restaurant";
 }
 
-// Get nearby localities using reverse geocoding
+// OPTIMIZATION #3: Get nearby localities with permanent caching
 async function getNearbyLocalities(lat: number, lng: number, points: { lat: number; lng: number; direction: string }[]) {
+  const cacheKey = getLocalityCacheKey(lat, lng);
+  
+  // Check cache first - localities rarely change
+  try {
+    const { data: cached } = await supabase
+      .from('api_cache')
+      .select('data, created_at')
+      .eq('cache_key', cacheKey)
+      .single();
+    
+    if (cached) {
+      const cacheAge = (Date.now() - new Date(cached.created_at).getTime()) / (1000 * 60 * 60);
+      if (cacheAge < LOCALITIES_CACHE_HOURS) {
+        console.log(`[Cache HIT] Returning cached localities for ${cacheKey}`);
+        return cached.data;
+      }
+    }
+  } catch (e) {
+    console.log(`[Cache MISS] Fetching fresh localities for ${cacheKey}`);
+  }
+
   const localities: { name: string; lat: number; lng: number }[] = [];
   const seenNames = new Set<string>();
 
@@ -258,7 +334,7 @@ async function getNearbyLocalities(lat: number, lng: number, points: { lat: numb
     console.error("Error getting current locality:", e);
   }
 
-  // Then get localities for nearby points
+  // Then get localities for nearby points (limit to 2 more to reduce API calls)
   for (const point of points) {
     if (localities.length >= 3) break;
     try {
@@ -272,7 +348,25 @@ async function getNearbyLocalities(lat: number, lng: number, points: { lat: numb
     }
   }
 
-  return { localities };
+  const result = { localities };
+
+  // Save to cache for 7 days
+  if (localities.length > 0) {
+    try {
+      await supabase
+        .from('api_cache')
+        .upsert({
+          cache_key: cacheKey,
+          data: result,
+          created_at: new Date().toISOString(),
+        }, { onConflict: 'cache_key' });
+      console.log(`[Cache SAVE] Cached ${localities.length} localities for ${cacheKey}`);
+    } catch (e) {
+      console.error("[Cache SAVE] Failed to cache localities:", e);
+    }
+  }
+
+  return result;
 }
 
 // Reverse geocode a point to get locality name

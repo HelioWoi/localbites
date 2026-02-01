@@ -132,8 +132,8 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
 
   return (
     <div className="min-h-screen bg-zinc-50 flex flex-col">
-      {/* Header */}
-      <div className="p-6 flex items-center justify-center">
+      {/* Header - closer to content */}
+      <div className="pt-12 pb-6 flex items-center justify-center">
         <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
             <Utensils size={18} className="text-white" />
@@ -146,7 +146,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex items-center justify-center p-6">
+      <div className="flex-1 flex items-start justify-center p-6 pt-0">
         <div className="w-full max-w-md">
           <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 p-8">
             <h1 className="text-2xl font-bold text-zinc-900 mb-1">

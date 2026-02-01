@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Volume2, VolumeX, ChevronUp, Star, MapPin, Globe, Navigation } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, ChevronUp, Star, MapPin, Globe, Navigation, Heart, Bookmark, X, ChevronLeft } from 'lucide-react';
 
 interface MenuItem {
   id: string;
@@ -37,6 +37,46 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   const [isPlaying, setIsPlaying] = useState(true);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  // Likes and saves state
+  const [likedItems, setLikedItems] = useState<Set<string>>(new Set());
+  const [savedItems, setSavedItems] = useState<Set<string>>(new Set());
+  
+  // Load saved items from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(`saved_dishes_${restaurant.id}`);
+    if (saved) {
+      setSavedItems(new Set(JSON.parse(saved)));
+    }
+  }, [restaurant.id]);
+  
+  // Toggle like
+  const toggleLike = (itemId: string) => {
+    setLikedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
+  };
+  
+  // Toggle save
+  const toggleSave = (itemId: string) => {
+    setSavedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      // Save to localStorage
+      localStorage.setItem(`saved_dishes_${restaurant.id}`, JSON.stringify([...next]));
+      return next;
+    });
+  };
 
   // Filter items by category
   const filteredItems = activeCategory 
@@ -67,6 +107,45 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
       }
     });
   }, [activeVideoIndex, isMuted, isPlaying, filteredItems]);
+  
+  // Auto-play next video when current ends
+  useEffect(() => {
+    const currentVideo = videoRefs.current[activeVideoIndex];
+    if (!currentVideo) return;
+    
+    const handleVideoEnd = () => {
+      // If not the last video in filtered items, go to next
+      if (activeVideoIndex < filteredItems.length - 1) {
+        setActiveVideoIndex(activeVideoIndex + 1);
+        if (scrollRef.current) {
+          scrollRef.current.scrollTo({ 
+            top: (activeVideoIndex + 1) * window.innerHeight, 
+            behavior: 'smooth' 
+          });
+        }
+      } else {
+        // Last video of current category - switch to next category
+        const currentCategoryIndex = restaurant.categories.indexOf(activeCategory || '');
+        const nextCategoryIndex = currentCategoryIndex + 1;
+        
+        if (activeCategory === null) {
+          // We're in "All" view, go to first category
+          if (restaurant.categories.length > 0) {
+            setActiveCategory(restaurant.categories[0]);
+          }
+        } else if (nextCategoryIndex < restaurant.categories.length) {
+          // Go to next category
+          setActiveCategory(restaurant.categories[nextCategoryIndex]);
+        } else {
+          // All categories done, go back to "All"
+          setActiveCategory(null);
+        }
+      }
+    };
+    
+    currentVideo.addEventListener('ended', handleVideoEnd);
+    return () => currentVideo.removeEventListener('ended', handleVideoEnd);
+  }, [activeVideoIndex, filteredItems.length, activeCategory, restaurant.categories]);
 
   // Reset video index when category changes
   useEffect(() => {
@@ -81,13 +160,31 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
       {/* Header - Restaurant Info */}
       <div className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-black/80 via-black/40 to-transparent p-6 pt-12">
         <div className="flex items-center gap-4">
-          {restaurant.logoUrl ? (
-            <img src={restaurant.logoUrl} alt={restaurant.name} className="w-12 h-12 rounded-full object-cover border-2 border-white/20" />
-          ) : (
-            <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center">
-              <span className="text-white font-bold text-lg">{restaurant.name.charAt(0)}</span>
-            </div>
-          )}
+          {/* Back button */}
+          <button 
+            onClick={() => {
+              const slug = restaurant.slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+              window.location.href = `/#profile-${restaurant.id}`;
+              window.history.back();
+            }}
+            className="p-2 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all flex-shrink-0"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          {/* Logo - clickable to go back */}
+          <button onClick={() => {
+            const slug = restaurant.slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            window.location.href = `/#profile-${restaurant.id}`;
+            window.history.back();
+          }} className="flex-shrink-0">
+            {restaurant.logoUrl ? (
+              <img src={restaurant.logoUrl} alt={restaurant.name} className="w-12 h-12 rounded-full object-cover border-2 border-white/20" />
+            ) : (
+              <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center">
+                <span className="text-white font-bold text-lg">{restaurant.name.charAt(0)}</span>
+              </div>
+            )}
+          </button>
           <div className="flex-1">
             <h1 className="text-white font-bold text-lg leading-tight">{restaurant.name}</h1>
             <div className="flex items-center gap-2 text-white/60 text-xs">
@@ -167,12 +264,55 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
 
             {/* Right side controls */}
             <div className="absolute right-4 bottom-40 flex flex-col items-center gap-4">
+              {/* Like button */}
+              <button 
+                onClick={() => toggleLike(item.id)}
+                className="flex flex-col items-center gap-1"
+              >
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                  likedItems.has(item.id) 
+                    ? 'bg-red-500' 
+                    : 'bg-white/20 backdrop-blur-md'
+                }`}>
+                  <Heart 
+                    size={24} 
+                    className={likedItems.has(item.id) ? 'text-white fill-white' : 'text-white'} 
+                  />
+                </div>
+                <span className="text-white text-[10px] font-medium">
+                  {likedItems.has(item.id) ? 'Liked' : 'Like'}
+                </span>
+              </button>
+              
+              {/* Save button */}
+              <button 
+                onClick={() => toggleSave(item.id)}
+                className="flex flex-col items-center gap-1"
+              >
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                  savedItems.has(item.id) 
+                    ? 'bg-orange-500' 
+                    : 'bg-white/20 backdrop-blur-md'
+                }`}>
+                  <Bookmark 
+                    size={24} 
+                    className={savedItems.has(item.id) ? 'text-white fill-white' : 'text-white'} 
+                  />
+                </div>
+                <span className="text-white text-[10px] font-medium">
+                  {savedItems.has(item.id) ? 'Saved' : 'Save'}
+                </span>
+              </button>
+              
+              {/* Mute button */}
               <button 
                 onClick={() => setIsMuted(!isMuted)}
-                className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white"
+                className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white mt-2"
               >
                 {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
               </button>
+              
+              {/* Play/Pause button */}
               <button 
                 onClick={() => setIsPlaying(!isPlaying)}
                 className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white"

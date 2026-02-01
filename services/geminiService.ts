@@ -1,6 +1,6 @@
 
 import { Restaurant, UserLocation, Review } from "../types";
-import { getAllRestaurants, hasSupabaseData } from "./supabaseService";
+import { getPartnerRestaurants, hasSupabaseData } from "./supabaseService";
 import { searchNearbyRestaurants as searchGooglePlaces, getPlaceDetails } from "./googlePlacesProxy";
 
 export async function getNearbyRestaurants(
@@ -8,6 +8,7 @@ export async function getNearbyRestaurants(
   filters?: { cuisine?: string; price?: string; openNow?: boolean }
 ): Promise<Restaurant[]> {
   console.log('[LocalBites] Fetching restaurants for:', location.name);
+  console.log('[LocalBites] Location coordinates:', { lat: location.lat, lng: location.lng, radius: location.radius });
   
   // 1. First, get partner restaurants from Supabase (they have priority)
   let partnerRestaurants: Restaurant[] = [];
@@ -15,7 +16,9 @@ export async function getNearbyRestaurants(
     const hasData = await hasSupabaseData();
     if (hasData) {
       console.log('[LocalBites] Loading partner restaurants from Supabase');
-      partnerRestaurants = await getAllRestaurants();
+      // Pass user location for distance calculation
+      console.log('[LocalBites] About to call getPartnerRestaurants with:', location.lat, location.lng);
+      partnerRestaurants = await getPartnerRestaurants(location.lat, location.lng);
       console.log('[LocalBites] Found', partnerRestaurants.length, 'partner restaurants');
     }
   } catch (error) {
@@ -58,15 +61,23 @@ export async function getNearbyRestaurants(
   }
 
   // 3. Merge results: Partners first, then Google (avoiding duplicates)
+  console.log('[LocalBites] Merging results - Partners:', partnerRestaurants.length, 'Google:', googleRestaurants.length);
   const partnerNames = new Set(partnerRestaurants.map(r => r.name.toLowerCase()));
   const filteredGoogleRestaurants = googleRestaurants.filter(
     r => !partnerNames.has(r.name.toLowerCase())
   );
 
   let results = [...partnerRestaurants, ...filteredGoogleRestaurants];
+  console.log('[LocalBites] After merge:', results.length, 'restaurants');
+  console.log('[LocalBites] First restaurant:', results[0]?.name, 'isSubscribed:', results[0]?.isSubscribed);
 
-  // 4. Sort by distance (closest first)
+  // 4. Sort: Partners FIRST (priority), then by distance within each group
   results.sort((a, b) => {
+    // Priority 1: Partners (isSubscribed) always come first
+    if (a.isSubscribed && !b.isSubscribed) return -1;
+    if (!a.isSubscribed && b.isSubscribed) return 1;
+    
+    // Priority 2: Within same group (both partners or both non-partners), sort by distance
     const distA = parseFloat(a.distance.replace(/[^\d.]/g, '')) || 0;
     const distB = parseFloat(b.distance.replace(/[^\d.]/g, '')) || 0;
     // Convert km to m if needed for comparison
@@ -74,20 +85,28 @@ export async function getNearbyRestaurants(
     const distBMeters = b.distance.includes('km') ? distB * 1000 : distB;
     return distAMeters - distBMeters;
   });
+  console.log('[LocalBites] After sort:', results.length, 'restaurants');
+  console.log('[LocalBites] First restaurant after sort:', results[0]?.name, 'isSubscribed:', results[0]?.isSubscribed);
 
   // 5. Apply filters
+  const beforeFilters = results.length;
   if (filters?.cuisine && filters.cuisine !== 'All') {
     results = results.filter(r => 
       r.cuisine.toLowerCase().includes(filters.cuisine!.toLowerCase())
     );
+    console.log('[LocalBites] After cuisine filter:', results.length, '(was', beforeFilters, ')');
   }
 
   if (filters?.price) {
+    const beforePrice = results.length;
     results = results.filter(r => r.priceLevel === filters.price);
+    console.log('[LocalBites] After price filter:', results.length, '(was', beforePrice, ')');
   }
 
   if (filters?.openNow) {
+    const beforeOpen = results.length;
     results = results.filter(r => r.isOpen);
+    console.log('[LocalBites] After openNow filter:', results.length, '(was', beforeOpen, ')');
   }
 
   // 6. No fallback to demo data - only show real results

@@ -89,15 +89,20 @@ export async function getPlaceDetails(placeId: string): Promise<{
   photos: string[];
 } | null> {
   try {
+    console.log('[GooglePlaces] Getting details for:', placeId);
+    
     const { data, error } = await supabase.functions.invoke('google-places', {
       body: { action: 'getDetails', placeId },
     });
 
-    if (error || data.error) {
-      console.error('[GooglePlaces] Error getting details:', error || data.error);
+    console.log('[GooglePlaces] Details response:', { data, error });
+
+    if (error || data?.error) {
+      console.error('[GooglePlaces] Error getting details:', error || data?.error);
       return null;
     }
 
+    console.log('[GooglePlaces] Reviews found:', data?.reviews?.length || 0);
     return data;
   } catch (error) {
     console.error('[GooglePlaces] Error:', error);

@@ -9,7 +9,7 @@ import PartnerPortal from './screens/partner/PartnerPortal';
 import RestaurantMenuLoader from './components/RestaurantMenuLoader';
 import MediaContainer from './components/MediaContainer';
 import FloatingFilters from './components/FloatingFilters';
-import { getNearbyRestaurants } from './services/geminiService';
+import { getNearbyRestaurants, getRestaurantDetails } from './services/geminiService';
 import { likeRestaurant, unlikeRestaurant, saveRestaurant, unsaveRestaurant, getUserLikes, getUserSaves, getAllLikesCounts } from './services/interactionService';
 import { CUISINES, PRICES } from './constants';
 import { Home, Search, MessageSquare, Filter, Bookmark, ExternalLink, Info, Loader2, X, ArrowRight, Globe, MapPin, ChevronUp, Crown, PlayCircle, Heart, Star, Clock } from 'lucide-react';
@@ -35,6 +35,8 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>('SPLASH');
   const [location, setLocation] = useState<UserLocation | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [allRestaurants, setAllRestaurants] = useState<Restaurant[]>([]); // Full list for pagination
+  const [visibleCount, setVisibleCount] = useState(20); // Show 20 at a time
   const [activeRestaurantIndex, setActiveRestaurantIndex] = useState(0);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -50,6 +52,8 @@ const App: React.FC = () => {
   const [showSearch, setShowSearch] = useState(false);
   const [showReviewsFeed, setShowReviewsFeed] = useState(false);
   const [showRestaurantReviews, setShowRestaurantReviews] = useState<Restaurant | null>(null);
+  const [modalReviews, setModalReviews] = useState<any[]>([]);
+  const [loadingModalReviews, setLoadingModalReviews] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [openProfileReviews, setOpenProfileReviews] = useState(false);
   const [likesCounts, setLikesCounts] = useState<Map<string, number>>(new Map());
@@ -103,13 +107,20 @@ const App: React.FC = () => {
     setError(null);
     try {
       const data = await getNearbyRestaurants(loc, f);
-      setRestaurants(data);
+      console.log('[App] Total restaurants from getNearbyRestaurants:', data.length);
+      console.log('[App] First 3 restaurants:', data.slice(0, 3).map(r => ({ name: r.name, isSubscribed: r.isSubscribed, distance: r.distance })));
+      
+      setAllRestaurants(data); // Store full list
+      setRestaurants(data.slice(0, 20)); // Show first 20
+      setVisibleCount(20);
       setActiveRestaurantIndex(0);
       if (feedRef.current) feedRef.current.scrollTo({ top: 0 });
       
-      // Load likes counts for all restaurants
+      console.log('[App] Set restaurants state with:', data.slice(0, 20).length, 'items');
+      
+      // Load likes counts for visible restaurants
       if (data.length > 0) {
-        const ids = data.map(r => r.id);
+        const ids = data.slice(0, 20).map(r => r.id);
         const counts = await getAllLikesCounts(ids);
         setLikesCounts(counts);
       }
@@ -123,9 +134,64 @@ const App: React.FC = () => {
     }
   }, [filters]);
 
+  // Load more restaurants (pagination)
+  const loadMoreRestaurants = useCallback(async () => {
+    const newCount = visibleCount + 20;
+    const newRestaurants = allRestaurants.slice(0, newCount);
+    setRestaurants(newRestaurants);
+    setVisibleCount(newCount);
+    
+    // Load likes for new restaurants
+    const newIds = allRestaurants.slice(visibleCount, newCount).map(r => r.id);
+    if (newIds.length > 0) {
+      const newCounts = await getAllLikesCounts(newIds);
+      setLikesCounts(prev => new Map([...prev, ...newCounts]));
+    }
+  }, [allRestaurants, visibleCount]);
+
   useEffect(() => {
     if (location) fetchRestaurants(location);
   }, [location, fetchRestaurants]);
+
+  // Fetch reviews when restaurant reviews modal opens
+  useEffect(() => {
+    const fetchModalReviews = async () => {
+      // Check if it's a Google restaurant (ID starts with ChIJ or places/)
+      const isGoogleRestaurant = showRestaurantReviews && 
+        (showRestaurantReviews.id.startsWith('places/') || showRestaurantReviews.id.startsWith('ChIJ'));
+      
+      if (isGoogleRestaurant) {
+        // Check if restaurant already has reviews
+        if (showRestaurantReviews.reviews && showRestaurantReviews.reviews.length > 0) {
+          setModalReviews(showRestaurantReviews.reviews);
+          return;
+        }
+        
+        setLoadingModalReviews(true);
+        try {
+          console.log('[App] Fetching reviews for:', showRestaurantReviews.id);
+          const details = await getRestaurantDetails(showRestaurantReviews.id);
+          console.log('[App] Got details:', details);
+          if (details?.reviews && details.reviews.length > 0) {
+            setModalReviews(details.reviews);
+          } else {
+            setModalReviews([]);
+          }
+        } catch (error) {
+          console.error('Error fetching modal reviews:', error);
+          setModalReviews([]);
+        } finally {
+          setLoadingModalReviews(false);
+        }
+      } else if (showRestaurantReviews) {
+        // Non-Google restaurant - use existing reviews
+        setModalReviews(showRestaurantReviews.reviews || []);
+      } else {
+        setModalReviews([]);
+      }
+    };
+    fetchModalReviews();
+  }, [showRestaurantReviews]);
 
   const handleLocationSelect = (loc: UserLocation) => {
     setLocation(loc);
@@ -140,11 +206,20 @@ const App: React.FC = () => {
     setShowFilterModal(null);
   };
 
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    // Throttle scroll handler to prevent excessive state updates
+    if (scrollTimeoutRef.current) return;
+    
+    scrollTimeoutRef.current = setTimeout(() => {
+      scrollTimeoutRef.current = null;
+    }, 100);
+    
     const scrollPos = e.currentTarget.scrollTop;
     const itemHeight = window.innerHeight;
     const index = Math.round(scrollPos / itemHeight);
-    if (index !== activeRestaurantIndex) {
+    if (index !== activeRestaurantIndex && index >= 0 && index < restaurants.length) {
       setActiveRestaurantIndex(index);
       setShowDishInfo(false);
     }
@@ -491,6 +566,7 @@ const App: React.FC = () => {
         )}
       </div>
 
+      
       {/* Search Modal */}
       {showSearch && (
         <div className="fixed inset-0 z-[70] bg-black/90 backdrop-blur-lg flex flex-col animate-in fade-in duration-300">
@@ -604,9 +680,10 @@ const App: React.FC = () => {
                   <div key={idx} className="snap-item relative">
                     {/* Full screen photo */}
                     <img 
-                      src={review.photoUrl || review.restaurantPhoto} 
+                      src={review.photoUrl || review.restaurantPhoto || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'} 
                       className="absolute inset-0 w-full h-full object-cover" 
-                      alt="Review" 
+                      alt="Review"
+                      onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'; }}
                     />
                     
                     {/* Gradient overlay */}
@@ -718,14 +795,25 @@ const App: React.FC = () => {
       {/* Restaurant Reviews Modal - Full screen swipeable feed */}
       {showRestaurantReviews && (
         <div className="fixed inset-0 z-[70] bg-black">
-          {showRestaurantReviews.reviews && showRestaurantReviews.reviews.length > 0 ? (
+          {loadingModalReviews ? (
+            <div className="h-full flex flex-col items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-orange-500 mb-4" />
+              <p className="text-white/60">Loading reviews...</p>
+            </div>
+          ) : modalReviews.length > 0 ? (
             <div className="snap-container">
-              {showRestaurantReviews.reviews.slice(0, 10).map((review, idx) => (
+              {modalReviews.slice(0, 10).map((review, idx) => {
+                // Always use the restaurant's main photo (same as feed) for consistency
+                const photoSrc = showRestaurantReviews.mainPhotoUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800';
+                return (
                 <div key={idx} className="snap-item relative">
                   <img 
-                    src={review.photoUrl || showRestaurantReviews.mainPhotoUrl} 
+                    src={photoSrc} 
                     className="absolute inset-0 w-full h-full object-cover" 
-                    alt="Review" 
+                    alt="Review"
+                    onError={(e) => { 
+                      e.currentTarget.src = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'; 
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/30" />
                   
@@ -736,16 +824,17 @@ const App: React.FC = () => {
                     <X size={20} className="text-white" />
                   </button>
                   
-                  <a 
-                    href={`${showRestaurantReviews.googleMapsUrl}#reviews`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="absolute top-12 right-4 z-10 flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full"
+                  <button 
+                    onClick={() => {
+                      const url = showRestaurantReviews.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(showRestaurantReviews.name + ' ' + showRestaurantReviews.address)}`;
+                      window.open(url, '_blank');
+                    }}
+                    className="absolute top-12 right-4 z-10 flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full active:scale-95 transition-transform"
                   >
                     <Star size={14} className="text-amber-400" fill="currentColor" />
                     <span className="text-white font-bold text-sm">{showRestaurantReviews.rating?.toFixed(1)}</span>
                     <span className="text-white/70 text-xs">({showRestaurantReviews.totalReviews} reviews)</span>
-                  </a>
+                  </button>
                   
                   <div className="absolute bottom-24 left-0 right-0 p-6">
                     <div className="flex items-center gap-3 mb-4">
@@ -788,7 +877,8 @@ const App: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center p-6">

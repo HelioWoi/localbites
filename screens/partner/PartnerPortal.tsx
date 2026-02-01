@@ -43,10 +43,9 @@ const PartnerPortal: React.FC = () => {
       }
     } catch (error) {
       console.error('Session check error:', error);
-    } finally {
-      console.log('Setting isLoading to false');
-      setIsLoading(false);
     }
+    // Always set loading to false after everything completes
+    setIsLoading(false);
   };
 
   const loadUserData = async (userId: string, email: string) => {

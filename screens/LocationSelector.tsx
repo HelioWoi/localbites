@@ -55,7 +55,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [allRestaurants, setAllRestaurants] = useState<any[]>([]);
-  const [selectedRadius, setSelectedRadius] = useState<5 | 10>(5);
+  const selectedRadius = 5; // Fixed at 5km for cost optimization
   const [userLat, setUserLat] = useState<number | null>(null);
   const [userLng, setUserLng] = useState<number | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -64,6 +64,9 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
 
   // Get user's location on mount and fetch nearby regions
   useEffect(() => {
+    const defaultLat = -26.6811;
+    const defaultLng = 153.1214;
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
@@ -75,59 +78,66 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
           // Fetch nearby regions using reverse geocoding
           await fetchNearbyRegions(lat, lng);
         },
-        async () => {
-          // Use default location (Mooloolaba) if geolocation fails
-          setUserLat(-26.6811);
-          setUserLng(153.1214);
-          await fetchNearbyRegions(-26.6811, 153.1214);
-        }
+        async (error) => {
+          // Silently use default location (Mooloolaba) if geolocation fails
+          console.log('Geolocation not available, using default location');
+          setUserLat(defaultLat);
+          setUserLng(defaultLng);
+          await fetchNearbyRegions(defaultLat, defaultLng);
+        },
+        { timeout: 5000, enableHighAccuracy: false }
       );
     } else {
       // Fallback if geolocation not available
-      setUserLat(-26.6811);
-      setUserLng(153.1214);
-      fetchNearbyRegions(-26.6811, 153.1214);
+      setUserLat(defaultLat);
+      setUserLng(defaultLng);
+      fetchNearbyRegions(defaultLat, defaultLng);
     }
   }, []);
 
   // Fetch nearby regions using Google Places API via Edge Function
   const fetchNearbyRegions = async (lat: number, lng: number) => {
     setLoadingRegions(true);
+    const nearbyPoints = generateNearbyPoints(lat, lng);
+    
     try {
-      // Generate nearby points and get their locality names
-      const nearbyPoints = generateNearbyPoints(lat, lng);
       const regions: NearbyRegion[] = [];
       const seenNames = new Set<string>();
 
-      // Use Supabase Edge Function to get place names
-      const { data, error } = await supabase.functions.invoke('google-places', {
-        body: {
-          action: 'getNearbyLocalities',
-          lat,
-          lng,
-          points: nearbyPoints
-        }
-      });
-
-      if (!error && data?.localities && data.localities.length > 0) {
-        data.localities.forEach((locality: any, index: number) => {
-          if (!seenNames.has(locality.name) && regions.length < 4) {
-            seenNames.add(locality.name);
-            const distKm = calculateDistance(lat, lng, locality.lat, locality.lng);
-            regions.push({
-              name: locality.name,
-              lat: locality.lat,
-              lng: locality.lng,
-              img: DEFAULT_IMAGES[index % DEFAULT_IMAGES.length],
-              distanceKm: distKm,
-              distance: distKm < 1 ? `${Math.round(distKm * 1000)}m` : `${Math.round(distKm)}km`
-            });
+      // Try to use Supabase Edge Function to get place names
+      try {
+        const { data, error } = await supabase.functions.invoke('google-places', {
+          body: {
+            action: 'getNearbyLocalities',
+            lat,
+            lng,
+            points: nearbyPoints
           }
         });
+
+        if (!error && data?.localities && data.localities.length > 0) {
+          data.localities.forEach((locality: any, index: number) => {
+            if (!seenNames.has(locality.name) && regions.length < 4) {
+              seenNames.add(locality.name);
+              const distKm = calculateDistance(lat, lng, locality.lat, locality.lng);
+              regions.push({
+                name: locality.name,
+                lat: locality.lat,
+                lng: locality.lng,
+                img: DEFAULT_IMAGES[index % DEFAULT_IMAGES.length],
+                distanceKm: distKm,
+                distance: distKm < 1 ? `${Math.round(distKm * 1000)}m` : `${Math.round(distKm)}km`
+              });
+            }
+          });
+        } else if (error) {
+          console.log('Edge Function not available, using generic regions');
+        }
+      } catch (edgeFunctionError) {
+        console.log('Edge Function error, using generic regions');
       }
 
-      
-      // If we couldn't get localities, create generic ones based on directions
+      // Always ensure we have 4 regions (fill with generic ones if needed)
       if (regions.length < 4) {
         nearbyPoints.slice(0, 4 - regions.length).forEach((point, index) => {
           const distKm = calculateDistance(lat, lng, point.lat, point.lng);
@@ -144,9 +154,8 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
 
       setNearbyRegions(regions);
     } catch (error) {
-      console.error('Error fetching nearby regions:', error);
-      // Fallback to generic regions
-      const nearbyPoints = generateNearbyPoints(lat, lng);
+      console.log('Fallback: Using generic nearby regions');
+      // Guaranteed fallback to generic regions
       setNearbyRegions(nearbyPoints.slice(0, 4).map((point, index) => ({
         name: `${point.direction} Area`,
         lat: point.lat,
@@ -155,8 +164,9 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
         distanceKm: 3,
         distance: '3km'
       })));
+    } finally {
+      setLoadingRegions(false);
     }
-    setLoadingRegions(false);
   };
 
   const suggestions = nearbyRegions;
@@ -170,18 +180,23 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
     loadRestaurants();
   }, []);
 
-  // Filter restaurants as user types
+  // Filter restaurants as user types with debounce
   useEffect(() => {
-    if (query.trim().length > 0) {
-      const filtered = allRestaurants.filter(r => 
-        r.name?.toLowerCase().includes(query.toLowerCase()) ||
-        r.cuisine?.toLowerCase().includes(query.toLowerCase()) ||
-        r.address?.toLowerCase().includes(query.toLowerCase())
-      );
-      setSearchResults(filtered);
-    } else {
-      setSearchResults([]);
-    }
+    const timeoutId = setTimeout(() => {
+      if (query.trim().length > 0) {
+        const lowerQuery = query.toLowerCase();
+        const filtered = allRestaurants.filter(r => 
+          r.name?.toLowerCase().includes(lowerQuery) ||
+          r.cuisine?.toLowerCase().includes(lowerQuery) ||
+          r.address?.toLowerCase().includes(lowerQuery)
+        );
+        setSearchResults(filtered.slice(0, 10)); // Limit results
+      } else {
+        setSearchResults([]);
+      }
+    }, 150); // 150ms debounce
+    
+    return () => clearTimeout(timeoutId);
   }, [query, allRestaurants]);
 
   const handleUseCurrent = () => {
@@ -200,10 +215,32 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
           }, 3000);
         },
         () => {
-          setIsSearching(false);
-          alert("Please enable location permissions");
+          // If geolocation fails, use saved location or default (Mooloolaba)
+          const lat = userLat || -26.6811;
+          const lng = userLng || 153.1214;
+          setTimeout(() => {
+            onLocationSelect({
+              lat,
+              lng,
+              name: 'Current Location',
+              radius: selectedRadius * 1000
+            });
+          }, 3000);
         }
       );
+    } else {
+      // Fallback if geolocation not available
+      setIsSearching(true);
+      const lat = userLat || -26.6811;
+      const lng = userLng || 153.1214;
+      setTimeout(() => {
+        onLocationSelect({
+          lat,
+          lng,
+          name: 'Current Location',
+          radius: selectedRadius * 1000
+        });
+      }, 3000);
     }
   };
 
@@ -218,31 +255,20 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
     }, 3000);
   };
 
-  // GPS Animation Overlay - Same as SplashScreen
+  // GPS Animation Overlay - Simplified for better performance
   if (isSearching) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-zinc-50 text-zinc-900 overflow-hidden">
         <div className="flex flex-col items-center justify-center">
-          {/* GPS Pin with pulse animation */}
-          <div className="relative">
-            {/* Pulse rings */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-32 h-32 bg-orange-500/10 rounded-full animate-ping" style={{ animationDuration: '1.5s' }} />
-            </div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-24 h-24 bg-orange-500/20 rounded-full animate-ping" style={{ animationDuration: '1.5s', animationDelay: '0.3s' }} />
-            </div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-16 h-16 bg-orange-500/30 rounded-full animate-ping" style={{ animationDuration: '1.5s', animationDelay: '0.6s' }} />
-            </div>
-            
-            {/* Center pin */}
-            <div className="relative z-10 w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center shadow-xl shadow-orange-500/40">
-              <MapPin className="w-8 h-8 text-white animate-bounce" style={{ animationDuration: '1s' }} />
+          {/* Simplified GPS animation */}
+          <div className="relative w-20 h-20">
+            <div className="absolute inset-0 bg-orange-500/20 rounded-full animate-pulse" />
+            <div className="absolute inset-2 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center shadow-lg">
+              <MapPin className="w-8 h-8 text-white" />
             </div>
           </div>
           
-          <h2 className="mt-8 text-xl font-bold text-zinc-800 animate-pulse">
+          <h2 className="mt-8 text-xl font-bold text-zinc-800">
             Finding your location...
           </h2>
           
@@ -250,15 +276,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
             Searching for the best bites nearby
           </p>
           
-          {/* Animated dots */}
-          <div className="mt-6 flex items-center gap-2">
-            <Navigation className="w-4 h-4 text-orange-500 animate-spin" style={{ animationDuration: '2s' }} />
-            <div className="flex gap-1">
-              <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 bg-orange-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-          </div>
+          <Loader2 className="mt-6 w-6 h-6 text-orange-500 animate-spin" />
         </div>
       </div>
     );
@@ -331,31 +349,9 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
         Use Current Location
       </button>
       
-      {/* Radius Toggle */}
+      {/* Search radius indicator */}
       <div className="flex items-center justify-center gap-2 mb-4">
-        <span className="text-xs text-zinc-400">Search radius:</span>
-        <div className="flex bg-zinc-100 rounded-full p-1">
-          <button
-            onClick={() => setSelectedRadius(5)}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-              selectedRadius === 5
-                ? 'bg-orange-500 text-white shadow-sm'
-                : 'text-zinc-500 hover:text-zinc-700'
-            }`}
-          >
-            5 km
-          </button>
-          <button
-            onClick={() => setSelectedRadius(10)}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-              selectedRadius === 10
-                ? 'bg-orange-500 text-white shadow-sm'
-                : 'text-zinc-500 hover:text-zinc-700'
-            }`}
-          >
-            10 km
-          </button>
-        </div>
+        <span className="text-xs text-zinc-400">Search radius: <span className="text-orange-500 font-semibold">5 km</span></span>
       </div>
 
       <div className="flex-1 overflow-y-auto">

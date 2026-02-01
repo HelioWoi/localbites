@@ -108,7 +108,7 @@ export async function getRestaurantById(id: string): Promise<Restaurant | null> 
 // Check if Supabase has data
 export async function hasSupabaseData(): Promise<boolean> {
   const { count, error } = await supabase
-    .from('restaurants')
+    .from('partners')
     .select('*', { count: 'exact', head: true });
 
   if (error) {
@@ -116,11 +116,26 @@ export async function hasSupabaseData(): Promise<boolean> {
     return false;
   }
 
+  console.log('[hasSupabaseData] Partners count:', count);
   return (count || 0) > 0;
 }
 
+// Calculate distance between two points in km
+function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 // Fetch partner restaurants (from partners table with menu_items)
-export async function getPartnerRestaurants(): Promise<Restaurant[]> {
+export async function getPartnerRestaurants(userLat?: number, userLng?: number): Promise<Restaurant[]> {
+  console.log('[getPartnerRestaurants] Called with userLat:', userLat, 'userLng:', userLng);
+  
   const { data: partners, error } = await supabase
     .from('partners')
     .select(`
@@ -135,10 +150,38 @@ export async function getPartnerRestaurants(): Promise<Restaurant[]> {
     return [];
   }
 
+  console.log('[PartnerRestaurants] Raw partners from DB:', partners?.length || 0);
+  if (partners && partners.length > 0) {
+    partners.forEach(p => {
+      console.log(`  - ${p.restaurant_name}: ${p.menu_items?.length || 0} items, lat: ${p.latitude}, lng: ${p.longitude}`);
+    });
+  }
+
   // Transform partner data to Restaurant format
-  return (partners || [])
-    .filter(p => p.restaurant_name && p.menu_items && p.menu_items.length > 0)
-    .map(p => ({
+  const filtered = (partners || [])
+    .filter(p => {
+      const hasName = !!p.restaurant_name;
+      const hasItems = p.menu_items && p.menu_items.length > 0;
+      console.log(`[Filter] ${p.restaurant_name || 'NO NAME'}: name=${hasName}, items=${hasItems}`);
+      return hasName && hasItems;
+    });
+
+  console.log('[PartnerRestaurants] After filter:', filtered.length);
+
+  return filtered.map(p => {
+    // Calculate real distance if coordinates are available
+    let distance = '0.5 km'; // Default
+    if (userLat && userLng && p.latitude && p.longitude) {
+      const distKm = calculateDistance(userLat, userLng, p.latitude, p.longitude);
+      distance = distKm < 1 
+        ? `${Math.round(distKm * 1000)}m` 
+        : `${distKm.toFixed(1)} km`;
+      console.log(`[Distance] ${p.restaurant_name}: ${distance} (${distKm.toFixed(2)} km)`);
+    } else {
+      console.log(`[Distance] ${p.restaurant_name}: using default ${distance} (missing coords: user=${!!(userLat && userLng)}, partner=${!!(p.latitude && p.longitude)})`);
+    }
+
+    return {
       id: p.id,
       name: p.restaurant_name,
       cuisine: p.cuisine || 'Various',
@@ -147,7 +190,7 @@ export async function getPartnerRestaurants(): Promise<Restaurant[]> {
       totalReviews: 0,
       address: p.address || '',
       phone: p.phone || '',
-      distance: '0.5 km',
+      distance,
       mainPhotoUrl: p.photo_url || p.menu_items[0]?.video_url || '',
       googleMapsUrl: p.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address)}` : '',
       website: p.website || '',
@@ -155,18 +198,28 @@ export async function getPartnerRestaurants(): Promise<Restaurant[]> {
       isOpen: true,
       isPartner: true,
       slug: p.slug,
-      dishes: (p.menu_items || []).map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        description: item.description || '',
-        thumbnailUrl: item.video_url,
-        videoUrl: item.video_url,
-        price: item.price,
-        category: item.category,
-      })),
+      dishes: (p.menu_items || [])
+        .sort((a: any, b: any) => {
+          // Featured items first
+          if (a.is_featured && !b.is_featured) return -1;
+          if (!a.is_featured && b.is_featured) return 1;
+          // Then by sort_order
+          return (a.sort_order || 0) - (b.sort_order || 0);
+        })
+        .map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          description: item.description || '',
+          thumbnailUrl: item.video_url,
+          videoUrl: item.video_url,
+          price: item.price,
+          category: item.category,
+          isFeatured: item.is_featured || false,
+        })),
       reviews: [],
       reviewSnippets: [],
-    }));
+    };
+  });
 }
 
 // Get all restaurants (both regular and partner)

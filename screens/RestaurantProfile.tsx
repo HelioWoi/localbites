@@ -58,12 +58,23 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   // Load Google reviews for non-partner restaurants
   useEffect(() => {
     const loadGoogleReviews = async () => {
-      // Only load if it's a Google restaurant (id starts with "places/") and has no reviews
-      if (restaurant.id.startsWith('places/') && (!restaurant.reviews || restaurant.reviews.length === 0)) {
+      // Google Place IDs start with "ChIJ" or "places/"
+      const isGoogleRestaurant = restaurant.id.startsWith('places/') || restaurant.id.startsWith('ChIJ');
+      const needsReviews = !restaurant.reviews || restaurant.reviews.length === 0;
+      
+      console.log('[RestaurantProfile] Restaurant ID:', restaurant.id);
+      console.log('[RestaurantProfile] Is Google restaurant:', isGoogleRestaurant);
+      console.log('[RestaurantProfile] Needs reviews:', needsReviews);
+      
+      if (isGoogleRestaurant && needsReviews) {
         setLoadingReviews(true);
         try {
+          console.log('[RestaurantProfile] Fetching reviews for:', restaurant.id);
           const details = await getPlaceDetails(restaurant.id);
-          if (details?.reviews) {
+          console.log('[RestaurantProfile] Got details:', details);
+          
+          if (details?.reviews && details.reviews.length > 0) {
+            console.log('[RestaurantProfile] Setting', details.reviews.length, 'reviews');
             setGoogleReviews(details.reviews.map((r, i) => ({
               id: `google-${i}`,
               authorName: r.authorName,
@@ -73,9 +84,11 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
               relativeTimeDescription: r.relativeTimeDescription,
               time: r.time,
             })));
+          } else {
+            console.log('[RestaurantProfile] No reviews in response');
           }
         } catch (error) {
-          console.error('Error loading Google reviews:', error);
+          console.error('[RestaurantProfile] Error loading Google reviews:', error);
         } finally {
           setLoadingReviews(false);
         }
@@ -129,9 +142,17 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   };
 
   const openVideoReels = (startIndex: number) => {
-    setActiveVideoIndex(startIndex);
-    setSwipeHintCounts(new Array(dishesWithVideo.length).fill(0));
-    setShowVideoReels(true);
+    // Navigate to menu page with categories instead of opening modal
+    if (restaurant.isSubscribed && onNavigateToPartner) {
+      // For partner restaurants, navigate to their menu page
+      const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      window.location.href = `/r/${slug}`;
+    } else {
+      // Fallback to modal for non-partner restaurants
+      setActiveVideoIndex(startIndex);
+      setSwipeHintCounts(new Array(dishesWithVideo.length).fill(0));
+      setShowVideoReels(true);
+    }
   };
 
   const toggleMute = () => {
@@ -263,9 +284,10 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
             {sortedReviews.map((review, idx) => (
               <div key={review.id} className="h-screen w-full snap-start relative overflow-hidden">
                 <img 
-                  src={review.photoUrl} 
+                  src={review.photoUrl || restaurant.mainPhotoUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'} 
                   className={`w-full h-full object-cover transition-transform duration-[8000ms] ease-out ${idx === activeReviewIndex ? 'scale-110' : 'scale-100'}`}
                   alt="Customer photo"
+                  onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'; }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40" />
                 
@@ -275,11 +297,17 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                     <button onClick={() => setShowReviewsReel(false)} className="p-3 bg-white/20 backdrop-blur-md rounded-2xl text-white active:scale-90 transition-transform">
                       <X size={24} />
                     </button>
-                    <div className="flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-md rounded-full">
+                    <button 
+                      onClick={() => {
+                        const url = restaurant.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurant.name + ' ' + restaurant.address)}`;
+                        window.open(url, '_blank');
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-md rounded-full active:scale-95 transition-transform"
+                    >
                       <Star size={14} className="text-amber-400" fill="currentColor" />
                       <span className="text-white text-sm font-bold">{restaurant.rating}</span>
                       <span className="text-white/60 text-xs">({restaurant.totalReviews} reviews)</span>
-                    </div>
+                    </button>
                   </div>
                 </div>
 

@@ -3,7 +3,7 @@ import {
   LogOut, Plus, Play, Trash2, Eye, Heart, MapPin,
   Loader2, X, Upload, Check, Settings, BarChart3,
   Video, Crown, AlertCircle, ChevronRight, Calendar,
-  TrendingUp, Clock, Edit2, Save, QrCode, Copy, ExternalLink, Menu, Camera, Image
+  TrendingUp, Clock, Edit2, Save, QrCode, Copy, ExternalLink, Menu, Camera, Image, Star
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { PartnerUser } from './PartnerPortal';
@@ -32,6 +32,7 @@ interface MenuItem {
   price?: number;
   sort_order: number;
   is_active: boolean;
+  is_featured?: boolean;
 }
 
 interface PartnerData {
@@ -187,102 +188,12 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     }
   };
 
-  // Drag and drop handlers
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('video/')) {
-      setUploadFile(file);
-      setUploadPreview(URL.createObjectURL(file));
-      setShowUploadModal(true);
-    }
-  }, []);
-
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setUploadFile(file);
       setUploadPreview(URL.createObjectURL(file));
-      setShowUploadModal(true);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!uploadFile || !dishName.trim() || !restaurant) return;
-
-    setIsUploading(true);
-    setUploadProgress(10);
-
-    try {
-      const fileName = `${user.id}/${Date.now()}-${uploadFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-      setUploadProgress(30);
-
-      const { error: uploadError } = await supabase.storage
-        .from('videos')
-        .upload(fileName, uploadFile);
-
-      if (uploadError) throw uploadError;
-      setUploadProgress(70);
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('videos')
-        .getPublicUrl(fileName);
-
-      const { data: dish, error: dishError } = await supabase
-        .from('dishes')
-        .insert({
-          restaurant_id: restaurant.id,
-          name: dishName.trim(),
-          video_url: publicUrl,
-        })
-        .select()
-        .single();
-
-      if (dishError) throw dishError;
-      setUploadProgress(100);
-
-      setVideos([...videos, dish]);
-      
-      setTimeout(() => {
-        resetUploadModal();
-      }, 800);
-
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      alert('Upload failed: ' + error.message);
-      setUploadProgress(0);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const resetUploadModal = () => {
-    setShowUploadModal(false);
-    setUploadFile(null);
-    setUploadPreview(null);
-    setDishName('');
-    setUploadProgress(0);
-  };
-
-  const handleDeleteVideo = async (dishId: string) => {
-    if (!confirm('Delete this video? This cannot be undone.')) return;
-
-    try {
-      await supabase.from('dishes').delete().eq('id', dishId);
-      setVideos(videos.filter(v => v.id !== dishId));
-    } catch (error) {
-      console.error('Delete error:', error);
+      setShowMenuUploadModal(true);
     }
   };
 
@@ -323,7 +234,12 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
   // Menu item handlers
   const handleMenuUpload = async () => {
-    if (!uploadFile || !menuItemName.trim() || !menuItemCategory.trim() || !partnerData) return;
+    if (!uploadFile || !menuItemName.trim() || !partnerData) return;
+
+    // Determine the final category name
+    const finalCategory = menuItemCategory === '__new__' ? newCategory.trim() : menuItemCategory.trim();
+    
+    if (!finalCategory) return;
 
     // Validate file size (5MB max)
     const maxSize = 5 * 1024 * 1024; // 5MB
@@ -355,11 +271,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         .insert({
           partner_id: partnerData.id,
           name: menuItemName.trim(),
-          category: menuItemCategory.trim(),
+          category: finalCategory,
           description: menuItemDescription.trim() || null,
           price: menuItemPrice ? parseFloat(menuItemPrice) : null,
           video_url: publicUrl,
-          sort_order: menuItems.filter(i => i.category === menuItemCategory).length,
+          sort_order: menuItems.filter(i => i.category === finalCategory).length,
         })
         .select()
         .single();
@@ -368,8 +284,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       setUploadProgress(100);
 
       setMenuItems([...menuItems, item]);
-      if (!categories.includes(menuItemCategory.trim())) {
-        setCategories([...categories, menuItemCategory.trim()]);
+      if (!categories.includes(finalCategory)) {
+        setCategories([...categories, finalCategory]);
       }
       
       setTimeout(() => {
@@ -405,6 +321,42 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       setMenuItems(menuItems.filter(i => i.id !== itemId));
     } catch (error) {
       console.error('Delete error:', error);
+    }
+  };
+
+  const handleToggleFeatured = async (itemId: string) => {
+    if (!partnerData) return;
+
+    try {
+      const item = menuItems.find(i => i.id === itemId);
+      const newFeaturedState = !item?.is_featured;
+
+      // If setting as featured, unset all other featured items first
+      if (newFeaturedState) {
+        const updates = menuItems
+          .filter(i => i.is_featured && i.id !== itemId)
+          .map(i => 
+            supabase.from('menu_items').update({ is_featured: false }).eq('id', i.id)
+          );
+        await Promise.all(updates);
+      }
+
+      // Update the selected item
+      const { error } = await supabase
+        .from('menu_items')
+        .update({ is_featured: newFeaturedState })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      setMenuItems(menuItems.map(i => ({
+        ...i,
+        is_featured: i.id === itemId ? newFeaturedState : false
+      })));
+    } catch (error) {
+      console.error('Toggle featured error:', error);
+      alert('Failed to update cover video');
     }
   };
 
@@ -706,6 +658,30 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               </div>
             </div>
 
+            {/* Feed Cover Info */}
+            {menuItems.length > 0 && (
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-4 sm:p-5 border-2 border-amber-300">
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                    <Star size={20} className="text-white sm:w-6 sm:h-6" fill="white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-base font-bold text-zinc-900 mb-2">
+                      Choose Your Feed Cover Video
+                    </h3>
+                    <div className="space-y-2">
+                      <p className="text-sm text-zinc-700 leading-relaxed">
+                        <strong>Click the star button</strong> <span className="inline-flex items-center justify-center w-6 h-6 bg-black/60 rounded-full mx-1"><Star size={12} className="text-white" /></span> on any video below to set it as your <strong>feed cover</strong>.
+                      </p>
+                      <p className="text-xs text-zinc-600">
+                        💡 This video will appear <strong>first</strong> when users discover your restaurant in the LocalBites feed.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Add Menu Item */}
             <div className="flex items-center justify-between">
               <div>
@@ -730,11 +706,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                       <h3 className="font-semibold text-zinc-900">{category}</h3>
                       <p className="text-xs text-zinc-500">{menuItems.filter(i => i.category === category).length} items</p>
                     </div>
-                    <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <div className="p-4 grid grid-cols-3 sm:grid-cols-4 gap-3">
                       {menuItems.filter(i => i.category === category).map(item => (
                         <div key={item.id} className="relative group">
                           <div 
-                            className="aspect-[9/16] bg-zinc-100 rounded-xl overflow-hidden cursor-pointer"
+                            className="aspect-square bg-zinc-100 rounded-xl overflow-hidden cursor-pointer"
                             onClick={() => setPreviewVideo(item.video_url)}
                           >
                             <video src={item.video_url} className="w-full h-full object-cover" muted />
@@ -743,12 +719,31 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                                 <Play size={20} className="text-white ml-1" fill="white" />
                               </div>
                             </div>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleDeleteMenuItem(item.id); }}
-                              className="absolute top-2 right-2 p-2 bg-red-500 rounded-full text-white hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            {/* Featured badge - always visible if featured */}
+                            {item.is_featured && (
+                              <div className="absolute top-2 left-2 px-2 py-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full flex items-center gap-1 shadow-lg z-10">
+                                <Star size={12} className="text-white" fill="white" />
+                                <span className="text-white text-[10px] font-bold">FEED COVER</span>
+                              </div>
+                            )}
+                            
+                            {/* Action buttons - ALWAYS VISIBLE */}
+                            <div className="absolute top-2 right-2 flex gap-2 z-10">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleToggleFeatured(item.id); }}
+                                className={`p-2 rounded-full text-white transition-all shadow-lg ${item.is_featured ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600' : 'bg-black/60 hover:bg-black/80 backdrop-blur-sm'}`}
+                                title={item.is_featured ? 'Remove from feed cover' : 'Set as feed cover'}
+                              >
+                                <Star size={14} fill={item.is_featured ? 'white' : 'none'} />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteMenuItem(item.id); }}
+                                className="p-2 bg-red-500/90 backdrop-blur-sm rounded-full text-white hover:bg-red-600 transition-colors shadow-lg"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                            
                             <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
                               <p className="text-white font-semibold text-sm truncate">{item.name}</p>
                               {item.price && <p className="text-white/70 text-xs">${item.price.toFixed(2)}</p>}
@@ -788,7 +783,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                 <p className="text-zinc-500 mb-6 max-w-md mx-auto">
                   Upgrade to Pro to see which videos are most liked, views per item, directions clicks, and conversion tracking.
                 </p>
-                <div className="grid grid-cols-3 gap-4 mb-6 opacity-50">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 opacity-50">
                   <div className="bg-zinc-50 rounded-xl p-4 text-center">
                     <Eye size={24} className="text-zinc-400 mx-auto mb-2" />
                     <p className="text-xs text-zinc-500">Views per video</p>
@@ -1012,7 +1007,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               </div>
 
               {/* Plan comparison */}
-              <div className="mt-4 grid grid-cols-2 gap-4">
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className={`p-4 rounded-lg border ${user.plan === 'trial' ? 'border-orange-200 bg-orange-50' : 'border-zinc-200'}`}>
                   <p className="font-semibold text-zinc-900 mb-2">Free</p>
                   <ul className="text-xs text-zinc-600 space-y-1">
@@ -1149,10 +1144,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                       <input
                         type="text"
                         value={newCategory}
-                        onChange={(e) => {
-                          setNewCategory(e.target.value);
-                          setMenuItemCategory(e.target.value);
-                        }}
+                        onChange={(e) => setNewCategory(e.target.value)}
                         placeholder="New category name"
                         className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
                         autoFocus
@@ -1227,7 +1219,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               </button>
               <button
                 onClick={handleMenuUpload}
-                disabled={!uploadFile || !menuItemName.trim() || !menuItemCategory.trim() || menuItemCategory === '__new__' || isUploading}
+                disabled={!uploadFile || !menuItemName.trim() || (menuItemCategory === '__new__' ? !newCategory.trim() : !menuItemCategory.trim()) || isUploading}
                 className="flex-1 py-3 bg-orange-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-orange-600 transition-colors"
               >
                 {isUploading ? (
