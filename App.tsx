@@ -7,9 +7,10 @@ import RestaurantProfile from './screens/RestaurantProfile';
 import AdminDashboard from './screens/AdminDashboard';
 import PartnerPortal from './screens/partner/PartnerPortal';
 import RestaurantMenuLoader from './components/RestaurantMenuLoader';
+import RestaurantProfileLoader from './components/RestaurantProfileLoader';
 import MediaContainer from './components/MediaContainer';
 import FloatingFilters from './components/FloatingFilters';
-import { getNearbyRestaurants, getRestaurantDetails } from './services/geminiService';
+import { getNearbyRestaurants, getRestaurantDetails, getRemainingSearches } from './services/geminiService';
 import { likeRestaurant, unlikeRestaurant, saveRestaurant, unsaveRestaurant, getUserLikes, getUserSaves, getAllLikesCounts } from './services/interactionService';
 import { CUISINES, PRICES } from './constants';
 import { Home, Search, MessageSquare, Filter, Bookmark, ExternalLink, Info, Loader2, X, ArrowRight, Globe, MapPin, ChevronUp, Crown, PlayCircle, Heart, Star, Clock } from 'lucide-react';
@@ -17,9 +18,17 @@ import { Home, Search, MessageSquare, Filter, Bookmark, ExternalLink, Info, Load
 // Check if we're on the partner route
 const isPartnerRoute = window.location.pathname === '/partner' || window.location.pathname.startsWith('/partner');
 
-// Check if we're on a restaurant menu route (QR Code)
-const isMenuRoute = window.location.pathname.startsWith('/r/');
-const menuSlug = isMenuRoute ? window.location.pathname.replace('/r/', '') : null;
+// Check if we're on a restaurant route
+const isRestaurantRoute = window.location.pathname.startsWith('/r/');
+const isMenuRoute = isRestaurantRoute && window.location.pathname.endsWith('/menu');
+const isProfileRoute = isRestaurantRoute && !isMenuRoute;
+
+// Extract slug from URL
+let restaurantSlug = null;
+if (isRestaurantRoute) {
+  const pathParts = window.location.pathname.split('/');
+  restaurantSlug = pathParts[2]; // /r/slug or /r/slug/menu
+}
 
 const App: React.FC = () => {
   // If on partner route, render Partner Portal
@@ -27,9 +36,14 @@ const App: React.FC = () => {
     return <PartnerPortal />;
   }
 
-  // If on restaurant menu route (QR Code), render isolated menu page
-  if (isMenuRoute && menuSlug) {
-    return <RestaurantMenuLoader slug={menuSlug} />;
+  // If on restaurant menu route, render menu page
+  if (isMenuRoute && restaurantSlug) {
+    return <RestaurantMenuLoader slug={restaurantSlug} />;
+  }
+  
+  // If on restaurant profile route, render profile page
+  if (isProfileRoute && restaurantSlug) {
+    return <RestaurantProfileLoader slug={restaurantSlug} />;
   }
 
   const [state, setState] = useState<AppState>('SPLASH');
@@ -81,7 +95,24 @@ const App: React.FC = () => {
       if (hash.startsWith('#profile-')) {
         const restaurantId = hash.replace('#profile-', '');
         // Find restaurant in current list
-        const restaurant = allRestaurants.find(r => r.id === restaurantId);
+        let restaurant = allRestaurants.find(r => r.id === restaurantId);
+        
+        // If not found in allRestaurants, try sessionStorage (from menu page)
+        if (!restaurant) {
+          const storedData = sessionStorage.getItem('restaurant_profile_data');
+          if (storedData) {
+            try {
+              const parsedData = JSON.parse(storedData);
+              if (parsedData.id === restaurantId) {
+                restaurant = parsedData;
+                sessionStorage.removeItem('restaurant_profile_data'); // Clean up
+              }
+            } catch (e) {
+              console.error('Failed to parse restaurant data from sessionStorage:', e);
+            }
+          }
+        }
+        
         if (restaurant) {
           setSelectedRestaurant(restaurant);
           setState('PROFILE');
@@ -126,12 +157,18 @@ const App: React.FC = () => {
   }, [activeRestaurantIndex]);
 
   const fetchRestaurants = useCallback(async (loc: UserLocation, f = filters) => {
+    console.log('[App] 🔄 fetchRestaurants called with location:', loc.name);
     setIsLoading(true);
     setError(null);
     try {
       const data = await getNearbyRestaurants(loc, f);
-      console.log('[App] Total restaurants from getNearbyRestaurants:', data.length);
+      console.log('[App] ✅ Total restaurants from getNearbyRestaurants:', data.length);
       console.log('[App] First 3 restaurants:', data.slice(0, 3).map(r => ({ name: r.name, isSubscribed: r.isSubscribed, distance: r.distance })));
+      
+      if (data.length === 0) {
+        console.error('[App] ❌ NO RESTAURANTS RETURNED - This will cause empty feed!');
+        setError('No restaurants found in this area');
+      }
       
       setAllRestaurants(data); // Store full list
       setRestaurants(data.slice(0, 20)); // Show first 20
@@ -139,7 +176,11 @@ const App: React.FC = () => {
       setActiveRestaurantIndex(0);
       if (feedRef.current) feedRef.current.scrollTo({ top: 0 });
       
-      console.log('[App] Set restaurants state with:', data.slice(0, 20).length, 'items');
+      console.log('[App] ✅ Set restaurants state with:', data.slice(0, 20).length, 'items');
+      console.log('[App] 📊 allRestaurants.length:', data.length);
+      console.log('[App] 📊 restaurants.length:', data.slice(0, 20).length);
+      console.log('[App] 🔘 Should show "Ver Mais" button?', data.slice(0, 20).length < data.length);
+      console.log('[App] Current state will be: FEED');
       
       // Load likes counts for visible restaurants
       if (data.length > 0) {
@@ -174,7 +215,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (location) fetchRestaurants(location);
-  }, [location, fetchRestaurants]);
+  }, [location]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch reviews when restaurant reviews modal opens
   useEffect(() => {
@@ -219,6 +260,10 @@ const App: React.FC = () => {
   const handleLocationSelect = (loc: UserLocation) => {
     setLocation(loc);
     setShowSaved(false);
+    // Clear hash to prevent hashchange from interfering
+    if (window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
     setState('FEED');
   };
 
@@ -389,6 +434,33 @@ const App: React.FC = () => {
       )}
 
       <div ref={feedRef} className={`snap-container no-scrollbar bg-black ${isExternalOverlayOpen ? 'pointer-events-none' : ''}`} onScroll={handleScroll}>
+        {/* TODO: Re-enable after testing - Info banner when search limit reached
+        {!isLoading && restaurants.length > 0 && getRemainingSearches() === 0 && (
+          <div className="fixed top-20 left-4 right-4 z-50 bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl p-4 shadow-lg animate-slide-down">
+            <div className="flex items-start gap-3">
+              <Info size={20} className="text-white flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-white font-semibold text-sm mb-1">
+                  Showing Premium Partners
+                </p>
+                <p className="text-white/90 text-xs leading-relaxed">
+                  Daily search limit reached. Discover more restaurants tomorrow or explore our premium partners!
+                </p>
+              </div>
+              <button 
+                onClick={() => {
+                  const banner = document.querySelector('.animate-slide-down');
+                  if (banner) banner.remove();
+                }}
+                className="text-white/80 hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+        )}
+        */}
+        
         {isLoading && restaurants.length === 0 ? (
           Array.from({ length: 3 }).map((_, i) => (
             <div key={`skeleton-${i}`} className="snap-item">
@@ -570,7 +642,45 @@ const App: React.FC = () => {
               </div>
             </div>
           ))
-        ) : !isLoading && error ? (
+        ) : null}
+        
+        {/* "Ver Mais" button at the end of feed */}
+        {!isLoading && restaurants.length > 0 && restaurants.length < allRestaurants.length && (
+          <div className="snap-item">
+            <div className="video-card shadow-none rounded-none border-none bg-gradient-to-br from-zinc-900 to-black flex items-center justify-center">
+              <div className="text-center p-8">
+                <div className="w-20 h-20 bg-orange-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <ArrowRight size={40} className="text-orange-500" />
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-3">
+                  Mais Restaurantes
+                </h3>
+                <p className="text-white/60 text-sm mb-6 max-w-xs mx-auto">
+                  Encontramos {allRestaurants.length - restaurants.length} restaurantes adicionais na sua área
+                </p>
+                <button
+                  onClick={() => {
+                    loadMoreRestaurants();
+                    // Scroll to next item after loading
+                    setTimeout(() => {
+                      if (feedRef.current) {
+                        feedRef.current.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
+                      }
+                    }, 100);
+                  }}
+                  className="px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold rounded-2xl active:scale-95 transition-all shadow-lg shadow-orange-500/30"
+                >
+                  Ver Mais Restaurantes
+                </button>
+                <p className="text-white/40 text-xs mt-4">
+                  Mostrando {restaurants.length} de {allRestaurants.length}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {!isLoading && error ? (
           <div className="h-full w-full flex flex-col items-center justify-center p-12 text-center bg-white">
             <div className="w-20 h-20 bg-zinc-50 rounded-full flex items-center justify-center mb-6">
               <Info className="text-zinc-300" size={32} />

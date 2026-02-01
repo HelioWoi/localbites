@@ -33,8 +33,9 @@ interface RestaurantMenuPageProps {
 const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) => {
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false); // Autoplay with sound
   const [isPlaying, setIsPlaying] = useState(true);
+  const [showSavedOnly, setShowSavedOnly] = useState(false); // Filter for saved videos
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   
@@ -43,11 +44,17 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   const [savedItems, setSavedItems] = useState<Set<string>>(new Set());
   const [likesCounts, setLikesCounts] = useState<Map<string, number>>(new Map());
   
-  // Load saved items from localStorage
+  // Load saved items from localStorage and check URL params
   useEffect(() => {
     const saved = localStorage.getItem(`saved_dishes_${restaurant.id}`);
     if (saved) {
       setSavedItems(new Set(JSON.parse(saved)));
+    }
+    
+    // Check if URL has ?saved=true parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('saved') === 'true') {
+      setShowSavedOnly(true);
     }
     
     // Load likes counts from Supabase
@@ -95,21 +102,22 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   const toggleSave = (itemId: string) => {
     setSavedItems(prev => {
       const next = new Set(prev);
-      if (next.has(itemId)) {
-        next.delete(itemId);
-      } else {
-        next.add(itemId);
-      }
-      // Save to localStorage
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
       localStorage.setItem(`saved_dishes_${restaurant.id}`, JSON.stringify([...next]));
       return next;
     });
   };
 
-  // Filter items by category
-  const filteredItems = activeCategory 
+  // Filter items by category and saved status
+  let filteredItems = activeCategory 
     ? restaurant.menuItems.filter(item => item.category === activeCategory)
     : restaurant.menuItems;
+  
+  // If showSavedOnly is true, only show saved videos
+  if (showSavedOnly) {
+    filteredItems = filteredItems.filter(item => savedItems.has(item.id));
+  }
 
   // Handle scroll to update active video
   const handleScroll = () => {
@@ -191,8 +199,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
           {/* Back button */}
           <button 
             onClick={() => {
-              // Navigate to restaurant profile
-              window.location.href = `/#profile-${restaurant.id}`;
+              // Navigate to restaurant profile page
+              window.location.href = `/r/${restaurant.slug}`;
             }}
             className="p-2 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all flex-shrink-0"
           >
@@ -200,8 +208,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
           </button>
           {/* Logo - clickable to go back */}
           <button onClick={() => {
-            // Navigate to restaurant profile
-            window.location.href = `/#profile-${restaurant.id}`;
+            // Navigate to restaurant profile page
+            window.location.href = `/r/${restaurant.slug}`;
           }} className="flex-shrink-0">
             {restaurant.logoUrl ? (
               <img src={restaurant.logoUrl} alt={restaurant.name} className="w-12 h-12 rounded-full object-cover border-2 border-white/20" />

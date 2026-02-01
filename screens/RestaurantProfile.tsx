@@ -146,7 +146,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
     if (restaurant.isSubscribed && onNavigateToPartner) {
       // For partner restaurants, navigate to their menu page
       const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      window.location.href = `/r/${slug}`;
+      window.location.href = `/r/${slug}/menu`;
     } else {
       // Fallback to modal for non-partner restaurants
       setActiveVideoIndex(startIndex);
@@ -473,11 +473,9 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         {savedDishes.length > 0 && (
           <button 
             onClick={() => {
-              // Open reels starting from first saved dish
-              const firstSavedIndex = dishesWithVideo.findIndex(d => savedDishIds.has(d.id));
-              if (firstSavedIndex >= 0) {
-                openVideoReels(firstSavedIndex);
-              }
+              // Navigate to menu page with saved filter
+              const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+              window.location.href = `/r/${slug}/menu?saved=true`;
             }}
             className="w-full bg-white rounded-2xl border border-zinc-200 p-4 flex items-center justify-between active:bg-zinc-50 transition-colors"
           >

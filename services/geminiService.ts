@@ -4,12 +4,16 @@ import { getPartnerRestaurants, hasSupabaseData } from "./supabaseService";
 import { searchNearbyRestaurants as searchGooglePlaces, getPlaceDetails } from "./googlePlacesProxy";
 
 // HYBRID COST OPTIMIZATION: Partners first, limited Google API usage
-const GOOGLE_API_LIMIT = 10; // Only fetch 10 Google restaurants to reduce costs
+const GOOGLE_API_LIMIT = 50; // Fetch up to 50 Google restaurants (increased for testing)
 const RATE_LIMIT_KEY = 'google_api_searches';
 const DAILY_SEARCH_LIMIT = 5; // Max 5 searches per day per user
 
 // Check if user has exceeded daily search limit
 function canUseGoogleAPI(): boolean {
+  // TODO: Re-enable rate limiting after testing
+  return true; // DISABLED FOR TESTING - Always allow API access
+  
+  /* COMMENTED OUT FOR TESTING
   const today = new Date().toDateString();
   const stored = localStorage.getItem(RATE_LIMIT_KEY);
   
@@ -27,14 +31,20 @@ function canUseGoogleAPI(): boolean {
   }
   
   return data.count < DAILY_SEARCH_LIMIT;
+  */
 }
 
 function incrementSearchCount(): void {
+  // TODO: Re-enable rate limiting after testing
+  return; // DISABLED FOR TESTING - Don't increment counter
+  
+  /* COMMENTED OUT FOR TESTING
   const today = new Date().toDateString();
   const stored = localStorage.getItem(RATE_LIMIT_KEY);
   const data = stored ? JSON.parse(stored) : { date: today, count: 0 };
   data.count += 1;
   localStorage.setItem(RATE_LIMIT_KEY, JSON.stringify(data));
+  */
 }
 
 // Get remaining searches for today

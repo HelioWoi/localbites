@@ -132,21 +132,21 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
 
   return (
     <div className="min-h-screen bg-zinc-50 flex flex-col">
-      {/* Header - closer to content */}
-      <div className="pt-12 pb-6 flex items-center justify-center">
+      {/* Header - better spacing */}
+      <div className="pt-16 pb-8 flex items-center justify-center">
         <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-            <Utensils size={18} className="text-white" />
+          <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
+            <Utensils size={20} className="text-white" />
           </div>
           <div>
-            <span className="text-lg font-bold text-zinc-900">LocalBites</span>
-            <span className="text-lg font-light text-zinc-400 ml-1">Partner</span>
+            <span className="text-xl font-bold text-zinc-900">LocalBites</span>
+            <span className="text-xl font-light text-zinc-400 ml-1">Partner</span>
           </div>
         </a>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 flex items-start justify-center p-6 pt-0">
+      {/* Content - centered vertically */}
+      <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
           <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 p-8">
             <h1 className="text-2xl font-bold text-zinc-900 mb-1">

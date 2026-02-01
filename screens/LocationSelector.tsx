@@ -255,20 +255,31 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
     }, 3000);
   };
 
-  // GPS Animation Overlay - Simplified for better performance
+  // GPS Animation Overlay - Same as SplashScreen intro animation
   if (isSearching) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-zinc-50 text-zinc-900 overflow-hidden">
         <div className="flex flex-col items-center justify-center">
-          {/* Simplified GPS animation */}
-          <div className="relative w-20 h-20">
-            <div className="absolute inset-0 bg-orange-500/20 rounded-full animate-pulse" />
-            <div className="absolute inset-2 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center shadow-lg">
-              <MapPin className="w-8 h-8 text-white" />
+          {/* GPS Pin with pulse animation - Same as SplashScreen */}
+          <div className="relative">
+            {/* Pulse rings */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-32 h-32 bg-orange-500/10 rounded-full animate-ping" style={{ animationDuration: '1.5s' }} />
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-24 h-24 bg-orange-500/20 rounded-full animate-ping" style={{ animationDuration: '1.5s', animationDelay: '0.3s' }} />
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-16 h-16 bg-orange-500/30 rounded-full animate-ping" style={{ animationDuration: '1.5s', animationDelay: '0.6s' }} />
+            </div>
+            
+            {/* Center pin */}
+            <div className="relative z-10 w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center shadow-xl shadow-orange-500/40">
+              <MapPin className="w-8 h-8 text-white animate-bounce" style={{ animationDuration: '1s' }} />
             </div>
           </div>
           
-          <h2 className="mt-8 text-xl font-bold text-zinc-800">
+          <h2 className="mt-8 text-xl font-bold text-zinc-800 animate-pulse">
             Finding your location...
           </h2>
           
@@ -276,7 +287,15 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
             Searching for the best bites nearby
           </p>
           
-          <Loader2 className="mt-6 w-6 h-6 text-orange-500 animate-spin" />
+          {/* Animated dots - Same as SplashScreen */}
+          <div className="mt-6 flex items-center gap-2">
+            <Navigation className="w-4 h-4 text-orange-500 animate-spin" style={{ animationDuration: '2s' }} />
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-2 h-2 bg-orange-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
         </div>
       </div>
     );
