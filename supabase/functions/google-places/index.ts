@@ -8,9 +8,9 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // Initialize Supabase client for caching
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-// Cache duration in hours
-const PLACES_CACHE_HOURS = 6;
-const LOCALITIES_CACHE_HOURS = 168; // 7 days - localities rarely change
+// Cache duration in hours - OPTIMIZED FOR COST REDUCTION
+const PLACES_CACHE_HOURS = 720; // 30 days - restaurants rarely change
+const LOCALITIES_CACHE_HOURS = 720; // 30 days - localities rarely change
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

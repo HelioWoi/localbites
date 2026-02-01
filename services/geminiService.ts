@@ -3,6 +3,55 @@ import { Restaurant, UserLocation, Review } from "../types";
 import { getPartnerRestaurants, hasSupabaseData } from "./supabaseService";
 import { searchNearbyRestaurants as searchGooglePlaces, getPlaceDetails } from "./googlePlacesProxy";
 
+// HYBRID COST OPTIMIZATION: Partners first, limited Google API usage
+const GOOGLE_API_LIMIT = 10; // Only fetch 10 Google restaurants to reduce costs
+const RATE_LIMIT_KEY = 'google_api_searches';
+const DAILY_SEARCH_LIMIT = 5; // Max 5 searches per day per user
+
+// Check if user has exceeded daily search limit
+function canUseGoogleAPI(): boolean {
+  const today = new Date().toDateString();
+  const stored = localStorage.getItem(RATE_LIMIT_KEY);
+  
+  if (!stored) {
+    localStorage.setItem(RATE_LIMIT_KEY, JSON.stringify({ date: today, count: 0 }));
+    return true;
+  }
+  
+  const data = JSON.parse(stored);
+  
+  // Reset counter if it's a new day
+  if (data.date !== today) {
+    localStorage.setItem(RATE_LIMIT_KEY, JSON.stringify({ date: today, count: 0 }));
+    return true;
+  }
+  
+  return data.count < DAILY_SEARCH_LIMIT;
+}
+
+function incrementSearchCount(): void {
+  const today = new Date().toDateString();
+  const stored = localStorage.getItem(RATE_LIMIT_KEY);
+  const data = stored ? JSON.parse(stored) : { date: today, count: 0 };
+  data.count += 1;
+  localStorage.setItem(RATE_LIMIT_KEY, JSON.stringify(data));
+}
+
+// Get remaining searches for today
+export function getRemainingSearches(): number {
+  const today = new Date().toDateString();
+  const stored = localStorage.getItem(RATE_LIMIT_KEY);
+  
+  if (!stored) return DAILY_SEARCH_LIMIT;
+  
+  const data = JSON.parse(stored);
+  
+  // If it's a new day, return full limit
+  if (data.date !== today) return DAILY_SEARCH_LIMIT;
+  
+  return Math.max(0, DAILY_SEARCH_LIMIT - data.count);
+}
+
 export async function getNearbyRestaurants(
   location: UserLocation, 
   filters?: { cuisine?: string; price?: string; openNow?: boolean }
@@ -10,14 +59,12 @@ export async function getNearbyRestaurants(
   console.log('[LocalBites] Fetching restaurants for:', location.name);
   console.log('[LocalBites] Location coordinates:', { lat: location.lat, lng: location.lng, radius: location.radius });
   
-  // 1. First, get partner restaurants from Supabase (they have priority)
+  // 1. ALWAYS get partner restaurants first (NO API COST)
   let partnerRestaurants: Restaurant[] = [];
   try {
     const hasData = await hasSupabaseData();
     if (hasData) {
-      console.log('[LocalBites] Loading partner restaurants from Supabase');
-      // Pass user location for distance calculation
-      console.log('[LocalBites] About to call getPartnerRestaurants with:', location.lat, location.lng);
+      console.log('[LocalBites] Loading partner restaurants from Supabase (NO API COST)');
       partnerRestaurants = await getPartnerRestaurants(location.lat, location.lng);
       console.log('[LocalBites] Found', partnerRestaurants.length, 'partner restaurants');
     }
@@ -25,16 +72,31 @@ export async function getNearbyRestaurants(
     console.error('[LocalBites] Supabase error:', error);
   }
 
-  // 2. Then, get Google Places restaurants
+  // 2. CONDITIONALLY get Google Places restaurants (WITH COST CONTROLS)
   let googleRestaurants: Restaurant[] = [];
-  if (location.lat && location.lng) {
+  
+  // Only use Google API if:
+  // a) User hasn't exceeded daily limit
+  // b) We have valid coordinates
+  const canUseAPI = canUseGoogleAPI();
+  
+  if (!canUseAPI) {
+    console.log('[LocalBites] ⚠️ Daily Google API search limit reached. Showing partners only.');
+  } else if (location.lat && location.lng) {
     try {
       const radius = location.radius || 5000; // Default 5km
-      console.log('[LocalBites] Searching Google Places with radius:', radius / 1000, 'km');
+      console.log('[LocalBites] Searching Google Places (LIMITED TO', GOOGLE_API_LIMIT, 'results)');
+      
+      // Increment search count BEFORE making the API call
+      incrementSearchCount();
+      
       const googlePlaces = await searchGooglePlaces(location.lat, location.lng, radius);
       
+      // LIMIT to 10 restaurants to reduce API costs
+      const limitedPlaces = googlePlaces.slice(0, GOOGLE_API_LIMIT);
+      
       // Convert Google Places to Restaurant format
-      googleRestaurants = googlePlaces.map(place => ({
+      googleRestaurants = limitedPlaces.map(place => ({
         id: place.id,
         name: place.name,
         cuisine: place.cuisine,
@@ -54,7 +116,7 @@ export async function getNearbyRestaurants(
         openingHours: place.openingHours || [],
       }));
       
-      console.log('[LocalBites] Found', googleRestaurants.length, 'Google restaurants');
+      console.log('[LocalBites] Found', googleRestaurants.length, 'Google restaurants (limited)');
     } catch (error) {
       console.error('[LocalBites] Google Places error:', error);
     }
