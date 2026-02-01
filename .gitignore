@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Supabase local files
+supabase/.temp/
+supabase/.branches/
+
+# Windsurf AI files
+.windsurf/

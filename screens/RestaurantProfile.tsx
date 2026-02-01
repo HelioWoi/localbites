@@ -439,6 +439,20 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                       muted 
                       playsInline
                       preload="metadata"
+                      onLoadedMetadata={(e) => {
+                        // Seek to 0.1s to show a valid frame
+                        e.currentTarget.currentTime = 0.1;
+                      }}
+                      onError={(e) => {
+                        console.error('Video failed to load:', dish.videoUrl);
+                        // Fallback to placeholder if video fails
+                        const target = e.currentTarget;
+                        target.style.display = 'none';
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'w-full h-full bg-zinc-200 flex items-center justify-center';
+                        placeholder.innerHTML = '<span class="text-zinc-400 text-xs">Video unavailable</span>';
+                        target.parentNode?.appendChild(placeholder);
+                      }}
                     />
                   ) : (
                     <img src={dish.thumbnailUrl || restaurant.mainPhotoUrl} className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" alt={dish.name} />

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Volume2, VolumeX, ChevronUp, Star, MapPin, Globe, Navigation, Heart, Bookmark, X, ChevronLeft } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, ChevronUp, Star, MapPin, Globe, Navigation, Heart, Bookmark, X, ChevronLeft, MessageSquare } from 'lucide-react';
 
 interface MenuItem {
   id: string;
@@ -41,6 +41,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   // Likes and saves state
   const [likedItems, setLikedItems] = useState<Set<string>>(new Set());
   const [savedItems, setSavedItems] = useState<Set<string>>(new Set());
+  const [likesCounts, setLikesCounts] = useState<Map<string, number>>(new Map());
   
   // Load saved items from localStorage
   useEffect(() => {
@@ -48,16 +49,43 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     if (saved) {
       setSavedItems(new Set(JSON.parse(saved)));
     }
-  }, [restaurant.id]);
+    
+    // Load likes counts from Supabase
+    const loadLikesCounts = async () => {
+      try {
+        const { getAllLikesCounts } = await import('../services/interactionService');
+        const itemIds = restaurant.menuItems.map(item => item.id);
+        const counts = await getAllLikesCounts(itemIds);
+        setLikesCounts(counts);
+      } catch (error) {
+        console.error('Failed to load likes counts:', error);
+      }
+    };
+    loadLikesCounts();
+  }, [restaurant.id, restaurant.menuItems]);
   
   // Toggle like
-  const toggleLike = (itemId: string) => {
+  const toggleLike = async (itemId: string) => {
+    const { likeRestaurant, unlikeRestaurant } = await import('../services/interactionService');
+    
     setLikedItems(prev => {
       const next = new Set(prev);
       if (next.has(itemId)) {
         next.delete(itemId);
+        unlikeRestaurant(itemId);
+        // Update count
+        const currentCount = likesCounts.get(itemId) || 0;
+        const newCounts = new Map(likesCounts);
+        newCounts.set(itemId, Math.max(0, currentCount - 1));
+        setLikesCounts(newCounts);
       } else {
         next.add(itemId);
+        likeRestaurant(itemId);
+        // Update count
+        const currentCount = likesCounts.get(itemId) || 0;
+        const newCounts = new Map(likesCounts);
+        newCounts.set(itemId, currentCount + 1);
+        setLikesCounts(newCounts);
       }
       return next;
     });
@@ -163,9 +191,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
           {/* Back button */}
           <button 
             onClick={() => {
-              const slug = restaurant.slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+              // Navigate to restaurant profile
               window.location.href = `/#profile-${restaurant.id}`;
-              window.history.back();
             }}
             className="p-2 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all flex-shrink-0"
           >
@@ -173,9 +200,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
           </button>
           {/* Logo - clickable to go back */}
           <button onClick={() => {
-            const slug = restaurant.slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            // Navigate to restaurant profile
             window.location.href = `/#profile-${restaurant.id}`;
-            window.history.back();
           }} className="flex-shrink-0">
             {restaurant.logoUrl ? (
               <img src={restaurant.logoUrl} alt={restaurant.name} className="w-12 h-12 rounded-full object-cover border-2 border-white/20" />
@@ -196,6 +222,17 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               </div>
             </div>
           </div>
+          {/* Review button - top right */}
+          <a
+            href={restaurant.googleMapsUrl ? `${restaurant.googleMapsUrl}#reviews` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurant.name + ' ' + restaurant.address)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full hover:bg-white/30 transition-all"
+          >
+            <Star size={14} className="text-amber-400" fill="currentColor" />
+            <span className="text-white font-bold text-sm">{restaurant.rating?.toFixed(1)}</span>
+            <span className="text-white/70 text-xs">({restaurant.totalReviews})</span>
+          </a>
         </div>
 
         {/* Category Pills */}
@@ -280,7 +317,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                   />
                 </div>
                 <span className="text-white text-[10px] font-medium">
-                  {likedItems.has(item.id) ? 'Liked' : 'Like'}
+                  {likesCounts.get(item.id) || 0}
                 </span>
               </button>
               

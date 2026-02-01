@@ -74,6 +74,29 @@ const App: React.FC = () => {
     loadUserInteractions();
   }, []);
 
+  // Handle hash navigation for restaurant profiles
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith('#profile-')) {
+        const restaurantId = hash.replace('#profile-', '');
+        // Find restaurant in current list
+        const restaurant = allRestaurants.find(r => r.id === restaurantId);
+        if (restaurant) {
+          setSelectedRestaurant(restaurant);
+          setState('PROFILE');
+        }
+      }
+    };
+
+    // Check on mount
+    handleHashChange();
+
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [allRestaurants]);
+
   useEffect(() => {
     if (!feedRef.current) return;
     feedRef.current.style.overflowY = isOverlayOpen ? 'hidden' : 'scroll';
@@ -433,37 +456,48 @@ const App: React.FC = () => {
                     </div>
                   )}
 
-                  {/* RIGHT SIDE ACTION BUTTONS - Like Instagram Reels */}
-                  <div className={`absolute right-4 bottom-40 flex flex-col items-center gap-5 z-20 transition-opacity ${showDishInfo ? 'opacity-0' : 'opacity-100'}`}>
-                    {/* Like button with count */}
+                  {/* RIGHT SIDE ACTION BUTTONS - Standardized with circles */}
+                  <div className={`absolute right-4 bottom-40 flex flex-col items-center gap-4 z-20 transition-opacity ${showDishInfo ? 'opacity-0' : 'opacity-100'}`}>
+                    {/* Like button */}
                     <button 
                       onClick={async (e) => {
                         e.stopPropagation();
                         const next = new Set(likedIds);
-                        const newCounts = new Map(likesCounts);
-                        const currentCount = Number(newCounts.get(res.id)) || 0;
-                        
                         if (next.has(res.id)) {
                           next.delete(res.id);
-                          setLikedIds(next);
+                          await unlikeRestaurant(res.id);
+                          const currentCount = likesCounts.get(res.id) || 0;
+                          const newCounts = new Map(likesCounts);
                           newCounts.set(res.id, Math.max(0, currentCount - 1));
                           setLikesCounts(newCounts);
-                          unlikeRestaurant(res.id);
                         } else {
                           next.add(res.id);
-                          setLikedIds(next);
+                          await likeRestaurant(res.id);
+                          const currentCount = likesCounts.get(res.id) || 0;
+                          const newCounts = new Map(likesCounts);
                           newCounts.set(res.id, currentCount + 1);
                           setLikesCounts(newCounts);
-                          likeRestaurant(res.id);
                         }
+                        setLikedIds(next);
                       }}
                       className="flex flex-col items-center gap-1"
                     >
-                      <Heart size={28} className={likedIds.has(res.id) ? "text-red-500 fill-red-500" : "text-white"} />
-                      <span className="text-white text-xs font-bold">{likesCounts.get(res.id) || 0}</span>
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                        likedIds.has(res.id) 
+                          ? 'bg-red-500' 
+                          : 'bg-white/20 backdrop-blur-md'
+                      }`}>
+                        <Heart 
+                          size={24} 
+                          className={likedIds.has(res.id) ? 'text-white fill-white' : 'text-white'} 
+                        />
+                      </div>
+                      <span className="text-white text-[10px] font-medium">
+                        {likesCounts.get(res.id) || 0}
+                      </span>
                     </button>
                     
-                    {/* Reviews button with count - opens restaurant reviews modal */}
+                    {/* Review button */}
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
@@ -471,28 +505,39 @@ const App: React.FC = () => {
                       }}
                       className="flex flex-col items-center gap-1"
                     >
-                      <img src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon%20review.png" alt="Reviews" className="w-7 h-7" />
-                      <span className="text-white text-xs font-bold">{res.totalReviews || 0}</span>
+                      <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center">
+                        <MessageSquare size={24} className="text-white" />
+                      </div>
+                      <span className="text-white text-[10px] font-medium">{res.totalReviews || 0}</span>
                     </button>
                     
                     {/* Save button */}
                     <button 
-                      onClick={async (e) => {
+                      onClick={(e) => {
                         e.stopPropagation();
                         const next = new Set(savedIds);
                         if (next.has(res.id)) {
                           next.delete(res.id);
-                          setSavedIds(next);
-                          await unsaveRestaurant(res.id);
                         } else {
                           next.add(res.id);
-                          setSavedIds(next);
-                          await saveRestaurant(res.id);
                         }
+                        setSavedIds(next);
                       }}
                       className="flex flex-col items-center gap-1"
                     >
-                      <Bookmark size={26} className={savedIds.has(res.id) ? "text-white fill-white" : "text-white"} />
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                        savedIds.has(res.id) 
+                          ? 'bg-orange-500' 
+                          : 'bg-white/20 backdrop-blur-md'
+                      }`}>
+                        <Bookmark 
+                          size={24} 
+                          className={savedIds.has(res.id) ? 'text-white fill-white' : 'text-white'} 
+                        />
+                      </div>
+                      <span className="text-white text-[10px] font-medium">
+                        {savedIds.has(res.id) ? 'Saved' : 'Save'}
+                      </span>
                     </button>
                   </div>
 
