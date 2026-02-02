@@ -1,7 +1,7 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { supabase } from '../lib/supabase';
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+// Gemini API is now protected via Supabase Edge Function
+// API key stays on server, client calls Edge Function
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -76,59 +76,44 @@ export async function chatWithBitesBuddy(
   currentTriageData: TriageData
 ): Promise<AssistantResponse> {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-    // Build conversation context
-    const historyText = conversationHistory
-      .map(msg => `${msg.role === 'user' ? 'User' : 'Bites Buddy'}: ${msg.content}`)
-      .join('\n');
-
-    const currentStateText = `
-Current triage state:
-- Category: ${currentTriageData.category || 'not set'}
-- Cuisine: ${currentTriageData.cuisine || 'not set'}
-- Budget: ${currentTriageData.budget || 'not set'}
-`;
-
-    const prompt = `${SYSTEM_PROMPT}
-
-${currentStateText}
-
-Conversation history:
-${historyText}
-
-User: ${userMessage}
-
-Respond in JSON format with: message, quickReplies (array), category, cuisine, budget, shouldSearch (boolean).
-If you have enough info (category + cuisine OR category + "surprise me"), set shouldSearch to true.`;
-
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+    console.log('[Bites Buddy] Calling Edge Function with message:', userMessage);
     
-    // Parse JSON response
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Invalid response format from AI');
+    // Call Supabase Edge Function (API key protected on server)
+    const { data, error } = await supabase.functions.invoke('gemini-chat', {
+      body: {
+        userMessage,
+        conversationHistory,
+        currentTriageData,
+      },
+    });
+
+    if (error) {
+      console.error('[Bites Buddy] Edge Function error:', error);
+      throw error;
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    if (!data) {
+      throw new Error('No response from Edge Function');
+    }
 
-    // Update triage data
-    const updatedTriageData: TriageData = {
-      category: parsed.category || currentTriageData.category,
-      cuisine: parsed.cuisine || currentTriageData.cuisine,
-      budget: parsed.budget || currentTriageData.budget,
-      isComplete: parsed.shouldSearch || false,
-    };
+    console.log('[Bites Buddy] Response:', data);
 
     return {
-      message: parsed.message,
-      quickReplies: parsed.quickReplies || [],
-      triageData: updatedTriageData,
-      shouldSearch: parsed.shouldSearch || false,
+      message: data.message,
+      quickReplies: data.quickReplies || [],
+      triageData: data.triageData,
+      shouldSearch: data.shouldSearch || false,
     };
-  } catch (error) {
-    console.error('Bites Buddy error:', error);
+  } catch (error: any) {
+    console.error('[Bites Buddy] Error:', error);
+    
+    // Log specific error details for debugging
+    if (error?.message) {
+      console.error('[Bites Buddy] Error message:', error.message);
+    }
+    if (error?.status) {
+      console.error('[Bites Buddy] HTTP status:', error.status);
+    }
     
     // Fallback response
     return {

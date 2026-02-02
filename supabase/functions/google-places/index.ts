@@ -181,7 +181,7 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number,
     rating: place.rating,
     totalReviews: place.userRatingCount,
     priceLevel: priceLevelToString(place.priceLevel),
-    isOpen: place.currentOpeningHours?.openNow,
+    isOpen: place.currentOpeningHours?.openNow ?? false, // SAFE: Default to CLOSED if unknown
     openingHours: place.currentOpeningHours?.weekdayDescriptions || [],
     photoUrl: place.photos?.[0]?.name
       ? `${SUPABASE_URL}/functions/v1/google-places-photo?name=${encodeURIComponent(place.photos[0].name)}`

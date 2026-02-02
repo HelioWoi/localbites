@@ -67,7 +67,7 @@ const App: React.FC = () => {
   const [filters, setFilters] = useState({ 
     cuisine: 'All', 
     price: '', 
-    openNow: false, // Changed to false to show ALL restaurants by default
+    openNow: true, // Default to true - show only OPEN restaurants (user can disable to see all)
     dietary: 'All',
     ambiance: 'All',
     hasParking: false,
@@ -334,9 +334,13 @@ const App: React.FC = () => {
   // Fetch reviews when restaurant reviews modal opens
   useEffect(() => {
     const fetchModalReviews = async () => {
+      console.log('[REVIEW MODAL] useEffect triggered, showRestaurantReviews:', showRestaurantReviews);
+      
       // Check if it's a Google restaurant (ID starts with ChIJ or places/)
       const isGoogleRestaurant = showRestaurantReviews && 
         (showRestaurantReviews.id.startsWith('places/') || showRestaurantReviews.id.startsWith('ChIJ'));
+      
+      console.log('[REVIEW MODAL] isGoogleRestaurant:', isGoogleRestaurant);
       
       if (isGoogleRestaurant) {
         // Check if restaurant already has reviews
@@ -347,12 +351,15 @@ const App: React.FC = () => {
         
         setLoadingModalReviews(true);
         try {
-          console.log('[App] Fetching reviews for:', showRestaurantReviews.id);
+          console.log('[REVIEW MODAL] Fetching reviews for:', showRestaurantReviews.id);
           const details = await getRestaurantDetails(showRestaurantReviews.id);
-          console.log('[App] Got details:', details);
+          console.log('[REVIEW MODAL] Got details:', details);
+          console.log('[REVIEW MODAL] Reviews count:', details?.reviews?.length || 0);
           if (details?.reviews && details.reviews.length > 0) {
+            console.log('[REVIEW MODAL] Setting modalReviews with', details.reviews.length, 'reviews');
             setModalReviews(details.reviews);
           } else {
+            console.log('[REVIEW MODAL] No reviews found, setting empty array');
             setModalReviews([]);
           }
         } catch (error) {
@@ -430,9 +437,21 @@ const App: React.FC = () => {
         }}
         onSelect={(category) => {
         setSelectedCategory(category);
-        // After selecting category, get location and load restaurants
+        
+        // GEOLOCATION STRATEGY:
+        // 1. Try real GPS first (production priority)
+        // 2. On error code 2 (common in dev with device emulation), use fallback
+        // 3. Never block user with hard errors
+        //
+        // WHY ERROR CODE 2 HAPPENS IN DEV:
+        // - Chrome DevTools device emulation doesn't provide real GPS
+        // - macOS CoreLocation returns kCLErrorLocationUnknown
+        // - This is environmental, not a code bug
+        // - Production devices with real GPS work fine
+        
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
+            // SUCCESS: Real GPS coordinates
             (position) => {
               const loc: UserLocation = {
                 lat: position.coords.latitude,
@@ -441,21 +460,48 @@ const App: React.FC = () => {
               };
               setLocation(loc);
               setState('FEED');
+              console.log('[Geolocation] ✓ Real GPS acquired:', loc);
             },
+            // ERROR: Graceful fallback
             (error) => {
-              console.error('Geolocation error:', error);
-              alert('Unable to get your location. Please enable location services and try again.');
-              // Stay on filter selection screen
+              console.log('[Geolocation] Error code:', error.code, '- Using fallback');
+              
+              // Error code 2 = Position unavailable (common in dev/emulation)
+              // Use dev-friendly fallback instead of blocking user
+              const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+              
+              if (isLocalhost && error.code === 2) {
+                // DEV FALLBACK: Sunshine Coast, Australia
+                // This allows development and testing without real GPS
+                const devLoc: UserLocation = {
+                  lat: -26.68,
+                  lng: 153.12,
+                  name: 'Sunshine Coast (Dev Mode)'
+                };
+                setLocation(devLoc);
+                setState('FEED');
+                console.log('[Geolocation] ⚠️ Using dev fallback:', devLoc);
+              } else {
+                // PRODUCTION: Show friendly message, stay on selection screen
+                // User can try again or contact support
+                console.error('[Geolocation] Production error:', error);
+                alert('Unable to detect your location. Please check your device location settings and try again.');
+              }
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 0
             }
           );
         } else {
-          alert('Geolocation is not supported by your browser.');
-          // Stay on filter selection screen
+          // Browser doesn't support geolocation at all
+          alert('Your browser does not support location services.');
         }
       }}
       onSkip={() => {
         setSelectedCategory('all');
-        // Skip and get GPS, then go to feed
+        
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
             (position) => {
@@ -466,10 +512,27 @@ const App: React.FC = () => {
               };
               setLocation(loc);
               setState('FEED');
+              console.log('[Geolocation] ✓ Real GPS acquired (skip):', loc);
             },
             (error) => {
-              console.error('Geolocation error:', error);
+              console.log('[Geolocation] Error on skip:', error.code);
+              const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+              
+              if (isLocalhost && error.code === 2) {
+                const devLoc: UserLocation = {
+                  lat: -26.68,
+                  lng: 153.12,
+                  name: 'Sunshine Coast (Dev Mode)'
+                };
+                setLocation(devLoc);
+                console.log('[Geolocation] ⚠️ Using dev fallback (skip):', devLoc);
+              }
               setState('FEED');
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 0
             }
           );
         } else {
@@ -477,7 +540,6 @@ const App: React.FC = () => {
         }
       }}
       onManualSearch={(searchQuery) => {
-        // Set search query in filters and get GPS location
         setFilters(prev => ({ ...prev, cuisine: searchQuery }));
         setSelectedCategory('all');
         
@@ -491,14 +553,33 @@ const App: React.FC = () => {
               };
               setLocation(loc);
               setState('FEED');
+              console.log('[Geolocation] ✓ Real GPS acquired (manual search):', loc);
             },
             (error) => {
-              console.error('Geolocation error:', error);
-              alert('Unable to get your location. Please enable location services.');
+              console.log('[Geolocation] Error on manual search:', error.code);
+              const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+              
+              if (isLocalhost && error.code === 2) {
+                const devLoc: UserLocation = {
+                  lat: -26.68,
+                  lng: 153.12,
+                  name: 'Sunshine Coast (Dev Mode)'
+                };
+                setLocation(devLoc);
+                setState('FEED');
+                console.log('[Geolocation] ⚠️ Using dev fallback (manual search):', devLoc);
+              } else {
+                alert('Unable to detect your location. Please check your device location settings.');
+              }
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 0
             }
           );
         } else {
-          alert('Geolocation is not supported by your browser.');
+          alert('Your browser does not support location services.');
         }
       }}
     />
@@ -525,15 +606,17 @@ const App: React.FC = () => {
             setSelectedCategory(categoryMap[triageData.category] || 'all');
           }
           
-          // Apply cuisine filter if provided
-          if (triageData.cuisine) {
-            setFilters(prev => ({ ...prev, cuisine: triageData.cuisine || '' }));
-          }
+          // NOTE: We intentionally do NOT apply cuisine filter from AI
+          // The category already filters by establishment type (restaurants, cafes, bars)
+          // Applying cuisine would cause 0 results because AI values don't match API values
           
           // Apply budget filter if provided
           if (triageData.budget) {
             setFilters(prev => ({ ...prev, price: triageData.budget || '' }));
           }
+          
+          // Reset cuisine filter to show all results for the category
+          setFilters(prev => ({ ...prev, cuisine: '' }));
           
           // Close modal and get GPS
           setShowBitesAI(false);
@@ -548,10 +631,29 @@ const App: React.FC = () => {
                 };
                 setLocation(loc);
                 setState('FEED');
+                console.log('[Geolocation] ✓ Real GPS acquired (AI search):', loc);
               },
               (error) => {
-                console.error('Geolocation error:', error);
-                alert('Unable to get your location. Please enable location services.');
+                console.log('[Geolocation] Error on AI search:', error.code);
+                const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                
+                if (isLocalhost && error.code === 2) {
+                  const devLoc: UserLocation = {
+                    lat: -26.68,
+                    lng: 153.12,
+                    name: 'Sunshine Coast (Dev Mode)'
+                  };
+                  setLocation(devLoc);
+                  setState('FEED');
+                  console.log('[Geolocation] ⚠️ Using dev fallback (AI search):', devLoc);
+                } else {
+                  alert('Unable to detect your location. Please check your device location settings.');
+                }
+              },
+              {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
               }
             );
           }
@@ -622,13 +724,15 @@ const App: React.FC = () => {
                 setSelectedCategory(categoryMap[triageData.category] || 'all');
               }
               
-              if (triageData.cuisine) {
-                setFilters(prev => ({ ...prev, cuisine: triageData.cuisine || '' }));
-              }
+              // NOTE: Do NOT apply cuisine filter from AI - causes 0 results
+              // Category already filters by establishment type
               
               if (triageData.budget) {
                 setFilters(prev => ({ ...prev, price: triageData.budget || '' }));
               }
+              
+              // Reset cuisine filter to show all results
+              setFilters(prev => ({ ...prev, cuisine: '' }));
               
               setShowBitesAI(false);
               setState('FEED');
@@ -709,7 +813,27 @@ const App: React.FC = () => {
             <div className="absolute top-0 right-0 w-2 h-2 bg-orange-500 rounded-full"></div>
           </button>
           <button 
-            onClick={() => setFilters(f => ({ ...f, openNow: !f.openNow }))}
+            onClick={async () => {
+              const newOpenNowValue = !filters.openNow;
+              console.log('[OPEN Button] Clicked! Refreshing feed with openNow:', newOpenNowValue);
+              
+              // Update filter state
+              setFilters(f => ({ ...f, openNow: newOpenNowValue }));
+              
+              // Clear current restaurants and reload with new filter
+              setRestaurants([]);
+              setActiveRestaurantIndex(0);
+              setCurrentPage(1);
+              setHasMorePages(true);
+              
+              // Reload restaurants with openNow filter
+              if (location) {
+                await fetchRestaurants(location);
+              }
+              
+              // Scroll to top
+              feedRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             className={`px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all ${filters.openNow ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}
           >
             <Clock size={14} />
@@ -803,7 +927,15 @@ const App: React.FC = () => {
         )}
         */}
         
-        {isLoading && restaurants.length === 0 ? (
+        {/* Apply openNow filter in real-time */}
+        {(() => {
+          const displayedRestaurants = filters.openNow 
+            ? restaurants.filter(r => r.isOpen) 
+            : restaurants;
+          
+          console.log('[Feed] openNow filter:', filters.openNow, '| Total:', restaurants.length, '| Displayed:', displayedRestaurants.length);
+          
+          return isLoading && restaurants.length === 0 ? (
           Array.from({ length: 3 }).map((_, i) => (
             <div key={`skeleton-${i}`} className="snap-item">
               <div className="video-card shadow-none rounded-none md:rounded-[40px] border-none bg-zinc-100 overflow-hidden">
@@ -819,8 +951,8 @@ const App: React.FC = () => {
               </div>
             </div>
           ))
-        ) : restaurants.length > 0 ? (
-          restaurants.map((res, i) => (
+        ) : displayedRestaurants.length > 0 ? (
+          displayedRestaurants.map((res, i) => (
             <div key={res.id} className="snap-item">
               <div className={`video-card shadow-none rounded-none border-none bg-black transition-all duration-500 ease-out transform-gpu ${activeRestaurantIndex === i ? 'opacity-100 scale-100' : 'opacity-80 scale-[0.97]'}`}>
                 <MediaContainer 
@@ -913,7 +1045,12 @@ const App: React.FC = () => {
                     
                     {/* Reviews button */}
                     <button
-                      onClick={() => setShowRestaurantReviews(res)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log('[REVIEW ICON] Clicked on review icon for restaurant:', res.name, res.id);
+                        console.log('[REVIEW ICON] Setting showRestaurantReviews to:', res);
+                        setShowRestaurantReviews(res);
+                      }}
                       className="flex flex-col items-center gap-1"
                     >
                       <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center">
@@ -981,7 +1118,8 @@ const App: React.FC = () => {
               </div>
             </div>
           ))
-        ) : null}
+        ) : null;
+        })()}
         
         {/* Loading indicator when lazy loading more restaurants */}
         {isLoadingMore && (
@@ -1289,6 +1427,9 @@ const App: React.FC = () => {
       {/* Restaurant Reviews Modal - Full screen swipeable feed */}
       {showRestaurantReviews && (
         <div className="fixed inset-0 z-[70] bg-black">
+          {console.log('[REVIEW MODAL] Rendering modal for restaurant:', showRestaurantReviews.name)}
+          {console.log('[REVIEW MODAL] Modal reviews count:', modalReviews.length)}
+          {console.log('[REVIEW MODAL] Loading state:', loadingModalReviews)}
           {loadingModalReviews ? (
             <div className="h-full flex flex-col items-center justify-center">
               <Loader2 className="w-8 h-8 animate-spin text-orange-500 mb-4" />
@@ -1522,15 +1663,16 @@ const App: React.FC = () => {
               setSelectedCategory(categoryMap[triageData.category] || 'all');
             }
             
-            // Apply cuisine filter if provided
-            if (triageData.cuisine) {
-              setFilters(prev => ({ ...prev, cuisine: triageData.cuisine || '' }));
-            }
+            // NOTE: Do NOT apply cuisine filter from AI - causes 0 results
+            // Category already filters by establishment type
             
             // Apply budget filter if provided
             if (triageData.budget) {
               setFilters(prev => ({ ...prev, price: triageData.budget || '' }));
             }
+            
+            // Reset cuisine filter to show all results
+            setFilters(prev => ({ ...prev, cuisine: '' }));
             
             // Get GPS and go to feed
             if (navigator.geolocation) {

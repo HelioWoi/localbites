@@ -82,7 +82,7 @@ export async function getNearbyRestaurants(
       const fullFilters = {
         cuisine: filters.cuisine || 'All',
         price: filters.price || '',
-        openNow: filters.openNow ?? false, // Changed to false - show all by default
+        openNow: filters.openNow || false,
         dietary: (filters as any).dietary || 'All',
         ambiance: (filters as any).ambiance || 'All',
         hasParking: (filters as any).hasParking || false,
@@ -203,7 +203,7 @@ export async function getNearbyRestaurants(
     const fullFilters = {
       cuisine: filters.cuisine || 'All',
       price: filters.price || '',
-      openNow: filters.openNow ?? false, // Changed to false - show all by default
+      openNow: filters.openNow || false,
       dietary: (filters as any).dietary || 'All',
       ambiance: (filters as any).ambiance || 'All',
       hasParking: (filters as any).hasParking || false,
