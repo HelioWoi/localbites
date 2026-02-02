@@ -32,6 +32,85 @@ function getLocalityCacheKey(lat: number, lng: number): string {
   return `locality_${roundedLat}_${roundedLng}`;
 }
 
+// Calculate if restaurant is open based on opening hours
+// Google API returns incorrect isOpen values, so we calculate manually
+function calculateIsOpen(openingHours: string[]): boolean {
+  if (!openingHours || openingHours.length === 0) {
+    return false; // SAFE: If no hours info, assume CLOSED
+  }
+
+  try {
+    // Get current time in Australia/Brisbane timezone (where most users are)
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Australia/Brisbane',
+      weekday: 'long',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false
+    });
+    
+    const parts = formatter.formatToParts(now);
+    const currentDay = parts.find(p => p.type === 'weekday')?.value || '';
+    const currentHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+    const currentMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
+    const currentTimeInMinutes = currentHour * 60 + currentMinute;
+
+    // Find today's hours
+    const todayHours = openingHours.find(h => h.startsWith(currentDay));
+    
+    if (!todayHours) {
+      return false; // SAFE: If can't find today's hours, assume CLOSED
+    }
+
+    // Check if closed
+    if (todayHours.toLowerCase().includes('closed')) {
+      return false;
+    }
+
+    // Parse hours - handle multiple formats
+    // Format 1: "Monday: 7:00 AM – 2:00 PM"
+    // Format 2: "Monday: 7:00 AM - 2:00 PM"
+    // Format 3: "Monday: 7:00 – 14:00"
+    const timeMatch = todayHours.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?\s*[–-]\s*(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    
+    if (!timeMatch) {
+      return false; // SAFE: If can't parse, assume CLOSED
+    }
+
+    const [_, openHourStr, openMinStr, openPeriod, closeHourStr, closeMinStr, closePeriod] = timeMatch;
+    
+    // Convert to 24-hour format
+    let openTime = parseInt(openHourStr) * 60 + parseInt(openMinStr);
+    if (openPeriod) {
+      if (openPeriod.toUpperCase() === 'PM' && parseInt(openHourStr) !== 12) {
+        openTime += 12 * 60;
+      }
+      if (openPeriod.toUpperCase() === 'AM' && parseInt(openHourStr) === 12) {
+        openTime = parseInt(openMinStr);
+      }
+    }
+    
+    let closeTime = parseInt(closeHourStr) * 60 + parseInt(closeMinStr);
+    if (closePeriod) {
+      if (closePeriod.toUpperCase() === 'PM' && parseInt(closeHourStr) !== 12) {
+        closeTime += 12 * 60;
+      }
+      if (closePeriod.toUpperCase() === 'AM' && parseInt(closeHourStr) === 12) {
+        closeTime = parseInt(closeMinStr);
+      }
+    }
+
+    // Check if current time is within opening hours
+    const isOpen = currentTimeInMinutes >= openTime && currentTimeInMinutes < closeTime;
+    
+    return isOpen;
+  } catch (error) {
+    console.error('Error calculating isOpen:', error);
+    return false; // SAFE: On error, assume CLOSED
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -172,28 +251,31 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number,
   }
 
   // Transform places to response format
-  const result = (allPlaces || []).map((place: any) => ({
-    id: place.id,
-    name: place.displayName?.text || "Unknown",
-    address: place.formattedAddress || "",
-    phone: place.nationalPhoneNumber,
-    website: place.websiteUri,
-    rating: place.rating,
-    totalReviews: place.userRatingCount,
-    priceLevel: priceLevelToString(place.priceLevel),
-    isOpen: place.currentOpeningHours?.openNow ?? false, // SAFE: Default to CLOSED if unknown
-    openingHours: place.currentOpeningHours?.weekdayDescriptions || [],
-    photoUrl: place.photos?.[0]?.name
-      ? `${SUPABASE_URL}/functions/v1/google-places-photo?name=${encodeURIComponent(place.photos[0].name)}`
-      : undefined,
-    googleMapsUrl: place.googleMapsUri || `https://www.google.com/maps/place/?q=place_id:${place.id}`,
-    cuisine: extractCuisine(place.types),
-    location: {
-      lat: place.location?.latitude,
-      lng: place.location?.longitude,
-    },
-    reviews: [], // Reviews now fetched on demand via getPlaceDetails to save costs
-  }));
+  const result = (allPlaces || []).map((place: any) => {
+    const openingHours = place.currentOpeningHours?.weekdayDescriptions || [];
+    return {
+      id: place.id,
+      name: place.displayName?.text || "Unknown",
+      address: place.formattedAddress || "",
+      phone: place.nationalPhoneNumber,
+      website: place.websiteUri,
+      rating: place.rating,
+      totalReviews: place.userRatingCount,
+      priceLevel: priceLevelToString(place.priceLevel),
+      isOpen: calculateIsOpen(openingHours), // Calculate manually - Google API returns incorrect values
+      openingHours: openingHours,
+      photoUrl: place.photos?.[0]?.name
+        ? `${SUPABASE_URL}/functions/v1/google-places-photo?name=${encodeURIComponent(place.photos[0].name)}`
+        : undefined,
+      googleMapsUrl: place.googleMapsUri || `https://www.google.com/maps/place/?q=place_id:${place.id}`,
+      cuisine: extractCuisine(place.types),
+      location: {
+        lat: place.location?.latitude,
+        lng: place.location?.longitude,
+      },
+      reviews: [], // Reviews now fetched on demand via getPlaceDetails to save costs
+    };
+  });
 
   // OPTIMIZATION #2: Save to cache for future requests
   if (result.length > 0) {
