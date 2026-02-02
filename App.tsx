@@ -11,10 +11,12 @@ import RestaurantMenuLoader from './components/RestaurantMenuLoader';
 import RestaurantProfileLoader from './components/RestaurantProfileLoader';
 import MediaContainer from './components/MediaContainer';
 import FloatingFilters from './components/FloatingFilters';
+import BitesAI from './components/BitesAI';
 import { getNearbyRestaurants, getRestaurantDetails, getRemainingSearches } from './services/geminiService';
+import { TriageData } from './services/aiAssistant';
 import { likeRestaurant, unlikeRestaurant, saveRestaurant, unsaveRestaurant, getUserLikes, getUserSaves, getAllLikesCounts } from './services/interactionService';
 import { CUISINES, PRICES, DIETARY_OPTIONS, AMBIANCE_OPTIONS } from './constants';
-import { Home, Search, MessageSquare, Filter, Bookmark, ExternalLink, Info, Loader2, X, ArrowRight, Globe, MapPin, ChevronUp, Crown, PlayCircle, Heart, Star, Clock } from 'lucide-react';
+import { Home, Search, MessageSquare, Filter, Bookmark, ExternalLink, Info, Loader2, X, ArrowRight, Globe, MapPin, ChevronUp, Crown, PlayCircle, Heart, Star, Clock, Sparkles } from 'lucide-react';
 import { useLazyLoading } from './hooks/useLazyLoading';
 
 // Check if we're on the partner route
@@ -80,6 +82,7 @@ const App: React.FC = () => {
   const [feedSwipeCount, setFeedSwipeCount] = useState(0);
   const [showSearch, setShowSearch] = useState(false);
   const [showReviewsFeed, setShowReviewsFeed] = useState(false);
+  const [showBitesAI, setShowBitesAI] = useState(false);
   const [showRestaurantReviews, setShowRestaurantReviews] = useState<Restaurant | null>(null);
   const [modalReviews, setModalReviews] = useState<any[]>([]);
   const [loadingModalReviews, setLoadingModalReviews] = useState(false);
@@ -398,6 +401,15 @@ const App: React.FC = () => {
     const scrollPos = e.currentTarget.scrollTop;
     const itemHeight = window.innerHeight;
     const index = Math.round(scrollPos / itemHeight);
+    
+    // Check if user reached the end of feed
+    if (index >= restaurants.length - 1 && restaurants.length > 0 && !showBitesAI) {
+      // Open AI Assistant when reaching the last restaurant
+      setTimeout(() => {
+        setShowBitesAI(true);
+      }, 500);
+    }
+    
     if (index !== activeRestaurantIndex && index >= 0 && index < restaurants.length) {
       setActiveRestaurantIndex(index);
       setShowDishInfo(false);
@@ -410,8 +422,13 @@ const App: React.FC = () => {
   }} />;
 
   if (state === 'FILTER_SELECTION') return (
-    <FilterSelectionScreen
-      onSelect={(category) => {
+    <>
+      <FilterSelectionScreen
+        onOpenAI={() => {
+          console.log('[App] onOpenAI called, setting showBitesAI to true');
+          setShowBitesAI(true);
+        }}
+        onSelect={(category) => {
         setSelectedCategory(category);
         // After selecting category, get location and load restaurants
         if (navigator.geolocation) {
@@ -485,6 +502,63 @@ const App: React.FC = () => {
         }
       }}
     />
+    
+    {/* Bites AI Modal - Available in FilterSelection */}
+    {showBitesAI && (
+      <BitesAI
+        mode="voice"
+        onClose={() => {
+          console.log('[App] Closing BitesAI modal');
+          setShowBitesAI(false);
+        }}
+        onSearchTrigger={(triageData: TriageData) => {
+          console.log('[App] AI Search triggered with:', triageData);
+          // Map category
+          const categoryMap: { [key: string]: CategoryFilter } = {
+            'restaurants': 'restaurants',
+            'cafes': 'cafes',
+            'bars': 'bars',
+            'all': 'all',
+          };
+          
+          if (triageData.category) {
+            setSelectedCategory(categoryMap[triageData.category] || 'all');
+          }
+          
+          // Apply cuisine filter if provided
+          if (triageData.cuisine) {
+            setFilters(prev => ({ ...prev, cuisine: triageData.cuisine || '' }));
+          }
+          
+          // Apply budget filter if provided
+          if (triageData.budget) {
+            setFilters(prev => ({ ...prev, price: triageData.budget || '' }));
+          }
+          
+          // Close modal and get GPS
+          setShowBitesAI(false);
+          
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                const loc: UserLocation = {
+                  lat: position.coords.latitude,
+                  lng: position.coords.longitude,
+                  name: 'Current Location'
+                };
+                setLocation(loc);
+                setState('FEED');
+              },
+              (error) => {
+                console.error('Geolocation error:', error);
+                alert('Unable to get your location. Please enable location services.');
+              }
+            );
+          }
+        }}
+      />
+    )}
+    </>
   );
   if (state === 'LOCATION_SELECTOR') return <LocationSelector onLocationSelect={handleLocationSelect} />;
   if (state === 'ADMIN') return <AdminDashboard onClose={() => setState('FEED')} />;
@@ -493,22 +567,97 @@ const App: React.FC = () => {
     console.log('[Profile] Rendering profile for:', selectedRestaurant.name);
     
     return (
-      <RestaurantProfile 
-        restaurant={selectedRestaurant} 
-        onBack={() => {
-          setState('FEED');
-          setOpenProfileReviews(false);
-        }} 
-        isSaved={savedIds.has(selectedRestaurant.id)}
-        onToggleSave={() => {
-           const next = new Set(savedIds);
-           if (next.has(selectedRestaurant.id)) next.delete(selectedRestaurant.id);
-           else next.add(selectedRestaurant.id);
-           setSavedIds(next);
-        }}
-        openReviews={openProfileReviews}
-        onNavigateToPartner={() => setState('ADMIN')}
-      />
+      <>
+        <RestaurantProfile 
+          restaurant={selectedRestaurant} 
+          onBack={() => {
+            setState('FILTER_SELECTION');
+            setOpenProfileReviews(false);
+          }} 
+          isSaved={savedIds.has(selectedRestaurant.id)}
+          onToggleSave={() => {
+             const next = new Set(savedIds);
+             if (next.has(selectedRestaurant.id)) next.delete(selectedRestaurant.id);
+             else next.add(selectedRestaurant.id);
+             setSavedIds(next);
+          }}
+          openReviews={openProfileReviews}
+          onNavigateToPartner={() => setState('ADMIN')}
+          onOpenAI={() => setShowBitesAI(true)}
+          onOpenSearch={() => setShowSearch(true)}
+          onOpenFilter={() => setShowFilterModal('cuisine')}
+          isStandalone={false}
+        />
+        
+        {/* Search Modal */}
+        {showSearch && (
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end justify-center" onClick={() => setShowSearch(false)}>
+            <div className="bg-white w-full max-w-md rounded-t-[40px] p-8 pb-12" onClick={e => e.stopPropagation()}>
+              <h3 className="text-2xl font-black mb-6">Search</h3>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search restaurants..."
+                className="w-full px-4 py-3 border-2 border-zinc-200 rounded-2xl focus:border-orange-500 focus:outline-none"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Bites AI Modal */}
+        {showBitesAI && (
+          <BitesAI
+            mode="chat"
+            onClose={() => setShowBitesAI(false)}
+            onSearchTrigger={(triageData: TriageData) => {
+              const categoryMap: { [key: string]: CategoryFilter } = {
+                'restaurants': 'restaurants',
+                'cafes': 'cafes',
+                'bars': 'bars',
+                'all': 'all',
+              };
+              
+              if (triageData.category) {
+                setSelectedCategory(categoryMap[triageData.category] || 'all');
+              }
+              
+              if (triageData.cuisine) {
+                setFilters(prev => ({ ...prev, cuisine: triageData.cuisine || '' }));
+              }
+              
+              if (triageData.budget) {
+                setFilters(prev => ({ ...prev, price: triageData.budget || '' }));
+              }
+              
+              setShowBitesAI(false);
+              setState('FEED');
+            }}
+          />
+        )}
+
+        {/* Filter Modal */}
+        {showFilterModal && (
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end justify-center" onClick={() => setShowFilterModal(null)}>
+            <div className="bg-white w-full max-w-md rounded-t-[40px] max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="sticky top-0 bg-white z-10 flex justify-between items-center p-8 pb-4 border-b border-zinc-100">
+                <h3 className="text-2xl font-black">Filters</h3>
+                <button onClick={() => setShowFilterModal(null)} className="p-2 bg-zinc-100 rounded-full">
+                  <X size={20}/>
+                </button>
+              </div>
+              <div className="p-8">
+                <button 
+                  onClick={() => setShowFilterModal(null)}
+                  className="w-full py-4 bg-zinc-900 text-white font-bold rounded-2xl"
+                >
+                  Apply Filters
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 
@@ -552,8 +701,8 @@ const App: React.FC = () => {
           <button onClick={() => setShowSearch(true)} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
             <Search size={24} />
           </button>
-          <button onClick={() => setShowReviewsFeed(true)} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
-            <MessageSquare size={24} />
+          <button onClick={() => setShowBitesAI(true)} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+            <Sparkles size={24} />
           </button>
           <button onClick={() => setShowFilterModal('cuisine')} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors relative">
             <Filter size={24} />
@@ -762,12 +911,9 @@ const App: React.FC = () => {
                       </span>
                     </button>
                     
-                    {/* Review button */}
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowRestaurantReviews(res);
-                      }}
+                    {/* Reviews button */}
+                    <button
+                      onClick={() => setShowRestaurantReviews(res)}
                       className="flex flex-col items-center gap-1"
                     >
                       <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center">
@@ -1113,8 +1259,8 @@ const App: React.FC = () => {
                         <button onClick={() => { setShowReviewsFeed(false); setShowSearch(true); }} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
                           <Search size={24} />
                         </button>
-                        <button className="flex flex-col items-center gap-1 text-white transition-colors">
-                          <MessageSquare size={24} />
+                        <button onClick={() => setShowBitesAI(true)} className="flex flex-col items-center gap-1 text-white transition-colors">
+                          <Sparkles size={24} />
                         </button>
                         <button onClick={() => setShowFilterModal('cuisine')} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
                           <Filter size={24} />
@@ -1214,7 +1360,7 @@ const App: React.FC = () => {
                     <div className="flex items-center justify-between max-w-md mx-auto">
                       <button onClick={() => setShowRestaurantReviews(null)} className="text-white/60 hover:text-white"><Home size={24} /></button>
                       <button onClick={() => { setShowRestaurantReviews(null); setShowSearch(true); }} className="text-white/60 hover:text-white"><Search size={24} /></button>
-                      <button className="text-white"><MessageSquare size={24} /></button>
+                      <button onClick={() => setShowBitesAI(true)} className="text-white"><Sparkles size={24} /></button>
                       <button onClick={() => setShowFilterModal('cuisine')} className="text-white/60 hover:text-white"><Filter size={24} /></button>
                       <button 
                         onClick={() => window.open(showRestaurantReviews.googleMapsUrl, '_blank')}
@@ -1356,6 +1502,56 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+      
+      {/* Bites AI Modal - Global */}
+      {showBitesAI && (
+        <BitesAI
+          mode="chat"
+          onClose={() => setShowBitesAI(false)}
+          onSearchTrigger={(triageData: TriageData) => {
+            // Map category
+            const categoryMap: { [key: string]: CategoryFilter } = {
+              'restaurants': 'restaurants',
+              'cafes': 'cafes',
+              'bars': 'bars',
+              'all': 'all',
+            };
+            
+            if (triageData.category) {
+              setSelectedCategory(categoryMap[triageData.category] || 'all');
+            }
+            
+            // Apply cuisine filter if provided
+            if (triageData.cuisine) {
+              setFilters(prev => ({ ...prev, cuisine: triageData.cuisine || '' }));
+            }
+            
+            // Apply budget filter if provided
+            if (triageData.budget) {
+              setFilters(prev => ({ ...prev, price: triageData.budget || '' }));
+            }
+            
+            // Get GPS and go to feed
+            if (navigator.geolocation) {
+              navigator.geolocation.getCurrentPosition(
+                (position) => {
+                  const loc: UserLocation = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude,
+                    name: 'Current Location'
+                  };
+                  setLocation(loc);
+                  setState('FEED');
+                },
+                (error) => {
+                  console.error('Geolocation error:', error);
+                  alert('Unable to get your location. Please enable location services.');
+                }
+              );
+            }
+          }}
+        />
       )}
     </div>
   );

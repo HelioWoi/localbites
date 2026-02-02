@@ -5,9 +5,10 @@ interface FilterSelectionScreenProps {
   onSelect: (category: 'restaurants' | 'cafes' | 'bars' | 'all') => void;
   onSkip: () => void;
   onManualSearch?: (address: string) => void;
+  onOpenAI?: () => void;
 }
 
-const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect, onSkip, onManualSearch }) => {
+const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect, onSkip, onManualSearch, onOpenAI }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -76,10 +77,10 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
       iconBg: 'bg-purple-500/10',
     },
     {
-      id: 'all' as const,
+      id: 'ai' as const,
       icon: Sparkles,
-      title: 'Show Me All',
-      subtitle: 'All restaurants, cafes & bars',
+      title: 'Ask Bites',
+      subtitle: 'AI will help you choose',
       gradient: 'from-green-500 to-emerald-500',
       iconBg: 'bg-green-500/10',
     },
@@ -157,7 +158,16 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
               return (
                 <button
                   key={category.id}
-                  onClick={() => onSelect(category.id)}
+                  onClick={() => {
+                    console.log('[FilterSelection] Button clicked:', category.id, 'onOpenAI exists:', !!onOpenAI);
+                    if (category.id === 'ai' && onOpenAI) {
+                      console.log('[FilterSelection] Opening AI modal');
+                      onOpenAI();
+                    } else if (category.id !== 'ai') {
+                      console.log('[FilterSelection] Selecting category:', category.id);
+                      onSelect(category.id as 'restaurants' | 'cafes' | 'bars' | 'all');
+                    }
+                  }}
                   className="aspect-square bg-zinc-50 rounded-3xl p-6 flex flex-col items-center justify-center gap-3 hover:bg-zinc-100 active:scale-95 transition-all duration-200 group border border-zinc-100"
                 >
                   <div className={`w-16 h-16 bg-gradient-to-br ${category.gradient} rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>

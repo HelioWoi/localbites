@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.38.0",
+    "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.93.2",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",

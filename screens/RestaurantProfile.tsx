@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Restaurant, Dish, Review } from '../types';
-import { ChevronLeft, Globe, MapPin, Navigation, Bookmark, PlayCircle, Camera, X, Crown, Play, Pause, Volume2, VolumeX, Star, ChevronRight, ChevronUp, ExternalLink, Home, Search, MessageSquare, Filter, Clock, Heart, Trash2, Phone } from 'lucide-react';
+import { ChevronLeft, Globe, MapPin, Navigation, Bookmark, PlayCircle, Camera, X, Crown, Play, Pause, Volume2, VolumeX, Star, ChevronRight, ChevronUp, ExternalLink, Home, Search, MessageSquare, Filter, Clock, Heart, Trash2, Phone, Sparkles } from 'lucide-react';
 import { getPlaceDetails } from '../services/googlePlacesProxy';
 
 interface RestaurantProfileProps {
@@ -11,6 +11,7 @@ interface RestaurantProfileProps {
   onToggleSave: () => void;
   openReviews?: boolean;
   onNavigateToPartner?: () => void;
+  onOpenAI?: () => void;
 }
 
 // Helper to get/set saved dishes from localStorage
@@ -27,7 +28,7 @@ const saveDishesToStorage = (restaurantId: string, dishIds: Set<string>) => {
   localStorage.setItem(`saved_dishes_${restaurantId}`, JSON.stringify([...dishIds]));
 };
 
-const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBack, isSaved, onToggleSave, openReviews = false, onNavigateToPartner }) => {
+const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBack, isSaved, onToggleSave, openReviews = false, onNavigateToPartner, onOpenAI, onOpenSearch, onOpenFilter, isStandalone = false }) => {
   const [showVideoReels, setShowVideoReels] = useState(false);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [swipeHintCounts, setSwipeHintCounts] = useState<number[]>([]);
@@ -613,23 +614,50 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
       {/* Fixed Bottom Navigation Bar */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-lg border-t border-white/10 px-6 py-4 pb-8">
         <div className="flex items-center justify-between max-w-md mx-auto">
-          <button onClick={onBack} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
-            <Home size={24} />
-          </button>
-          <button className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
-            <Search size={24} />
-          </button>
-          <button onClick={() => setShowReviewsReel(true)} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
-            <MessageSquare size={24} />
-          </button>
-          <button className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors relative">
-            <Filter size={24} />
-            <div className="absolute top-0 right-0 w-2 h-2 bg-orange-500 rounded-full"></div>
-          </button>
-          <div className={`px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 ${restaurant.isOpen ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
-            <Clock size={14} />
-            {restaurant.isOpen ? 'OPEN' : 'CLOSED'}
-          </div>
+          {!isStandalone ? (
+            /* Full navigation - App context */
+            <>
+              <button onClick={() => {
+                console.log('[RestaurantProfile] Home clicked, calling onBack');
+                onBack();
+              }} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+                <Home size={24} />
+              </button>
+              <button onClick={() => {
+                console.log('[RestaurantProfile] Search clicked, onOpenSearch exists:', !!onOpenSearch);
+                if (onOpenSearch) onOpenSearch();
+              }} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+                <Search size={24} />
+              </button>
+              <button onClick={() => {
+                console.log('[RestaurantProfile] AI clicked, onOpenAI exists:', !!onOpenAI);
+                if (onOpenAI) onOpenAI();
+              }} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+                <Sparkles size={24} />
+              </button>
+              <button onClick={() => {
+                console.log('[RestaurantProfile] Filter clicked, onOpenFilter exists:', !!onOpenFilter);
+                if (onOpenFilter) onOpenFilter();
+              }} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors relative">
+                <Filter size={24} />
+                <div className="absolute top-0 right-0 w-2 h-2 bg-orange-500 rounded-full"></div>
+              </button>
+              <div className={`px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 ${restaurant.isOpen ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
+                <Clock size={14} />
+                {restaurant.isOpen ? 'OPEN' : 'CLOSED'}
+              </div>
+            </>
+          ) : (
+            /* Simple navigation - Standalone/QR code context */
+            <>
+              <div className="flex-1" />
+              <div className={`px-6 py-3 rounded-full text-sm font-bold flex items-center gap-2 ${restaurant.isOpen ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
+                <Clock size={16} />
+                {restaurant.isOpen ? 'OPEN NOW' : 'CLOSED'}
+              </div>
+              <div className="flex-1" />
+            </>
+          )}
         </div>
       </div>
     </div>

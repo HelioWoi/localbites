@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Volume2, VolumeX, ChevronUp, Star, MapPin, Globe, Navigation, Heart, Bookmark, X, ChevronLeft, MessageSquare } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, ChevronUp, Star, MapPin, Globe, Navigation, Heart, Bookmark, X, ChevronLeft, MessageSquare, Home, Search, Sparkles, Filter, Clock } from 'lucide-react';
 
 interface MenuItem {
   id: string;
@@ -438,11 +438,56 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
       </div>
 
       {/* Video counter */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
+      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40">
         <div className="bg-white/20 backdrop-blur-md rounded-full px-4 py-2">
           <span className="text-white text-xs font-bold">
             {activeVideoIndex + 1} / {filteredItems.length}
           </span>
+        </div>
+      </div>
+
+      {/* Fixed Bottom Navigation Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-lg border-t border-white/10 px-6 py-4 pb-8">
+        <div className="flex items-center justify-between max-w-md mx-auto">
+          <button 
+            onClick={() => window.location.href = '/'}
+            className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors"
+          >
+            <Home size={24} />
+          </button>
+          <button 
+            onClick={() => window.location.href = '/'}
+            className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors"
+          >
+            <Search size={24} />
+          </button>
+          <button 
+            onClick={() => {
+              // Trigger AI modal - will be handled by parent App component
+              window.dispatchEvent(new CustomEvent('openBitesAI'));
+            }}
+            className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors"
+          >
+            <Sparkles size={24} />
+          </button>
+          <button 
+            onClick={() => window.location.href = '/'}
+            className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors relative"
+          >
+            <Filter size={24} />
+            <div className="absolute top-0 right-0 w-2 h-2 bg-orange-500 rounded-full"></div>
+          </button>
+          <button 
+            className="px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all bg-green-500 text-white"
+            onClick={() => {
+              if (restaurant.googleMapsUrl) {
+                window.open(restaurant.googleMapsUrl, '_blank');
+              }
+            }}
+          >
+            <Clock size={14} />
+            OPEN
+          </button>
         </div>
       </div>
     </div>
