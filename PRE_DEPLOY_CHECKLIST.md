@@ -15,11 +15,11 @@
   - `stripe-webhook` - Webhook para pagamentos
 
 ### Google APIs
-- ✅ **Places API Key:** `AIzaSyBFuwVE7Omu6N3ZV4PHJvLORP0VqNlso3E`
+- ✅ **Places API Key:** Configurada em Supabase Secrets
   - Habilitada: Places API (New)
   - Custo: $17 por 1000 requests (Nearby Search)
   
-- ✅ **Gemini API Key:** `AIzaSyDKm8vUfVRtsfM-E2AsN20_VQ1McmqcskY`
+- ✅ **Gemini API Key:** Configurada em Supabase Secrets
   - Habilitada: Generative Language API
   - Modelo: `gemini-2.5-flash`
   - Custo: GRATUITO até 1500 requests/dia
