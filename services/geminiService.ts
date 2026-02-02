@@ -148,7 +148,7 @@ export async function getNearbyRestaurants(
         phone: place.phone,
         website: place.website,
         googleMapsUrl: place.googleMapsUrl,
-        mainPhotoUrl: place.photoUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800',
+        mainPhotoUrl: place.photoUrl, // Real photos from Google Places only, no fallback
         isSubscribed: false, // Google restaurants don't have video content
         dishes: [],
         reviews: place.reviews || [],

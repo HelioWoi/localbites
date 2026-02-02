@@ -132,16 +132,31 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
 
   // Play/pause videos based on active index
   useEffect(() => {
-    videoRefs.current.forEach((video, index) => {
-      if (video) {
-        if (index === activeVideoIndex && isPlaying) {
-          video.play().catch(() => {});
-        } else {
-          video.pause();
+    // Small delay to ensure video refs are ready after category change
+    const timer = setTimeout(() => {
+      videoRefs.current.forEach((video, index) => {
+        if (video) {
+          if (index === activeVideoIndex && isPlaying) {
+            // Ensure video is loaded before playing
+            if (video.readyState >= 2) {
+              video.play().catch(() => {});
+            } else {
+              // Wait for video to be ready
+              video.addEventListener('loadeddata', () => {
+                if (index === activeVideoIndex && isPlaying) {
+                  video.play().catch(() => {});
+                }
+              }, { once: true });
+            }
+          } else {
+            video.pause();
+          }
+          video.muted = isMuted;
         }
-        video.muted = isMuted;
-      }
-    });
+      });
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [activeVideoIndex, isMuted, isPlaying, filteredItems]);
   
   // Auto-play next video when current ends

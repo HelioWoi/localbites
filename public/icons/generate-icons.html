@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate LocalBites Icons</title>
+</head>
+<body>
+    <canvas id="canvas" width="512" height="512"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Background
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.roundRect(0, 0, 512, 512, 128);
+        ctx.fill();
+        
+        // Head (circle)
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.arc(256, 200, 80, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Body (triangle)
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.moveTo(256, 300);
+        ctx.lineTo(320, 420);
+        ctx.lineTo(192, 420);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Eyes
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(200, 180, 15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(312, 180, 15, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Smile
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 12;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.quadraticCurveTo(256, 270, 292, 230);
+        ctx.moveTo(220, 230);
+        ctx.quadraticCurveTo(256, 270, 292, 230);
+        ctx.stroke();
+        
+        // Download 512x512
+        canvas.toBlob(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'icon-512.png';
+            a.click();
+        });
+        
+        // Generate 192x192
+        setTimeout(() => {
+            const canvas192 = document.createElement('canvas');
+            canvas192.width = 192;
+            canvas192.height = 192;
+            const ctx192 = canvas192.getContext('2d');
+            ctx192.drawImage(canvas, 0, 0, 192, 192);
+            canvas192.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'icon-192.png';
+                a.click();
+            });
+        }, 1000);
+        
+        // Generate maskable (with padding)
+        setTimeout(() => {
+            const canvasMask = document.createElement('canvas');
+            canvasMask.width = 512;
+            canvasMask.height = 512;
+            const ctxMask = canvasMask.getContext('2d');
+            
+            // Orange background for maskable
+            ctxMask.fillStyle = '#f97316';
+            ctxMask.fillRect(0, 0, 512, 512);
+            
+            // Draw icon with padding
+            ctxMask.drawImage(canvas, 64, 64, 384, 384);
+            
+            canvasMask.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'icon-maskable.png';
+                a.click();
+            });
+        }, 2000);
+    </script>
+</body>
+</html>

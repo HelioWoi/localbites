@@ -427,11 +427,13 @@ const App: React.FC = () => {
             },
             (error) => {
               console.error('Geolocation error:', error);
-              setState('LOCATION_SELECTOR');
+              alert('Unable to get your location. Please enable location services and try again.');
+              // Stay on filter selection screen
             }
           );
         } else {
-          setState('LOCATION_SELECTOR');
+          alert('Geolocation is not supported by your browser.');
+          // Stay on filter selection screen
         }
       }}
       onSkip={() => {
@@ -455,6 +457,31 @@ const App: React.FC = () => {
           );
         } else {
           setState('FEED');
+        }
+      }}
+      onManualSearch={(searchQuery) => {
+        // Set search query in filters and get GPS location
+        setFilters(prev => ({ ...prev, cuisine: searchQuery }));
+        setSelectedCategory('all');
+        
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const loc: UserLocation = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+                name: 'Current Location'
+              };
+              setLocation(loc);
+              setState('FEED');
+            },
+            (error) => {
+              console.error('Geolocation error:', error);
+              alert('Unable to get your location. Please enable location services.');
+            }
+          );
+        } else {
+          alert('Geolocation is not supported by your browser.');
         }
       }}
     />
@@ -499,7 +526,7 @@ const App: React.FC = () => {
       <div className={`fixed top-0 left-0 right-0 z-40 pointer-events-none px-5 pt-12 transition-opacity ${showDishInfo ? 'opacity-0' : 'opacity-100'}`}>
         <div className="flex items-center justify-between pointer-events-auto">
           <div className="flex items-center gap-3">
-            <button onClick={() => setState('LOCATION_SELECTOR')} className="w-10 h-10 bg-orange-600 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform">
+            <button onClick={() => setState('FILTER_SELECTION')} className="w-10 h-10 bg-orange-600 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform">
                <span className="text-[10px] font-black text-white">LB</span>
             </button>
             <div className="flex flex-col">
@@ -861,10 +888,10 @@ const App: React.FC = () => {
                 Try Again
               </button>
               <button
-                onClick={() => setState('LOCATION_SELECTOR')}
+                onClick={() => setState('FILTER_SELECTION')}
                 className="px-8 py-4 bg-zinc-100 text-zinc-900 font-bold rounded-2xl active:scale-95 transition-all"
               >
-                Change Location
+                Change Filters
               </button>
             </div>
           </div>
@@ -876,10 +903,10 @@ const App: React.FC = () => {
             <h2 className="text-2xl font-black text-zinc-900 mb-2">No bites found here</h2>
             <p className="text-zinc-500 font-medium mb-8">Try adjusting your filters or searching a different area.</p>
             <button 
-              onClick={() => setState('LOCATION_SELECTOR')} 
+              onClick={() => setState('FILTER_SELECTION')} 
               className="px-8 py-4 bg-zinc-900 text-white font-bold rounded-2xl active:scale-95 transition-all"
             >
-              Try Another Location
+              Change Filters
             </button>
           </div>
         )}
