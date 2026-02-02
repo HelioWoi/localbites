@@ -74,13 +74,21 @@ const MediaContainer: React.FC<MediaContainerProps> = ({
           playsInline
           onLoadedData={() => setIsLoaded(true)}
         />
-      ) : (
+      ) : photoUrl ? (
         <img
           src={photoUrl}
           className={`h-full w-full object-cover transition-all duration-700 ${isLoaded ? 'opacity-100' : 'opacity-0'} ${isActive && isLoaded ? 'animate-ken-burns' : ''}`}
           onLoad={() => setIsLoaded(true)}
-          alt="Real Dish"
+          onError={(e) => {
+            console.error('[MediaContainer] Failed to load photo:', photoUrl);
+            setIsLoaded(true);
+          }}
+          alt="Restaurant"
         />
+      ) : (
+        <div className="flex items-center justify-center text-white">
+          <p>No photo available</p>
+        </div>
       )}
       
       {/* Gradients igual ao Reviews Reel - preto esfumado */}

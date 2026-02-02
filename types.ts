@@ -30,6 +30,11 @@ export interface Restaurant {
   reviewSnippets?: string[]; // Legacy: simple text snippets
   sources?: { title: string; uri: string }[]; // Grounding sources
   openingHours?: string[]; // e.g. ["Monday: 9:00 AM – 5:00 PM", ...]
+  // Advanced filters
+  dietaryOptions?: string[]; // e.g. ["vegan", "gluten-free", "vegetarian"]
+  ambiance?: string[]; // e.g. ["romantic", "family-friendly", "casual"]
+  hasParking?: boolean;
+  hasOutdoorSeating?: boolean;
 }
 
 export interface Dish {
@@ -47,4 +52,6 @@ export interface UserLocation {
   radius?: number; // Search radius in meters (default 5000)
 }
 
-export type AppState = 'SPLASH' | 'LOCATION_SELECTOR' | 'FEED' | 'PROFILE' | 'ADMIN' | 'FAVORITES';
+export type CategoryFilter = 'restaurants' | 'cafes' | 'bars' | 'all';
+
+export type AppState = 'SPLASH' | 'FILTER_SELECTION' | 'LOCATION_SELECTOR' | 'FEED' | 'PROFILE' | 'ADMIN' | 'PARTNER' | 'LOADING';

@@ -9,15 +9,38 @@ interface SplashScreenProps {
 const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   const [stage, setStage] = useState(0);
   const [showGps, setShowGps] = useState(false);
+  const [searchText, setSearchText] = useState(0);
+
+  const searchTexts = [
+    "Locating your position...",
+    "Searching within 5km radius...",
+    "Finding best rated places...",
+    "Analyzing reviews & ratings...",
+    "Filtering by cuisine & price...",
+    "Checking opening hours...",
+    "Sorting by distance...",
+    "Loading your feed..."
+  ];
 
   useEffect(() => {
     const t1 = setTimeout(() => setStage(1), 100);
     const t2 = setTimeout(() => setStage(2), 500);
     const t3 = setTimeout(() => setStage(3), 900);
     const t4 = setTimeout(() => setShowGps(true), 2000);
-    const t5 = setTimeout(onFinish, 6000);
+    const t5 = setTimeout(onFinish, 10000); // 8 segundos de GPS (2s logo + 8s GPS = 10s total)
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); clearTimeout(t5); };
   }, [onFinish]);
+
+  // Rotate search texts every 1 second (8 texts x 1s = 8s)
+  useEffect(() => {
+    if (!showGps) return;
+    
+    const interval = setInterval(() => {
+      setSearchText((prev) => (prev + 1) % searchTexts.length);
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [showGps]);
 
   // GPS searching animation
   if (showGps) {
@@ -43,12 +66,12 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
             </div>
           </div>
           
-          <h2 className="mt-8 text-xl font-bold text-zinc-800 animate-pulse">
-            Finding your location...
+          <h2 className="mt-8 text-xl font-bold text-zinc-800 transition-all duration-300">
+            {searchTexts[searchText]}
           </h2>
           
           <p className="mt-2 text-zinc-400 text-sm font-medium">
-            Searching for the best bites nearby
+            We're finding the best restaurants for you
           </p>
           
           {/* Animated dots */}

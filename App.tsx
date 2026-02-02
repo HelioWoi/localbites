@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { AppState, Restaurant, UserLocation } from './types';
+import { AppState, Restaurant, UserLocation, CategoryFilter } from './types';
 import SplashScreen from './screens/SplashScreen';
+import FilterSelectionScreen from './screens/FilterSelectionScreen';
 import LocationSelector from './screens/LocationSelector';
 import RestaurantProfile from './screens/RestaurantProfile';
 import AdminDashboard from './screens/AdminDashboard';
@@ -12,8 +13,9 @@ import MediaContainer from './components/MediaContainer';
 import FloatingFilters from './components/FloatingFilters';
 import { getNearbyRestaurants, getRestaurantDetails, getRemainingSearches } from './services/geminiService';
 import { likeRestaurant, unlikeRestaurant, saveRestaurant, unsaveRestaurant, getUserLikes, getUserSaves, getAllLikesCounts } from './services/interactionService';
-import { CUISINES, PRICES } from './constants';
+import { CUISINES, PRICES, DIETARY_OPTIONS, AMBIANCE_OPTIONS } from './constants';
 import { Home, Search, MessageSquare, Filter, Bookmark, ExternalLink, Info, Loader2, X, ArrowRight, Globe, MapPin, ChevronUp, Crown, PlayCircle, Heart, Star, Clock } from 'lucide-react';
+import { useLazyLoading } from './hooks/useLazyLoading';
 
 // Check if we're on the partner route
 const isPartnerRoute = window.location.pathname === '/partner' || window.location.pathname.startsWith('/partner');
@@ -47,6 +49,7 @@ const App: React.FC = () => {
   }
 
   const [state, setState] = useState<AppState>('SPLASH');
+  const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('all');
   const [location, setLocation] = useState<UserLocation | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [allRestaurants, setAllRestaurants] = useState<Restaurant[]>([]); // Full list for pagination
@@ -55,9 +58,21 @@ const App: React.FC = () => {
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState({ cuisine: 'All', price: '', openNow: true });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMorePages, setHasMorePages] = useState(true);
+  const [totalAvailable, setTotalAvailable] = useState(0);
+  const [filters, setFilters] = useState({ 
+    cuisine: 'All', 
+    price: '', 
+    openNow: false, // Changed to false to show ALL restaurants by default
+    dietary: 'All',
+    ambiance: 'All',
+    hasParking: false,
+    hasOutdoorSeating: false
+  });
   const [showDishInfo, setShowDishInfo] = useState(false);
-  const [showFilterModal, setShowFilterModal] = useState<'cuisine' | 'price' | null>(null);
+  const [showFilterModal, setShowFilterModal] = useState<'cuisine' | 'price' | 'dietary' | 'ambiance' | 'amenities' | null>(null);
   const [showSaved, setShowSaved] = useState(false);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
@@ -210,33 +225,33 @@ const App: React.FC = () => {
     setFeedSwipeCount(0);
   }, [activeRestaurantIndex]);
 
-  const fetchRestaurants = useCallback(async (loc: UserLocation, f = filters) => {
-    console.log('[App] 🔄 fetchRestaurants called with location:', loc.name);
+  const fetchRestaurants = useCallback(async (loc: UserLocation, f = filters, page = 1) => {
+    console.log('[App] 🔄 fetchRestaurants called - page:', page, 'location:', loc.name, 'category:', selectedCategory);
     setIsLoading(true);
     setError(null);
     try {
-      const data = await getNearbyRestaurants(loc, f);
+      const data = await getNearbyRestaurants(loc, f, selectedCategory);
       console.log('[App] ✅ Total restaurants from getNearbyRestaurants:', data.length);
-      console.log('[App] First 3 restaurants:', data.slice(0, 3).map(r => ({ name: r.name, isSubscribed: r.isSubscribed, distance: r.distance })));
       
       if (data.length === 0) {
-        console.error('[App] ❌ NO RESTAURANTS RETURNED - This will cause empty feed!');
+        console.error('[App] ❌ NO RESTAURANTS RETURNED');
         setError('No restaurants found in this area');
       }
       
-      setAllRestaurants(data); // Store full list
-      setRestaurants(data.slice(0, 20)); // Show first 20
-      setVisibleCount(20);
+      setAllRestaurants(data);
+      const initialCount = Math.min(20, data.length);
+      setRestaurants(data.slice(0, initialCount));
+      setVisibleCount(initialCount);
+      setCurrentPage(1);
+      setTotalAvailable(data.length);
+      setHasMorePages(data.length > initialCount);
       setActiveRestaurantIndex(0);
       if (feedRef.current) feedRef.current.scrollTo({ top: 0 });
       
-      console.log('[App] ✅ Set restaurants state with:', data.slice(0, 20).length, 'items');
-      console.log('[App] 📊 allRestaurants.length:', data.length);
-      console.log('[App] 📊 restaurants.length:', data.slice(0, 20).length);
-      console.log('[App] 🔘 Should show "Ver Mais" button?', data.slice(0, 20).length < data.length);
-      console.log('[App] Current state will be: FEED');
+      console.log('[App] ✅ Loaded page 1:', initialCount, 'restaurants, total available:', data.length);
+      console.log('[App] 📊 hasMorePages:', data.length > initialCount);
       
-      // Load likes counts for visible restaurants
+      // Load likes counts
       if (data.length > 0) {
         const ids = data.slice(0, 20).map(r => r.id);
         const counts = await getAllLikesCounts(ids);
@@ -250,22 +265,64 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [filters]);
+  }, [filters, selectedCategory]);
 
-  // Load more restaurants (pagination)
+  // Load more restaurants (lazy loading)
   const loadMoreRestaurants = useCallback(async () => {
-    const newCount = visibleCount + 20;
-    const newRestaurants = allRestaurants.slice(0, newCount);
-    setRestaurants(newRestaurants);
-    setVisibleCount(newCount);
+    if (isLoadingMore || !hasMorePages || !location) return;
     
-    // Load likes for new restaurants
-    const newIds = allRestaurants.slice(visibleCount, newCount).map(r => r.id);
-    if (newIds.length > 0) {
-      const newCounts = await getAllLikesCounts(newIds);
-      setLikesCounts(prev => new Map([...prev, ...newCounts]));
+    console.log('[LazyLoading] 📥 Loading more restaurants... page:', currentPage + 1);
+    setIsLoadingMore(true);
+    
+    try {
+      const nextPage = currentPage + 1;
+      const maxPages = 3; // Limit to 3 pages (60 restaurants total)
+      
+      if (nextPage > maxPages) {
+        console.log('[LazyLoading] ⚠️ Reached max pages (3)');
+        setHasMorePages(false);
+        setIsLoadingMore(false);
+        return;
+      }
+      
+      // Calculate new range
+      const newCount = nextPage * 20;
+      const newRestaurants = allRestaurants.slice(0, newCount);
+      
+      if (newRestaurants.length <= restaurants.length) {
+        console.log('[LazyLoading] ⚠️ No more restaurants available');
+        setHasMorePages(false);
+        setIsLoadingMore(false);
+        return;
+      }
+      
+      setRestaurants(newRestaurants);
+      setCurrentPage(nextPage);
+      setHasMorePages(newRestaurants.length < allRestaurants.length && nextPage < maxPages);
+      
+      console.log('[LazyLoading] ✅ Loaded page', nextPage, '- now showing', newRestaurants.length, 'restaurants');
+      
+      // Load likes for new restaurants
+      const newIds = allRestaurants.slice(restaurants.length, newCount).map(r => r.id);
+      if (newIds.length > 0) {
+        const newCounts = await getAllLikesCounts(newIds);
+        setLikesCounts(prev => new Map([...prev, ...newCounts]));
+      }
+    } catch (error) {
+      console.error('[LazyLoading] ❌ Error loading more:', error);
+    } finally {
+      setIsLoadingMore(false);
     }
-  }, [allRestaurants, visibleCount]);
+  }, [isLoadingMore, hasMorePages, location, currentPage, allRestaurants, restaurants.length]);
+
+  // Lazy loading hook - automatically loads more when scrolling to bottom
+  useLazyLoading({
+    feedRef,
+    isLoading,
+    isLoadingMore,
+    hasMorePages,
+    onLoadMore: loadMoreRestaurants,
+  });
 
   useEffect(() => {
     if (location) fetchRestaurants(location);
@@ -347,7 +404,61 @@ const App: React.FC = () => {
     }
   };
 
-  if (state === 'SPLASH') return <SplashScreen onFinish={() => setState('LOCATION_SELECTOR')} />;
+  if (state === 'SPLASH') return <SplashScreen onFinish={() => {
+    // After splash, show filter selection screen
+    setState('FILTER_SELECTION');
+  }} />;
+
+  if (state === 'FILTER_SELECTION') return (
+    <FilterSelectionScreen
+      onSelect={(category) => {
+        setSelectedCategory(category);
+        // After selecting category, get location and load restaurants
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const loc: UserLocation = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+                name: 'Current Location'
+              };
+              setLocation(loc);
+              setState('FEED');
+            },
+            (error) => {
+              console.error('Geolocation error:', error);
+              setState('LOCATION_SELECTOR');
+            }
+          );
+        } else {
+          setState('LOCATION_SELECTOR');
+        }
+      }}
+      onSkip={() => {
+        setSelectedCategory('all');
+        // Skip and get GPS, then go to feed
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const loc: UserLocation = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+                name: 'Current Location'
+              };
+              setLocation(loc);
+              setState('FEED');
+            },
+            (error) => {
+              console.error('Geolocation error:', error);
+              setState('FEED');
+            }
+          );
+        } else {
+          setState('FEED');
+        }
+      }}
+    />
+  );
   if (state === 'LOCATION_SELECTOR') return <LocationSelector onLocationSelect={handleLocationSelect} />;
   if (state === 'ADMIN') return <AdminDashboard onClose={() => setState('FEED')} />;
   
@@ -408,7 +519,7 @@ const App: React.FC = () => {
       {/* Fixed Bottom Navigation Bar */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-lg border-t border-white/10 px-6 py-4 pb-8">
         <div className="flex items-center justify-between max-w-md mx-auto">
-          <button onClick={() => setState('LOCATION_SELECTOR')} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
+          <button onClick={() => setState('FILTER_SELECTION')} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
             <Home size={24} />
           </button>
           <button onClick={() => setShowSearch(true)} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
@@ -699,36 +810,34 @@ const App: React.FC = () => {
           ))
         ) : null}
         
-        {/* "Ver Mais" button at the end of feed */}
-        {!isLoading && restaurants.length > 0 && restaurants.length < allRestaurants.length && (
+        {/* Loading indicator when lazy loading more restaurants */}
+        {isLoadingMore && (
+          <div className="snap-item">
+            <div className="video-card shadow-none rounded-none border-none bg-black flex items-center justify-center">
+              <div className="text-center p-8">
+                <Loader2 className="w-12 h-12 text-orange-500 animate-spin mx-auto mb-4" />
+                <p className="text-white/60 text-sm">Loading more restaurants...</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* End of results indicator */}
+        {!isLoading && !isLoadingMore && restaurants.length > 0 && !hasMorePages && (
           <div className="snap-item">
             <div className="video-card shadow-none rounded-none border-none bg-gradient-to-br from-zinc-900 to-black flex items-center justify-center">
               <div className="text-center p-8">
-                <div className="w-20 h-20 bg-orange-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <ArrowRight size={40} className="text-orange-500" />
+                <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Star size={32} className="text-orange-500" />
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-3">
-                  Mais Restaurantes
+                <h3 className="text-xl font-bold text-white mb-2">
+                  That's all for now!
                 </h3>
-                <p className="text-white/60 text-sm mb-6 max-w-xs mx-auto">
-                  Encontramos {allRestaurants.length - restaurants.length} restaurantes adicionais na sua área
+                <p className="text-white/60 text-sm max-w-xs mx-auto">
+                  You've seen all {restaurants.length} restaurants in your area
                 </p>
-                <button
-                  onClick={() => {
-                    loadMoreRestaurants();
-                    // Scroll to next item after loading
-                    setTimeout(() => {
-                      if (feedRef.current) {
-                        feedRef.current.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
-                      }
-                    }, 100);
-                  }}
-                  className="px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold rounded-2xl active:scale-95 transition-all shadow-lg shadow-orange-500/30"
-                >
-                  Ver Mais Restaurantes
-                </button>
                 <p className="text-white/40 text-xs mt-4">
-                  Mostrando {restaurants.length} de {allRestaurants.length}
+                  Try adjusting your filters to see more options
                 </p>
               </div>
             </div>
@@ -1114,33 +1223,109 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Filter Modals */}
+      {/* All Filters Modal */}
       {showFilterModal && (
-        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end justify-center p-6 animate-in fade-in duration-300" onClick={() => setShowFilterModal(null)}>
-          <div className="bg-white w-full max-w-md rounded-[40px] p-8 shadow-2xl animate-in slide-in-from-bottom-10" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-8">
-              <h3 className="text-xl font-black tracking-tight capitalize">Select {showFilterModal}</h3>
-              <button onClick={() => setShowFilterModal(null)} className="p-2 bg-zinc-100 rounded-full"><X size={20}/></button>
+        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-300" onClick={() => setShowFilterModal(null)}>
+          <div className="bg-white w-full max-w-md rounded-t-[40px] max-h-[85vh] overflow-y-auto shadow-2xl animate-in slide-in-from-bottom-10" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="sticky top-0 bg-white z-10 flex justify-between items-center p-8 pb-4 border-b border-zinc-100">
+              <h3 className="text-2xl font-black tracking-tight">Filters</h3>
+              <button onClick={() => setShowFilterModal(null)} className="p-2 bg-zinc-100 rounded-full hover:bg-zinc-200 transition-colors">
+                <X size={20}/>
+              </button>
             </div>
-            
-            <div className="grid grid-cols-2 gap-3 mb-8">
-              {showFilterModal === 'cuisine' ? CUISINES.map(c => (
-                <button 
-                  key={c}
-                  onClick={() => handleFilterUpdate({ cuisine: c })}
-                  className={`py-4 rounded-2xl font-bold transition-all ${filters.cuisine === c ? 'bg-orange-500 text-white' : 'bg-zinc-50 text-zinc-900 hover:bg-zinc-100'}`}
-                >
-                  {c}
-                </button>
-              )) : PRICES.map(p => (
-                <button 
-                  key={p}
-                  onClick={() => handleFilterUpdate({ price: p })}
-                  className={`py-4 rounded-2xl font-bold transition-all ${filters.price === p ? 'bg-orange-500 text-white' : 'bg-zinc-50 text-zinc-900 hover:bg-zinc-100'}`}
-                >
-                  {p}
-                </button>
-              ))}
+
+            <div className="p-8 space-y-8">
+              {/* Cuisine Section */}
+              <div>
+                <h4 className="text-sm font-bold text-zinc-500 uppercase tracking-wider mb-4">Cuisine</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {CUISINES.map(c => (
+                    <button 
+                      key={c}
+                      onClick={() => handleFilterUpdate({ cuisine: c })}
+                      className={`py-4 rounded-2xl font-bold transition-all ${filters.cuisine === c ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-50 text-zinc-900 hover:bg-zinc-100'}`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Price Section */}
+              <div>
+                <h4 className="text-sm font-bold text-zinc-500 uppercase tracking-wider mb-4">Price Range</h4>
+                <div className="grid grid-cols-3 gap-3">
+                  {PRICES.map(p => (
+                    <button 
+                      key={p}
+                      onClick={() => handleFilterUpdate({ price: p })}
+                      className={`py-4 rounded-2xl font-bold transition-all ${filters.price === p ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-50 text-zinc-900 hover:bg-zinc-100'}`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Dietary Options Section */}
+              <div>
+                <h4 className="text-sm font-bold text-zinc-500 uppercase tracking-wider mb-4">Dietary Options</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {DIETARY_OPTIONS.map(d => (
+                    <button 
+                      key={d}
+                      onClick={() => handleFilterUpdate({ dietary: d })}
+                      className={`py-4 rounded-2xl font-bold transition-all ${filters.dietary === d ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-50 text-zinc-900 hover:bg-zinc-100'}`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Ambiance Section */}
+              <div>
+                <h4 className="text-sm font-bold text-zinc-500 uppercase tracking-wider mb-4">Ambiance</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {AMBIANCE_OPTIONS.map(a => (
+                    <button 
+                      key={a}
+                      onClick={() => handleFilterUpdate({ ambiance: a })}
+                      className={`py-4 rounded-2xl font-bold transition-all ${filters.ambiance === a ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-50 text-zinc-900 hover:bg-zinc-100'}`}
+                    >
+                      {a}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Amenities Section */}
+              <div>
+                <h4 className="text-sm font-bold text-zinc-500 uppercase tracking-wider mb-4">Amenities</h4>
+                <div className="space-y-3">
+                  <button 
+                    onClick={() => handleFilterUpdate({ hasParking: !filters.hasParking })}
+                    className={`w-full py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 ${filters.hasParking ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-50 text-zinc-900 hover:bg-zinc-100'}`}
+                  >
+                    🅿️ Parking Available
+                  </button>
+                  <button 
+                    onClick={() => handleFilterUpdate({ hasOutdoorSeating: !filters.hasOutdoorSeating })}
+                    className={`w-full py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 ${filters.hasOutdoorSeating ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-50 text-zinc-900 hover:bg-zinc-100'}`}
+                  >
+                    🌿 Outdoor Seating
+                  </button>
+                </div>
+              </div>
+
+              {/* Apply Button */}
+              <button 
+                onClick={() => setShowFilterModal(null)}
+                className="w-full py-4 bg-zinc-900 text-white font-bold rounded-2xl hover:bg-zinc-800 transition-colors"
+              >
+                Apply Filters
+              </button>
             </div>
           </div>
         </div>

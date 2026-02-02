@@ -49,13 +49,14 @@ interface PlaceReview {
 export async function searchNearbyRestaurants(
   lat: number,
   lng: number,
-  radius: number = 10000
+  radius: number = 10000,
+  category: string = 'all'
 ): Promise<PlaceResult[]> {
   try {
-    console.log('[GooglePlaces] Calling Edge Function...');
+    console.log('[GooglePlaces] Calling Edge Function with category:', category);
     
     const { data, error } = await supabase.functions.invoke('google-places', {
-      body: { action: 'searchNearby', lat, lng, radius },
+      body: { action: 'searchNearby', lat, lng, radius, category },
     });
 
     if (error) {

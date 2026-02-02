@@ -32,6 +32,23 @@ function getLocalityCacheKey(lat: number, lng: number): string {
   return `locality_${roundedLat}_${roundedLng}`;
 }
 
+// Helper: Get random food photo from Unsplash
+function getRandomFoodPhoto(): string {
+  const foodPhotos = [
+    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800',
+    'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800',
+    'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800',
+    'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800',
+    'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800',
+    'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800',
+    'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800',
+    'https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=800',
+    'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?w=800',
+    'https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?w=800',
+  ];
+  return foodPhotos[Math.floor(Math.random() * foodPhotos.length)];
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -39,7 +56,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, lat, lng, radius, placeId, points } = await req.json();
+    const { action, lat, lng, radius, placeId, points, category } = await req.json();
 
     if (!GOOGLE_API_KEY) {
       throw new Error("Google Places API key not configured");
@@ -49,7 +66,7 @@ serve(async (req) => {
 
     switch (action) {
       case "searchNearby":
-        result = await searchNearbyRestaurants(lat, lng, radius || 2000);
+        result = await searchNearbyRestaurants(lat, lng, radius || 2000, category || 'all');
         break;
       case "getDetails":
         result = await getPlaceDetails(placeId);
@@ -57,6 +74,10 @@ serve(async (req) => {
       case "getNearbyLocalities":
         result = await getNearbyLocalities(lat, lng, points);
         break;
+      case "getPhoto":
+        // Proxy photo requests to avoid exposing API key
+        const { photoName } = await req.json();
+        return await getPhotoProxy(photoName);
       default:
         throw new Error("Invalid action");
     }
@@ -73,8 +94,8 @@ serve(async (req) => {
   }
 });
 
-async function searchNearbyRestaurants(lat: number, lng: number, radius: number) {
-  const cacheKey = getCacheKey(lat, lng, radius);
+async function searchNearbyRestaurants(lat: number, lng: number, radius: number, category: string = 'all') {
+  const cacheKey = `${getCacheKey(lat, lng, radius)}_${category}`;
   
   // OPTIMIZATION #2: Check cache first
   try {
@@ -96,10 +117,27 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number)
     console.log(`[Cache MISS] Fetching fresh data for ${cacheKey}`);
   }
 
-  // OPTIMIZATION #1: Single unified search instead of 5 separate calls
-  // Using "restaurant" as primary type which includes most food establishments
+  // OPTIMIZATION #1: Search based on selected category
   const allPlaces: any[] = [];
   const seenIds = new Set<string>();
+
+  // Determine which types to search based on category
+  let includedTypes: string[];
+  switch (category) {
+    case 'restaurants':
+      includedTypes = ["restaurant"];
+      break;
+    case 'cafes':
+      includedTypes = ["cafe", "bakery"];
+      break;
+    case 'bars':
+      includedTypes = ["bar", "night_club"];
+      break;
+    case 'all':
+    default:
+      includedTypes = ["restaurant", "cafe", "bar", "bakery"];
+      break;
+  }
 
   try {
     const response = await fetch(
@@ -113,9 +151,9 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number)
           "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.photos,places.location,places.types,places.googleMapsUri",
         },
         body: JSON.stringify({
-          // Single call with multiple types instead of 5 separate calls
-          includedTypes: ["restaurant", "cafe", "bar", "bakery"],
-          maxResultCount: 20,
+          // Search based on selected category
+          includedTypes: includedTypes,
+          maxResultCount: 20, // API limit is 20 per request
           locationRestriction: {
             circle: {
               center: { latitude: lat, longitude: lng },
@@ -163,7 +201,7 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number)
     isOpen: place.currentOpeningHours?.openNow,
     openingHours: place.currentOpeningHours?.weekdayDescriptions || [],
     photoUrl: place.photos?.[0]?.name
-      ? `https://places.googleapis.com/v1/${place.photos[0].name}/media?maxHeightPx=800&maxWidthPx=800&key=${GOOGLE_API_KEY}`
+      ? `${SUPABASE_URL}/functions/v1/google-places-photo?name=${encodeURIComponent(place.photos[0].name)}`
       : undefined,
     googleMapsUrl: place.googleMapsUri || `https://www.google.com/maps/place/?q=place_id:${place.id}`,
     cuisine: extractCuisine(place.types),
@@ -367,6 +405,35 @@ async function getNearbyLocalities(lat: number, lng: number, points: { lat: numb
   }
 
   return result;
+}
+
+// Proxy photo requests to avoid exposing API key in browser
+async function getPhotoProxy(photoName: string) {
+  try {
+    const photoUrl = `https://places.googleapis.com/v1/${photoName}/media?maxHeightPx=800&maxWidthPx=800&key=${GOOGLE_API_KEY}`;
+    
+    const response = await fetch(photoUrl);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch photo: ${response.status}`);
+    }
+
+    // Return the image directly
+    const imageData = await response.arrayBuffer();
+    return new Response(imageData, {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": response.headers.get("Content-Type") || "image/jpeg",
+        "Cache-Control": "public, max-age=86400", // Cache for 24 hours
+      },
+    });
+  } catch (error) {
+    console.error("Error proxying photo:", error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 }
 
 // Reverse geocode a point to get locality name

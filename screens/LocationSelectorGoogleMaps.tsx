@@ -189,7 +189,7 @@ const LocationSelectorGoogleMaps: React.FC<LocationSelectorGoogleMapsProps> = ({
             loading="lazy"
             allowFullScreen
             referrerPolicy="no-referrer-when-downgrade"
-            src={`https://www.google.com/maps/embed/v1/view?key=AIzaSyBFuwVE7Omu6N3ZV4PHJvLORP0VqNlso3E&center=${userLat},${userLng}&zoom=12&maptype=roadmap`}
+            src={`https://www.google.com/maps/embed/v1/view?key=${import.meta.env.VITE_GOOGLE_PLACES_API_KEY}&center=${userLat},${userLng}&zoom=12&maptype=roadmap`}
           />
           
           {/* Overlay with pins */}

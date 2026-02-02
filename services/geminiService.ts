@@ -2,6 +2,8 @@
 import { Restaurant, UserLocation, Review } from "../types";
 import { getPartnerRestaurants, hasSupabaseData } from "./supabaseService";
 import { searchNearbyRestaurants as searchGooglePlaces, getPlaceDetails } from "./googlePlacesProxy";
+import { enrichRestaurantWithFilters, applyFilters } from "../utils/filterHelpers";
+import { getCachedRestaurants, setCachedRestaurants } from "../utils/cacheHelpers";
 
 // HYBRID COST OPTIMIZATION: Partners first, limited Google API usage
 const GOOGLE_API_LIMIT = 50; // Fetch up to 50 Google restaurants (increased for testing)
@@ -64,10 +66,37 @@ export function getRemainingSearches(): number {
 
 export async function getNearbyRestaurants(
   location: UserLocation, 
-  filters?: { cuisine?: string; price?: string; openNow?: boolean }
+  filters?: { cuisine?: string; price?: string; openNow?: boolean },
+  category: string = 'all'
 ): Promise<Restaurant[]> {
   console.log('[LocalBites] Fetching restaurants for:', location.name);
   console.log('[LocalBites] Location coordinates:', { lat: location.lat, lng: location.lng, radius: location.radius });
+  
+  // 0. CHECK CACHE FIRST (saves 80% of API calls!)
+  const cachedRestaurants = getCachedRestaurants(location, category);
+  if (cachedRestaurants && cachedRestaurants.length > 0) {
+    console.log('[LocalBites] 🎯 Using cached restaurants - NO API COST!');
+    
+    // Apply filters to cached results
+    if (filters) {
+      const fullFilters = {
+        cuisine: filters.cuisine || 'All',
+        price: filters.price || '',
+        openNow: filters.openNow ?? false, // Changed to false - show all by default
+        dietary: (filters as any).dietary || 'All',
+        ambiance: (filters as any).ambiance || 'All',
+        hasParking: (filters as any).hasParking || false,
+        hasOutdoorSeating: (filters as any).hasOutdoorSeating || false,
+      };
+      const filtered = applyFilters(cachedRestaurants, fullFilters);
+      console.log('[LocalBites] Returning', filtered.length, 'cached restaurants (after filters)');
+      return filtered;
+    }
+    
+    return cachedRestaurants;
+  }
+  
+  console.log('[LocalBites] No valid cache, fetching fresh data...');
   
   // 1. ALWAYS get partner restaurants first (NO API COST)
   let partnerRestaurants: Restaurant[] = [];
@@ -100,7 +129,7 @@ export async function getNearbyRestaurants(
       // Increment search count BEFORE making the API call
       incrementSearchCount();
       
-      const googlePlaces = await searchGooglePlaces(location.lat, location.lng, radius);
+      const googlePlaces = await searchGooglePlaces(location.lat, location.lng, radius, category);
       
       // LIMIT to 10 restaurants to reduce API costs
       const limitedPlaces = googlePlaces.slice(0, GOOGLE_API_LIMIT);
@@ -143,7 +172,11 @@ export async function getNearbyRestaurants(
   console.log('[LocalBites] After merge:', results.length, 'restaurants');
   console.log('[LocalBites] First restaurant:', results[0]?.name, 'isSubscribed:', results[0]?.isSubscribed);
 
-  // 4. Sort: Partners FIRST (priority), then by distance within each group
+  // 4. Enrich restaurants with inferred filter data
+  results = results.map(r => enrichRestaurantWithFilters(r));
+  console.log('[LocalBites] Enriched restaurants with filter data');
+
+  // 5. Sort: Partners FIRST (priority), then by distance within each group
   results.sort((a, b) => {
     // Priority 1: Partners (isSubscribed) always come first
     if (a.isSubscribed && !b.isSubscribed) return -1;
@@ -160,28 +193,27 @@ export async function getNearbyRestaurants(
   console.log('[LocalBites] After sort:', results.length, 'restaurants');
   console.log('[LocalBites] First restaurant after sort:', results[0]?.name, 'isSubscribed:', results[0]?.isSubscribed);
 
-  // 5. Apply filters
+  // 6. SAVE TO CACHE (before applying filters, so cache has all restaurants)
+  setCachedRestaurants(results, location, category);
+  console.log('[LocalBites] ✅ Saved to cache for 1 hour');
+
+  // 7. Apply all filters (cuisine, price, openNow, dietary, ambiance, amenities)
   const beforeFilters = results.length;
-  if (filters?.cuisine && filters.cuisine !== 'All') {
-    results = results.filter(r => 
-      r.cuisine.toLowerCase().includes(filters.cuisine!.toLowerCase())
-    );
-    console.log('[LocalBites] After cuisine filter:', results.length, '(was', beforeFilters, ')');
+  if (filters) {
+    const fullFilters = {
+      cuisine: filters.cuisine || 'All',
+      price: filters.price || '',
+      openNow: filters.openNow ?? false, // Changed to false - show all by default
+      dietary: (filters as any).dietary || 'All',
+      ambiance: (filters as any).ambiance || 'All',
+      hasParking: (filters as any).hasParking || false,
+      hasOutdoorSeating: (filters as any).hasOutdoorSeating || false,
+    };
+    results = applyFilters(results, fullFilters);
+    console.log('[LocalBites] After filters:', results.length, '(was', beforeFilters, ')');
   }
 
-  if (filters?.price) {
-    const beforePrice = results.length;
-    results = results.filter(r => r.priceLevel === filters.price);
-    console.log('[LocalBites] After price filter:', results.length, '(was', beforePrice, ')');
-  }
-
-  if (filters?.openNow) {
-    const beforeOpen = results.length;
-    results = results.filter(r => r.isOpen);
-    console.log('[LocalBites] After openNow filter:', results.length, '(was', beforeOpen, ')');
-  }
-
-  // 6. No fallback to demo data - only show real results
+  // 8. No fallback to demo data - only show real results
   if (results.length === 0) {
     console.log('[LocalBites] No results found');
   }
