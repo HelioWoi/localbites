@@ -77,12 +77,12 @@ export async function getNearbyRestaurants(
   if (cachedRestaurants && cachedRestaurants.length > 0) {
     console.log('[LocalBites] 🎯 Using cached restaurants - NO API COST!');
     
-    // Apply filters to cached results
+    // Apply filters to cached results (except openNow - applied at display time)
     if (filters) {
       const fullFilters = {
         cuisine: filters.cuisine || 'All',
         price: filters.price || '',
-        openNow: filters.openNow || false,
+        openNow: false, // ALWAYS false here - openNow applied at display time only
         dietary: (filters as any).dietary || 'All',
         ambiance: (filters as any).ambiance || 'All',
         hasParking: (filters as any).hasParking || false,
@@ -197,13 +197,17 @@ export async function getNearbyRestaurants(
   setCachedRestaurants(results, location, category);
   console.log('[LocalBites] ✅ Saved to cache for 1 hour');
 
-  // 7. Apply all filters (cuisine, price, openNow, dietary, ambiance, amenities)
+  // 7. Apply filters (cuisine, price, dietary, ambiance, amenities)
+  // NOTE: openNow filter is applied ONLY at display time (App.tsx) because:
+  // 1. isOpen is time-sensitive and changes throughout the day
+  // 2. Cache should store ALL restaurants regardless of open status
+  // 3. User can toggle OPEN filter without re-fetching from API
   const beforeFilters = results.length;
   if (filters) {
     const fullFilters = {
       cuisine: filters.cuisine || 'All',
       price: filters.price || '',
-      openNow: filters.openNow || false,
+      openNow: false, // ALWAYS false here - openNow applied at display time only
       dietary: (filters as any).dietary || 'All',
       ambiance: (filters as any).ambiance || 'All',
       hasParking: (filters as any).hasParking || false,

@@ -817,8 +817,11 @@ const App: React.FC = () => {
               const newOpenNowValue = !filters.openNow;
               console.log('[OPEN Button] Clicked! Refreshing feed with openNow:', newOpenNowValue);
               
+              // Create new filters object with updated openNow value
+              const newFilters = { ...filters, openNow: newOpenNowValue };
+              
               // Update filter state
-              setFilters(f => ({ ...f, openNow: newOpenNowValue }));
+              setFilters(newFilters);
               
               // Clear current restaurants and reload with new filter
               setRestaurants([]);
@@ -826,9 +829,9 @@ const App: React.FC = () => {
               setCurrentPage(1);
               setHasMorePages(true);
               
-              // Reload restaurants with openNow filter
+              // Reload restaurants with NEW filters (pass directly to avoid race condition)
               if (location) {
-                await fetchRestaurants(location);
+                await fetchRestaurants(location, newFilters);
               }
               
               // Scroll to top

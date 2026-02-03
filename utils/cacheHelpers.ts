@@ -44,7 +44,10 @@ function hasLocationChanged(
 // Get cached restaurants
 export function getCachedRestaurants(location: UserLocation, category: string = 'all'): Restaurant[] | null {
   try {
-    const cacheKey = `restaurants_cache_${category}`;
+    // Include rounded location in cache key to prevent serving wrong location's data
+    const roundedLat = Math.round(location.lat * 100) / 100;
+    const roundedLng = Math.round(location.lng * 100) / 100;
+    const cacheKey = `restaurants_cache_${category}_${roundedLat}_${roundedLng}`;
     const cached = localStorage.getItem(cacheKey);
     
     if (!cached) {
@@ -87,7 +90,10 @@ export function getCachedRestaurants(location: UserLocation, category: string = 
 // Save restaurants to cache
 export function setCachedRestaurants(restaurants: Restaurant[], location: UserLocation, category: string = 'all'): void {
   try {
-    const cacheKey = `restaurants_cache_${category}`;
+    // Include rounded location in cache key (must match getCachedRestaurants)
+    const roundedLat = Math.round(location.lat * 100) / 100;
+    const roundedLng = Math.round(location.lng * 100) / 100;
+    const cacheKey = `restaurants_cache_${category}_${roundedLat}_${roundedLng}`;
     const entry: CacheEntry<Restaurant[]> = {
       data: restaurants,
       timestamp: Date.now(),
