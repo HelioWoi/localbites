@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Mic, Sparkles } from 'lucide-react';
-import { chatWithBitesBuddy, getInitialMessage, ChatMessage, TriageData } from '../services/aiAssistant';
+import { chatWithBitesBuddy, getInitialMessage, ChatMessage, TriageData, logBuddyIntent, logBuddyAction } from '../services/aiAssistant';
+import { UserIntent, initializeIntent } from '../types/intent';
 
 interface BitesAIProps {
   onClose: () => void;
@@ -16,6 +17,7 @@ const BitesAI: React.FC<BitesAIProps> = ({ onClose, onSearchTrigger, mode = 'voi
   const [triageData, setTriageData] = useState<TriageData>({ isComplete: false });
   const [hasStarted, setHasStarted] = useState(mode === 'chat'); // Auto-start if chat mode
   const [isListening, setIsListening] = useState(false);
+  const [userIntent, setUserIntent] = useState<UserIntent>(initializeIntent()); // Intent Engine
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);

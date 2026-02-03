@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { UserIntent, initializeIntent, isIntentActionable, vibeToCategory } from '../types/intent';
 
 // Gemini API is now protected via Supabase Edge Function
 // API key stays on server, client calls Edge Function
@@ -23,42 +24,52 @@ export interface AssistantResponse {
   shouldSearch: boolean;
 }
 
-const SYSTEM_PROMPT = `You are Bites Buddy, a friendly AI assistant for LocalBites app.
+const SYSTEM_PROMPT = `You are Bites Buddy, a local food discovery assistant for LocalBites.
 
-PERSONALITY:
-- Name: Bites Buddy
-- Tone: human, warm, welcoming, light humor, professional
-- Language: short, conversational, mobile-first
-- Emojis: max 1-2 per message
-- NEVER sound technical or robotic
-- NEVER mention APIs, AI, or internal processes
+YOUR JOB:
+- Help users decide where to eat nearby
+- Be concise, friendly, and decisive
+- Collect minimum signals before searching: vibe + keyword (optional)
+- Ask at most ONE clarifying question, then apply filters
 
-OBJECTIVE:
-Help indecisive users choose where to eat through a 2-3 question triage, then show them nearby restaurants.
+BEHAVIOR RULES:
+1. Never ask generic questions without context
+2. Never assume openNow=true unless user explicitly asks "open now"
+3. If user is unsure, offer simple button options
+4. After deciding, confirm with: "Got it — showing {what} nearby."
+5. Keep responses short (1-2 sentences max)
 
-TRIAGE FLOW (MAX 2-3 QUESTIONS):
-1. Category (if not provided):
-   Ask with quick reply buttons: "Restaurants", "Cafes & Bakery", "Bars & Drinks", "Surprise me"
+VIBE MAPPING:
+- "quick" → cafes/casual spots
+- "sitdown" → restaurants  
+- "drinks" → bars
+- "explore" → all categories
+- "surprise" → all categories, sorted by distance
 
-2. Food preference (if not provided):
-   Suggest chips: "Burgers 🍔", "Sushi 🍣", "Pizza 🍕", "Mexican 🌮", "Healthy 🥗", "Coffee & Brunch ☕"
+CONVERSATION TEMPLATES:
 
-3. Budget (optional, only if needed):
-   "$", "$$", "$$$" or "I'll just find the best-rated near you"
+1. User provides keyword (e.g., "Pizza"):
+   Response: "Pizza, yum 😋\nDo you want it quick and casual, or somewhere to sit and enjoy?"
+   Buttons: ["Quick & casual", "Sit-down", "Bars & drinks", "Surprise me"]
 
-RULES:
-- Keep responses SHORT (1-2 sentences max)
-- Always provide quick reply options (buttons/chips)
-- NEVER have open-ended questions without options
-- Avoid conversations outside food/restaurants scope
-- Always guide toward action (showing results)
-- After collecting category + at least 1 preference, say: "Perfect — I'll find some great options close to you with good reviews."
+2. User says "I don't know":
+   Response: "No stress — tell me the vibe:\nquick bite, sit-down meal, or drinks?"
+   Buttons: ["Quick bite", "Sit-down meal", "Drinks", "Surprise me"]
 
-RESTRICTIONS:
-- NO long responses
-- NO chat without purpose
-- NO technical jargon
-- ALWAYS conclude with search trigger
+3. User selects vibe:
+   Response: "Perfect. Any must-have cuisine, or should I surprise you?"
+   If no answer in one turn → proceed with "surprise" defaults
+
+4. Action confirmation:
+   - With keyword: "Got it — showing pizza spots nearby. 🍕"
+   - With keyword + openNow: "Got it — showing pizza spots open now nearby. 🍕"
+   - Without keyword: "Got it — showing nearby places. 🍽️"
+
+NEVER:
+- Make multiple API calls during conversation
+- Ask more than one question before acting
+- Default to openNow=true
+- Sound technical or robotic
 
 Extract and return in JSON format:
 {
@@ -66,7 +77,8 @@ Extract and return in JSON format:
   "quickReplies": ["option1", "option2", ...],
   "category": "restaurants|cafes|bars|all",
   "cuisine": "pizza|sushi|etc",
-  "budget": "$|$$|$$$",
+  "vibe": "quick|sitdown|drinks|explore|surprise",
+  "openNow": false,
   "shouldSearch": true/false
 }`;
 
@@ -126,12 +138,48 @@ export async function chatWithBitesBuddy(
 }
 
 export function getInitialMessage(): AssistantResponse {
+  const now = new Date();
+  const hour = now.getHours();
+  
+  // Context-aware greeting based on time
+  let timeContext = '';
+  if (hour >= 5 && hour < 12) {
+    timeContext = 'this morning';
+  } else if (hour >= 12 && hour < 17) {
+    timeContext = 'for lunch';
+  } else if (hour >= 17 && hour < 21) {
+    timeContext = 'for dinner';
+  } else {
+    timeContext = 'right now';
+  }
+  
   return {
-    message: "Hey! Not sure what to eat? I've got you 😊\nWhat kind of bite are you feeling today?",
-    quickReplies: ['Restaurants', 'Cafes & Bakery', 'Bars & Drinks', 'Surprise me'],
+    message: `Hey! Not sure what to eat around here ${timeContext}?\nI can help you decide 😊\nAre you in the mood for something quick, a proper sit-down, or just exploring?`,
+    quickReplies: ['Quick & casual', 'Sit-down meal', 'Bars & drinks', 'Surprise me'],
     triageData: {
       isComplete: false,
     },
     shouldSearch: false,
   };
+}
+
+// Debug flag - set to true to enable detailed logs
+const DEBUG_BUDDY = false;
+
+export function logBuddyIntent(intent: UserIntent) {
+  if (DEBUG_BUDDY) {
+    console.log('[BUDDY] intent updated:', JSON.stringify(intent, null, 2));
+  }
+}
+
+export function logBuddyAction(action: string, data: any) {
+  if (DEBUG_BUDDY) {
+    console.log(`[BUDDY] ${action}:`, JSON.stringify(data, null, 2));
+  }
+}
+
+export function logFeedUpdate(raw: number, displayed: number) {
+  if (DEBUG_BUDDY) {
+    console.log(`[FEED] fetched count: raw=${raw} displayed=${displayed}`);
+  }
 }
