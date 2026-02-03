@@ -6,10 +6,17 @@ import { UserIntent, initializeIntent } from '../types/intent';
 interface BitesAIProps {
   onClose: () => void;
   onSearchTrigger: (triageData: TriageData) => void;
+  onApplyIntent?: (intent: {
+    keyword?: string;
+    vibe?: 'quick' | 'sitdown' | 'drinks' | 'explore' | 'surprise';
+    category?: 'restaurants' | 'cafes' | 'bars' | 'all';
+    openNow?: boolean;
+    radiusKm?: number;
+  }) => void;
   mode?: 'voice' | 'chat'; // voice = Start talking screen, chat = Direct chat
 }
 
-const BitesAI: React.FC<BitesAIProps> = ({ onClose, onSearchTrigger, mode = 'voice' }) => {
+const BitesAI: React.FC<BitesAIProps> = ({ onClose, onSearchTrigger, onApplyIntent, mode = 'voice' }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);

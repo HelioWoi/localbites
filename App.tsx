@@ -94,6 +94,14 @@ const App: React.FC = () => {
   const [likesCounts, setLikesCounts] = useState<Map<string, number>>(new Map());
   const lastTapRef = useRef<{ id: string; time: number } | null>(null);
   
+  // Bites Buddy: Banner showing what assistant decided
+  const [buddyDecision, setBuddyDecision] = useState<{
+    keyword?: string;
+    category?: string;
+    openNow?: boolean;
+    radiusKm?: number;
+  } | null>(null);
+  
   const feedRef = useRef<HTMLDivElement>(null);
 
   const isOverlayOpen = showDishInfo || !!showFilterModal || showSaved;
@@ -383,6 +391,83 @@ const App: React.FC = () => {
     }
     setState('FEED');
   };
+
+  // Bites Buddy: Apply filters from chat intent and update feed
+  const applyFiltersFromBuddy = useCallback(async (intent: {
+    keyword?: string;
+    vibe?: 'quick' | 'sitdown' | 'drinks' | 'explore' | 'surprise';
+    category?: 'restaurants' | 'cafes' | 'bars' | 'all';
+    openNow?: boolean;
+    radiusKm?: number;
+  }) => {
+    console.log('[Buddy->Feed] Applying filters from intent:', intent);
+    
+    // Map vibe to category if not explicitly set
+    let targetCategory: CategoryFilter = 'all';
+    if (intent.category) {
+      targetCategory = intent.category as CategoryFilter;
+    } else if (intent.vibe) {
+      // Vibe mapping
+      switch (intent.vibe) {
+        case 'quick':
+          targetCategory = 'cafes';
+          break;
+        case 'sitdown':
+          targetCategory = 'restaurants';
+          break;
+        case 'drinks':
+          targetCategory = 'bars';
+          break;
+        case 'explore':
+        case 'surprise':
+          targetCategory = 'all';
+          break;
+      }
+    }
+    
+    // Update category
+    setSelectedCategory(targetCategory);
+    
+    // Update filters
+    setFilters(prev => ({
+      ...prev,
+      openNow: intent.openNow || false, // Never default to true
+      cuisine: intent.keyword || 'All', // Use keyword as cuisine filter
+    }));
+    
+    // Set banner to show what was decided
+    setBuddyDecision({
+      keyword: intent.keyword,
+      category: targetCategory,
+      openNow: intent.openNow || false,
+      radiusKm: intent.radiusKm || 10,
+    });
+    
+    // If keyword exists, trigger text search
+    if (intent.keyword && location) {
+      setIsLoading(true);
+      try {
+        const results = await searchRestaurantsByQuery(location, intent.keyword);
+        setAllRestaurants(results);
+        setRestaurants(results.slice(0, 20));
+        setVisibleCount(20);
+        setTotalAvailable(results.length);
+        setHasMorePages(results.length > 20);
+        setActiveRestaurantIndex(0);
+        if (feedRef.current) feedRef.current.scrollTo({ top: 0 });
+      } catch (error) {
+        console.error('[Buddy->Feed] Error searching:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    } else if (location) {
+      // No keyword - just refresh with category
+      await fetchRestaurants(location);
+    }
+    
+    // Close AI modal
+    setShowBitesAI(false);
+  }, [location, fetchRestaurants]);
 
   const handleFilterUpdate = (newFilters: Partial<typeof filters>) => {
     const updated = { ...filters, ...newFilters };
@@ -737,7 +822,9 @@ const App: React.FC = () => {
           <BitesAI
             mode="chat"
             onClose={() => setShowBitesAI(false)}
+            onApplyIntent={applyFiltersFromBuddy}
             onSearchTrigger={(triageData: TriageData) => {
+              // Legacy support - keep existing behavior
               const categoryMap: { [key: string]: CategoryFilter } = {
                 'restaurants': 'restaurants',
                 'cafes': 'cafes',
@@ -820,6 +907,29 @@ const App: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Bites Buddy Decision Banner */}
+      {buddyDecision && (
+        <div className="fixed top-24 left-4 right-4 z-40 bg-gradient-to-r from-orange-500/90 to-orange-600/90 backdrop-blur-md rounded-2xl px-4 py-3 shadow-lg animate-fade-in-up">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-white text-sm font-medium">
+              <Sparkles size={16} className="flex-shrink-0" />
+              <span>
+                Showing: {buddyDecision.keyword || 'Nearby places'}
+                {buddyDecision.category && buddyDecision.category !== 'all' && ` • ${buddyDecision.category}`}
+                {buddyDecision.openNow && ' • Open now'}
+                {` • ${buddyDecision.radiusKm}km`}
+              </span>
+            </div>
+            <button 
+              onClick={() => setBuddyDecision(null)}
+              className="text-white/80 hover:text-white transition-colors"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Fixed Bottom Navigation Bar */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-lg border-t border-white/10 px-6 py-4 pb-8">
