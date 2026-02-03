@@ -17,21 +17,38 @@ serve(async (req) => {
     const url = new URL(req.url);
     const photoName = url.searchParams.get("name");
 
-    if (!photoName || !GOOGLE_API_KEY) {
-      return new Response("Missing photo name or API key", { 
+    console.log("[google-places-photo] Received request for:", photoName);
+
+    if (!photoName) {
+      console.error("[google-places-photo] Missing photo name");
+      return new Response("Missing photo name", { 
         status: 400,
         headers: corsHeaders,
       });
     }
 
-    // Fetch photo from Google Places API
+    if (!GOOGLE_API_KEY) {
+      console.error("[google-places-photo] Missing API key");
+      return new Response("Missing API key", { 
+        status: 500,
+        headers: corsHeaders,
+      });
+    }
+
+    // The photoName from Google Places API is in format: "places/{placeId}/photos/{photoId}"
+    // We need to call: https://places.googleapis.com/v1/{photoName}/media
     const photoUrl = `https://places.googleapis.com/v1/${photoName}/media?maxHeightPx=800&maxWidthPx=800&key=${GOOGLE_API_KEY}`;
+    
+    console.log("[google-places-photo] Fetching from:", photoUrl.replace(GOOGLE_API_KEY, "***"));
     
     const response = await fetch(photoUrl);
     
+    console.log("[google-places-photo] Response status:", response.status);
+    
     if (!response.ok) {
-      console.error(`Failed to fetch photo: ${response.status}`);
-      return new Response("Photo not found", { 
+      const errorText = await response.text();
+      console.error(`[google-places-photo] Failed to fetch photo: ${response.status} - ${errorText}`);
+      return new Response(`Photo not found: ${response.status}`, { 
         status: response.status,
         headers: corsHeaders,
       });
@@ -39,6 +56,8 @@ serve(async (req) => {
 
     // Return the image directly
     const imageData = await response.arrayBuffer();
+    console.log("[google-places-photo] Successfully fetched image, size:", imageData.byteLength);
+    
     return new Response(imageData, {
       headers: {
         ...corsHeaders,
@@ -47,7 +66,7 @@ serve(async (req) => {
       },
     });
   } catch (error) {
-    console.error("Error proxying photo:", error);
+    console.error("[google-places-photo] Error proxying photo:", error);
     return new Response("Internal server error", {
       status: 500,
       headers: corsHeaders,

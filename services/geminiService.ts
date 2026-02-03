@@ -1,7 +1,7 @@
 
 import { Restaurant, UserLocation, Review } from "../types";
 import { getPartnerRestaurants, hasSupabaseData } from "./supabaseService";
-import { searchNearbyRestaurants as searchGooglePlaces, getPlaceDetails } from "./googlePlacesProxy";
+import { searchNearbyRestaurants as searchGooglePlaces, getPlaceDetails, textSearchRestaurants } from "./googlePlacesProxy";
 import { enrichRestaurantWithFilters, applyFilters } from "../utils/filterHelpers";
 import { getCachedRestaurants, setCachedRestaurants } from "../utils/cacheHelpers";
 
@@ -123,7 +123,7 @@ export async function getNearbyRestaurants(
     console.log('[LocalBites] ⚠️ Daily Google API search limit reached. Showing partners only.');
   } else if (location.lat && location.lng) {
     try {
-      const radius = location.radius || 5000; // Default 5km
+      const radius = location.radius || 10000; // Default 10km
       console.log('[LocalBites] Searching Google Places (LIMITED TO', GOOGLE_API_LIMIT, 'results)');
       
       // Increment search count BEFORE making the API call
@@ -224,6 +224,53 @@ export async function getNearbyRestaurants(
 
   console.log('[LocalBites] Returning', results.length, 'total restaurants');
   return results;
+}
+
+// Search restaurants by text query (pizza, sushi, italian, etc.)
+export async function searchRestaurantsByQuery(
+  location: UserLocation,
+  query: string
+): Promise<Restaurant[]> {
+  console.log('[LocalBites] Text search for:', query);
+  
+  if (!query || query.trim().length === 0) {
+    return [];
+  }
+
+  try {
+    const radius = location.radius || 10000; // Default 10km
+    const googlePlaces = await textSearchRestaurants(location.lat, location.lng, radius, query);
+    
+    // Convert Google Places to Restaurant format
+    const restaurants: Restaurant[] = googlePlaces.map(place => ({
+      id: place.id,
+      name: place.name,
+      cuisine: place.cuisine,
+      priceLevel: place.priceLevel,
+      distance: place.distance,
+      isOpen: place.isOpen ?? true,
+      rating: place.rating,
+      totalReviews: place.totalReviews,
+      address: place.address,
+      phone: place.phone,
+      website: place.website,
+      googleMapsUrl: place.googleMapsUrl,
+      mainPhotoUrl: place.photoUrl,
+      isSubscribed: false,
+      dishes: [],
+      reviews: place.reviews || [],
+      openingHours: place.openingHours || [],
+    }));
+
+    // Enrich with filter data
+    const enriched = restaurants.map(r => enrichRestaurantWithFilters(r));
+    
+    console.log('[LocalBites] Text search returned', enriched.length, 'restaurants for:', query);
+    return enriched;
+  } catch (error) {
+    console.error('[LocalBites] Text search error:', error);
+    return [];
+  }
 }
 
 // Fetch detailed info for a specific restaurant (with reviews)

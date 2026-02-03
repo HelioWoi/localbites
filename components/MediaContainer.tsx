@@ -22,6 +22,17 @@ const MediaContainer: React.FC<MediaContainerProps> = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const touchStartY = useRef<number | null>(null);
 
+  // Timeout to prevent infinite spinner - show content after 5 seconds even if not loaded
+  useEffect(() => {
+    if (!isLoaded) {
+      const timeout = setTimeout(() => {
+        console.log('[MediaContainer] Loading timeout - forcing loaded state');
+        setIsLoaded(true);
+      }, 5000);
+      return () => clearTimeout(timeout);
+    }
+  }, [isLoaded]);
+
   useEffect(() => {
     if (isSubscribed && videoRef.current) {
       if (isActive) {
@@ -86,8 +97,11 @@ const MediaContainer: React.FC<MediaContainerProps> = ({
           alt="Restaurant"
         />
       ) : (
-        <div className="flex items-center justify-center text-white">
-          <p>No photo available</p>
+        // No photo URL - show message
+        <div className="flex items-center justify-center h-full w-full bg-zinc-900">
+          <div className="text-center text-white/40">
+            <p className="text-sm">No photo available</p>
+          </div>
         </div>
       )}
       

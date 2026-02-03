@@ -49,7 +49,7 @@ interface PlaceReview {
 export async function searchNearbyRestaurants(
   lat: number,
   lng: number,
-  radius: number = 10000,
+  radius: number = 10000, // Default 10km
   category: string = 'all'
 ): Promise<PlaceResult[]> {
   try {
@@ -79,6 +79,44 @@ export async function searchNearbyRestaurants(
     return results;
   } catch (error) {
     console.error('[GooglePlaces] Error:', error);
+    return [];
+  }
+}
+
+// Text Search - search by query like "pizza", "sushi", etc.
+export async function textSearchRestaurants(
+  lat: number,
+  lng: number,
+  radius: number = 10000,
+  query: string
+): Promise<PlaceResult[]> {
+  try {
+    console.log('[GooglePlaces] Text search for:', query);
+    
+    const { data, error } = await supabase.functions.invoke('google-places', {
+      body: { action: 'textSearch', lat, lng, radius, query },
+    });
+
+    if (error) {
+      console.error('[GooglePlaces] Text search error:', error);
+      return [];
+    }
+
+    if (data.error) {
+      console.error('[GooglePlaces] Text search API error:', data.error);
+      return [];
+    }
+
+    // Add distance calculation
+    const results = (data || []).map((place: any) => ({
+      ...place,
+      distance: formatDistance(calculateDistance(lat, lng, place.location?.lat, place.location?.lng)),
+    }));
+
+    console.log('[GooglePlaces] Text search found', results.length, 'restaurants for:', query);
+    return results;
+  } catch (error) {
+    console.error('[GooglePlaces] Text search error:', error);
     return [];
   }
 }

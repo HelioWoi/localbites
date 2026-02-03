@@ -33,7 +33,7 @@ interface RestaurantMenuPageProps {
 const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) => {
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(false); // Autoplay with sound
+  const [isMuted, setIsMuted] = useState(true); // Must start muted for iOS autoplay to work
   const [isPlaying, setIsPlaying] = useState(true);
   const [showSavedOnly, setShowSavedOnly] = useState(false); // Filter for saved videos
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);

@@ -118,7 +118,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, lat, lng, radius, placeId, points, category } = await req.json();
+    const { action, lat, lng, radius, placeId, points, category, query } = await req.json();
 
     if (!GOOGLE_API_KEY) {
       throw new Error("Google Places API key not configured");
@@ -129,6 +129,10 @@ serve(async (req) => {
     switch (action) {
       case "searchNearby":
         result = await searchNearbyRestaurants(lat, lng, radius || 2000, category || 'all');
+        break;
+      case "textSearch":
+        // Text Search API - search by query like "pizza", "sushi", etc.
+        result = await textSearchRestaurants(lat, lng, radius || 5000, query);
         break;
       case "getDetails":
         result = await getPlaceDetails(placeId);
@@ -294,6 +298,114 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number,
   }
 
   return result;
+}
+
+// Text Search API - search by query like "pizza", "sushi", "italian restaurant", etc.
+async function textSearchRestaurants(lat: number, lng: number, radius: number, query: string) {
+  if (!query || query.trim().length === 0) {
+    return [];
+  }
+
+  const cacheKey = `text_search_${query.toLowerCase().replace(/\s+/g, '_')}_${Math.round(lat * 100) / 100}_${Math.round(lng * 100) / 100}`;
+  
+  // Check cache first
+  try {
+    const { data: cached } = await supabase
+      .from('api_cache')
+      .select('data, created_at')
+      .eq('cache_key', cacheKey)
+      .single();
+    
+    if (cached) {
+      const cacheAge = (Date.now() - new Date(cached.created_at).getTime()) / (1000 * 60 * 60);
+      if (cacheAge < PLACES_CACHE_HOURS) {
+        console.log(`[Text Search Cache HIT] Returning cached results for "${query}"`);
+        return cached.data;
+      }
+    }
+  } catch (e) {
+    console.log(`[Text Search Cache MISS] Fetching fresh data for "${query}"`);
+  }
+
+  try {
+    const response = await fetch(
+      "https://places.googleapis.com/v1/places:searchText",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": GOOGLE_API_KEY!,
+          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.photos,places.location,places.types,places.googleMapsUri",
+        },
+        body: JSON.stringify({
+          textQuery: `${query} restaurant`,
+          locationBias: {
+            circle: {
+              center: { latitude: lat, longitude: lng },
+              radius: radius,
+            },
+          },
+          maxResultCount: 20,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Text Search] Error: ${errorText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    const places = data.places || [];
+    
+    console.log(`[Text Search] Found ${places.length} results for "${query}"`);
+
+    const result = places.map((place: any) => {
+      const openingHours = place.currentOpeningHours?.weekdayDescriptions || [];
+      return {
+        id: place.id,
+        name: place.displayName?.text || "Unknown",
+        address: place.formattedAddress || "",
+        rating: place.rating,
+        totalReviews: place.userRatingCount,
+        priceLevel: priceLevelToString(place.priceLevel),
+        isOpen: place.currentOpeningHours?.openNow ?? true,
+        openingHours: openingHours,
+        photoUrl: place.photos?.[0]?.name
+          ? `${SUPABASE_URL}/functions/v1/google-places-photo?name=${encodeURIComponent(place.photos[0].name)}`
+          : undefined,
+        googleMapsUrl: place.googleMapsUri || `https://www.google.com/maps/place/?q=place_id:${place.id}`,
+        cuisine: extractCuisine(place.types),
+        location: {
+          lat: place.location?.latitude,
+          lng: place.location?.longitude,
+        },
+        reviews: [],
+      };
+    });
+
+    // Save to cache
+    if (result.length > 0) {
+      try {
+        await supabase
+          .from('api_cache')
+          .upsert({
+            cache_key: cacheKey,
+            data: result,
+            created_at: new Date().toISOString(),
+          }, { onConflict: 'cache_key' });
+        console.log(`[Text Search Cache SAVE] Cached ${result.length} results for "${query}"`);
+      } catch (e) {
+        console.error("[Text Search Cache SAVE] Failed:", e);
+      }
+    }
+
+    return result;
+  } catch (error) {
+    console.error("[Text Search] Error:", error);
+    return [];
+  }
 }
 
 async function getPlaceDetails(placeId: string) {

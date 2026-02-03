@@ -1,5 +1,89 @@
 import { Restaurant } from '../types';
 
+// Parse time string like "5:00" or "8:30" with optional AM/PM
+function parseTime(timeStr: string, isPM: boolean = false): number {
+  const match = timeStr.match(/(\d{1,2}):(\d{2})/);
+  if (!match) return -1;
+  
+  let hours = parseInt(match[1]);
+  const minutes = parseInt(match[2]);
+  
+  // If PM indicator is present and not 12, add 12
+  if (isPM && hours !== 12) hours += 12;
+  // If AM and 12, convert to 0
+  if (!isPM && hours === 12) hours = 0;
+  
+  return hours * 60 + minutes;
+}
+
+// Calculate if restaurant is currently open based on opening hours
+// Formats: "Tuesday: 5:00 – 8:30 PM" or "Monday: 10:30 AM – 9:00 PM" or "Monday: Closed"
+export function calculateIsOpenNow(openingHours: string[] | undefined): boolean {
+  if (!openingHours || openingHours.length === 0) {
+    return true; // Default to open if no hours available
+  }
+
+  const now = new Date();
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const currentDay = days[now.getDay()];
+  const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
+
+  // Find today's hours
+  const todayHours = openingHours.find(h => h.startsWith(currentDay));
+  
+  if (!todayHours) {
+    return true; // Default to open if today not found
+  }
+
+  // Check if closed today
+  if (todayHours.toLowerCase().includes('closed')) {
+    return false;
+  }
+
+  // Try to parse different formats
+  // Format 1: "Tuesday: 5:00 – 8:30 PM" (both times share PM)
+  // Format 2: "Monday: 10:30 AM – 9:00 PM" (each time has its own period)
+  // Format 3: "Friday: 12:00 – 2:00 PM, 5:00 – 8:30 PM" (multiple ranges)
+  
+  const hoursText = todayHours.replace(/^[A-Za-z]+:\s*/, ''); // Remove day prefix
+  
+  // Split by comma for multiple time ranges
+  const timeRanges = hoursText.split(',').map(s => s.trim());
+  
+  for (const range of timeRanges) {
+    // Check for format: "5:00 – 8:30 PM" or "10:30 AM – 9:00 PM"
+    const fullMatch = range.match(/(\d{1,2}:\d{2})\s*(AM|PM)?\s*[–-]\s*(\d{1,2}:\d{2})\s*(AM|PM)?/i);
+    
+    if (fullMatch) {
+      const [, openTime, openPeriod, closeTime, closePeriod] = fullMatch;
+      
+      // Determine AM/PM for each time
+      const closeIsPM = closePeriod?.toUpperCase() === 'PM';
+      const openIsPM = openPeriod ? openPeriod.toUpperCase() === 'PM' : closeIsPM; // If no period, use close period
+      
+      const openMinutes = parseTime(openTime, openIsPM);
+      const closeMinutes = parseTime(closeTime, closeIsPM);
+      
+      if (openMinutes === -1 || closeMinutes === -1) continue;
+      
+      // Check if current time is within this range
+      if (closeMinutes < openMinutes) {
+        // Crosses midnight
+        if (currentTimeInMinutes >= openMinutes || currentTimeInMinutes < closeMinutes) {
+          return true;
+        }
+      } else {
+        if (currentTimeInMinutes >= openMinutes && currentTimeInMinutes < closeMinutes) {
+          return true;
+        }
+      }
+    }
+  }
+  
+  // If we parsed hours but current time is not in any range, restaurant is closed
+  return false;
+}
+
 // Infer dietary options based on cuisine type
 export function inferDietaryOptions(cuisine: string, name: string): string[] {
   const options: string[] = [];

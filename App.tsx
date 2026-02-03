@@ -12,10 +12,11 @@ import RestaurantProfileLoader from './components/RestaurantProfileLoader';
 import MediaContainer from './components/MediaContainer';
 import FloatingFilters from './components/FloatingFilters';
 import BitesAI from './components/BitesAI';
-import { getNearbyRestaurants, getRestaurantDetails, getRemainingSearches } from './services/geminiService';
+import { getNearbyRestaurants, getRestaurantDetails, getRemainingSearches, searchRestaurantsByQuery } from './services/geminiService';
 import { TriageData } from './services/aiAssistant';
 import { likeRestaurant, unlikeRestaurant, saveRestaurant, unsaveRestaurant, getUserLikes, getUserSaves, getAllLikesCounts } from './services/interactionService';
 import { CUISINES, PRICES, DIETARY_OPTIONS, AMBIANCE_OPTIONS } from './constants';
+import { calculateIsOpenNow } from './utils/filterHelpers';
 import { Home, Search, MessageSquare, Filter, Bookmark, ExternalLink, Info, Loader2, X, ArrowRight, Globe, MapPin, ChevronUp, Crown, PlayCircle, Heart, Star, Clock, Sparkles } from 'lucide-react';
 import { useLazyLoading } from './hooks/useLazyLoading';
 
@@ -333,14 +334,16 @@ const App: React.FC = () => {
 
   // Fetch reviews when restaurant reviews modal opens
   useEffect(() => {
+    // Only run when showRestaurantReviews changes to a truthy value
+    if (!showRestaurantReviews) {
+      setModalReviews([]);
+      return;
+    }
+    
     const fetchModalReviews = async () => {
-      console.log('[REVIEW MODAL] useEffect triggered, showRestaurantReviews:', showRestaurantReviews);
-      
       // Check if it's a Google restaurant (ID starts with ChIJ or places/)
-      const isGoogleRestaurant = showRestaurantReviews && 
-        (showRestaurantReviews.id.startsWith('places/') || showRestaurantReviews.id.startsWith('ChIJ'));
-      
-      console.log('[REVIEW MODAL] isGoogleRestaurant:', isGoogleRestaurant);
+      const isGoogleRestaurant = 
+        showRestaurantReviews.id.startsWith('places/') || showRestaurantReviews.id.startsWith('ChIJ');
       
       if (isGoogleRestaurant) {
         // Check if restaurant already has reviews
@@ -351,15 +354,10 @@ const App: React.FC = () => {
         
         setLoadingModalReviews(true);
         try {
-          console.log('[REVIEW MODAL] Fetching reviews for:', showRestaurantReviews.id);
           const details = await getRestaurantDetails(showRestaurantReviews.id);
-          console.log('[REVIEW MODAL] Got details:', details);
-          console.log('[REVIEW MODAL] Reviews count:', details?.reviews?.length || 0);
           if (details?.reviews && details.reviews.length > 0) {
-            console.log('[REVIEW MODAL] Setting modalReviews with', details.reviews.length, 'reviews');
             setModalReviews(details.reviews);
           } else {
-            console.log('[REVIEW MODAL] No reviews found, setting empty array');
             setModalReviews([]);
           }
         } catch (error) {
@@ -368,15 +366,13 @@ const App: React.FC = () => {
         } finally {
           setLoadingModalReviews(false);
         }
-      } else if (showRestaurantReviews) {
+      } else {
         // Non-Google restaurant - use existing reviews
         setModalReviews(showRestaurantReviews.reviews || []);
-      } else {
-        setModalReviews([]);
       }
     };
     fetchModalReviews();
-  }, [showRestaurantReviews]);
+  }, [showRestaurantReviews?.id]); // Only re-run when restaurant ID changes
 
   const handleLocationSelect = (loc: UserLocation) => {
     setLocation(loc);
@@ -539,9 +535,38 @@ const App: React.FC = () => {
           setState('FEED');
         }
       }}
-      onManualSearch={(searchQuery) => {
-        setFilters(prev => ({ ...prev, cuisine: searchQuery }));
+      onManualSearch={async (searchQuery) => {
+        // Use Text Search API to search by query (pizza, sushi, etc.)
+        console.log('[ManualSearch] Text search for:', searchQuery);
+        setFilters(prev => ({ ...prev, cuisine: 'All' }));
         setSelectedCategory('all');
+        setIsLoading(true);
+        setState('FEED');
+        
+        const doTextSearch = async (loc: UserLocation) => {
+          try {
+            const results = await searchRestaurantsByQuery(loc, searchQuery);
+            console.log('[ManualSearch] Found', results.length, 'restaurants for:', searchQuery);
+            
+            if (results.length === 0) {
+              setError(`No restaurants found for "${searchQuery}"`);
+            } else {
+              setError(null);
+            }
+            
+            setAllRestaurants(results);
+            setRestaurants(results.slice(0, 20));
+            setVisibleCount(Math.min(20, results.length));
+            setTotalAvailable(results.length);
+            setHasMorePages(results.length > 20);
+            setActiveRestaurantIndex(0);
+          } catch (err) {
+            console.error('[ManualSearch] Error:', err);
+            setError(`Failed to search for "${searchQuery}"`);
+          } finally {
+            setIsLoading(false);
+          }
+        };
         
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
@@ -552,8 +577,7 @@ const App: React.FC = () => {
                 name: 'Current Location'
               };
               setLocation(loc);
-              setState('FEED');
-              console.log('[Geolocation] ✓ Real GPS acquired (manual search):', loc);
+              doTextSearch(loc);
             },
             (error) => {
               console.log('[Geolocation] Error on manual search:', error.code);
@@ -566,9 +590,9 @@ const App: React.FC = () => {
                   name: 'Sunshine Coast (Dev Mode)'
                 };
                 setLocation(devLoc);
-                setState('FEED');
-                console.log('[Geolocation] ⚠️ Using dev fallback (manual search):', devLoc);
+                doTextSearch(devLoc);
               } else {
+                setIsLoading(false);
                 alert('Unable to detect your location. Please check your device location settings.');
               }
             },
@@ -579,6 +603,7 @@ const App: React.FC = () => {
             }
           );
         } else {
+          setIsLoading(false);
           alert('Your browser does not support location services.');
         }
       }}
@@ -673,7 +698,7 @@ const App: React.FC = () => {
         <RestaurantProfile 
           restaurant={selectedRestaurant} 
           onBack={() => {
-            setState('FILTER_SELECTION');
+            setState('FEED');
             setOpenProfileReviews(false);
           }} 
           isSaved={savedIds.has(selectedRestaurant.id)}
@@ -930,13 +955,11 @@ const App: React.FC = () => {
         )}
         */}
         
-        {/* Apply openNow filter in real-time */}
+        {/* Apply openNow filter in real-time using actual opening hours */}
         {(() => {
           const displayedRestaurants = filters.openNow 
-            ? restaurants.filter(r => r.isOpen) 
+            ? restaurants.filter(r => calculateIsOpenNow(r.openingHours))
             : restaurants;
-          
-          console.log('[Feed] openNow filter:', filters.openNow, '| Total:', restaurants.length, '| Displayed:', displayedRestaurants.length);
           
           return isLoading && restaurants.length === 0 ? (
           Array.from({ length: 3 }).map((_, i) => (

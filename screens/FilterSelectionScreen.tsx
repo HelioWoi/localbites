@@ -147,7 +147,7 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
             </div>
             <div className="flex items-center justify-center gap-2 mt-3">
               <MapPin size={14} className="text-zinc-400" />
-              <span className="text-xs text-zinc-400 font-medium">Search radius: 5km</span>
+              <span className="text-xs text-zinc-400 font-medium">Search radius: 10km</span>
             </div>
           </form>
 
@@ -183,12 +183,12 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
             })}
           </div>
 
-          {/* Skip Button */}
+          {/* See All Button */}
           <button
             onClick={onSkip}
-            className="w-full text-zinc-400 text-sm font-medium py-4 hover:text-zinc-600 transition-colors"
+            className="w-full text-orange-500 text-sm font-bold py-4 hover:text-orange-600 transition-colors"
           >
-            Skip for now
+            See All Nearby →
           </button>
         </div>
       </div>
