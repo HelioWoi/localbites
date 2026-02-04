@@ -181,11 +181,11 @@ const LocationSelectorMap: React.FC<LocationSelectorMapProps> = ({ onLocationSel
         return distance <= radius;
       }).length;
       
-      // Add some Google restaurants estimate (simplified)
-      return count + Math.floor(Math.random() * 15) + 5;
+      // Return actual count of partner restaurants
+      return count;
     } catch (error) {
       console.error('Error counting restaurants:', error);
-      return Math.floor(Math.random() * 20) + 5;
+      return 0;
     }
   };
   

@@ -17,7 +17,7 @@ import { TriageData } from './services/aiAssistant';
 import { likeRestaurant, unlikeRestaurant, saveRestaurant, unsaveRestaurant, getUserLikes, getUserSaves, getAllLikesCounts } from './services/interactionService';
 import { CUISINES, PRICES, DIETARY_OPTIONS, AMBIANCE_OPTIONS } from './constants';
 import { calculateIsOpenNow } from './utils/filterHelpers';
-import { Home, Search, MessageSquare, Filter, Bookmark, ExternalLink, Info, Loader2, X, ArrowRight, Globe, MapPin, ChevronUp, Crown, PlayCircle, Heart, Star, Clock, Sparkles } from 'lucide-react';
+import { Home, Search, MessageSquare, Filter, Bookmark, ExternalLink, Info, Loader2, X, ArrowRight, Globe, MapPin, ChevronUp, Crown, PlayCircle, Heart, Star, Clock, Sparkles, Eye, Car, PersonStanding } from 'lucide-react';
 import { useLazyLoading } from './hooks/useLazyLoading';
 
 // Check if we're on the partner route
@@ -77,6 +77,7 @@ const App: React.FC = () => {
   const [showDishInfo, setShowDishInfo] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState<'cuisine' | 'price' | 'dietary' | 'ambiance' | 'amenities' | null>(null);
   const [showSaved, setShowSaved] = useState(false);
+  const [showSavedFeed, setShowSavedFeed] = useState(false);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [showHeartAnimation, setShowHeartAnimation] = useState<string | null>(null);
@@ -937,15 +938,20 @@ const App: React.FC = () => {
           <button onClick={() => setState('FILTER_SELECTION')} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
             <Home size={24} />
           </button>
-          <button onClick={() => setShowSearch(true)} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
-            <Search size={24} />
+          <button onClick={() => setShowFilterModal('cuisine')} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors relative">
+            <Filter size={24} />
+            <div className="absolute top-0 right-0 w-2 h-2 bg-orange-500 rounded-full"></div>
           </button>
           <button onClick={() => setShowBitesAI(true)} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
             <Sparkles size={24} />
           </button>
-          <button onClick={() => setShowFilterModal('cuisine')} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors relative">
-            <Filter size={24} />
-            <div className="absolute top-0 right-0 w-2 h-2 bg-orange-500 rounded-full"></div>
+          <button onClick={() => setShowSavedFeed(true)} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors relative">
+            <Bookmark size={24} />
+            {savedIds.size > 0 && (
+              <div className="absolute -top-1 -right-1 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-[10px] font-bold">{savedIds.size}</span>
+              </div>
+            )}
           </button>
           <button 
             onClick={async () => {
@@ -1195,6 +1201,21 @@ const App: React.FC = () => {
                       <span className="text-white text-[10px] font-medium">{res.totalReviews || 0}</span>
                     </button>
                     
+                    {/* See More button (Eye icon) */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedRestaurant(res);
+                        setState('PROFILE');
+                      }}
+                      className="flex flex-col items-center gap-1"
+                    >
+                      <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center">
+                        <Eye size={24} className="text-white" />
+                      </div>
+                      <span className="text-white text-[10px] font-medium">More</span>
+                    </button>
+                    
                     {/* Save button */}
                     <button 
                       onClick={(e) => {
@@ -1231,6 +1252,19 @@ const App: React.FC = () => {
                        <span className="text-white/70 text-xs font-medium">{res.cuisine}</span>
                        <span className="text-white/40">•</span>
                        <span className="text-white/70 text-xs font-medium">{res.distance}</span>
+                       {res.address && (
+                         <button
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             const destination = encodeURIComponent(res.address);
+                             window.open(`https://www.google.com/maps/dir/?api=1&destination=${destination}`, '_blank');
+                           }}
+                           className="hover:opacity-70 transition-opacity"
+                           aria-label="Open in Google Maps"
+                         >
+                           <MapPin size={14} className="text-white" />
+                         </button>
+                       )}
                     </div>
                     <h3 
                       className="text-3xl font-black text-white drop-shadow-lg tracking-tight leading-none cursor-pointer active:opacity-70 transition-opacity"
@@ -1332,6 +1366,181 @@ const App: React.FC = () => {
         )}
       </div>
 
+      {/* Saved Restaurants Feed */}
+      {showSavedFeed && (
+        <div className="fixed inset-0 z-[60] bg-black">
+          {/* Header */}
+          <div className="absolute top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/80 to-transparent p-4 pt-8">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setShowSavedFeed(false)}
+                className="p-2 bg-white/10 backdrop-blur-md rounded-full hover:bg-white/20 transition-colors"
+              >
+                <X size={20} className="text-white" />
+              </button>
+              <h2 className="text-white font-bold text-lg">Saved ({savedIds.size})</h2>
+              <div className="w-10" />
+            </div>
+          </div>
+
+          {/* Feed Container */}
+          <div className="h-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar">
+            {Array.from(savedIds).length === 0 ? (
+              <div className="h-full flex items-center justify-center p-8">
+                <div className="text-center">
+                  <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Bookmark size={32} className="text-white/60" />
+                  </div>
+                  <h3 className="text-white text-xl font-bold mb-2">No saved restaurants</h3>
+                  <p className="text-white/60 text-sm">Save restaurants from the feed to see them here</p>
+                </div>
+              </div>
+            ) : (
+              Array.from(savedIds)
+                .map((id) => restaurants.find(r => r.id === id))
+                .filter(Boolean)
+                .map((res, i) => (
+                  <div key={res!.id} className="snap-item">
+                    <div className="video-card shadow-none rounded-none border-none bg-black">
+                      <MediaContainer 
+                        videoUrl={res!.dishes[0]?.videoUrl} 
+                        photoUrl={res!.mainPhotoUrl}
+                        isActive={true}
+                        isSubscribed={res!.isSubscribed}
+                        onSwipeUp={() => {}}
+                        onPartialSwipeUp={() => {}}
+                      />
+                      
+                      <div className="absolute inset-0 cursor-pointer" onClick={() => {
+                        setSelectedRestaurant(res!);
+                        setShowSavedFeed(false);
+                        setState('PROFILE');
+                      }}>
+                        
+                        {/* RIGHT SIDE ACTION BUTTONS */}
+                        <div className="absolute right-4 bottom-40 flex flex-col items-center gap-4 z-20">
+                          {/* Like button */}
+                          <button 
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const next = new Set(likedIds);
+                              if (next.has(res!.id)) {
+                                next.delete(res!.id);
+                                await unlikeRestaurant(res!.id);
+                              } else {
+                                next.add(res!.id);
+                                await likeRestaurant(res!.id);
+                              }
+                              setLikedIds(next);
+                            }}
+                            className="flex flex-col items-center gap-1"
+                          >
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                              likedIds.has(res!.id) ? 'bg-red-500' : 'bg-white/20 backdrop-blur-md'
+                            }`}>
+                              <Heart 
+                                size={24} 
+                                className={likedIds.has(res!.id) ? 'text-white fill-white' : 'text-white'} 
+                              />
+                            </div>
+                            <span className="text-white text-[10px] font-medium">
+                              {likesCounts.get(res!.id) || 0}
+                            </span>
+                          </button>
+                          
+                          {/* Reviews button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowRestaurantReviews(res!);
+                            }}
+                            className="flex flex-col items-center gap-1"
+                          >
+                            <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center">
+                              <MessageSquare size={24} className="text-white" />
+                            </div>
+                            <span className="text-white text-[10px] font-medium">{res!.totalReviews || 0}</span>
+                          </button>
+                          
+                          {/* See More button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedRestaurant(res!);
+                              setShowSavedFeed(false);
+                              setState('PROFILE');
+                            }}
+                            className="flex flex-col items-center gap-1"
+                          >
+                            <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center">
+                              <Eye size={24} className="text-white" />
+                            </div>
+                            <span className="text-white text-[10px] font-medium">More</span>
+                          </button>
+                          
+                          {/* Unsave button */}
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const next = new Set(savedIds);
+                              next.delete(res!.id);
+                              setSavedIds(next);
+                              
+                              // Close feed if no more saved
+                              if (next.size === 0) {
+                                setShowSavedFeed(false);
+                              }
+                            }}
+                            className="flex flex-col items-center gap-1"
+                          >
+                            <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center">
+                              <Bookmark size={24} className="text-white fill-white" />
+                            </div>
+                            <span className="text-white text-[10px] font-medium">Saved</span>
+                          </button>
+                        </div>
+
+                        {/* INFO AT BOTTOM */}
+                        <div className="absolute bottom-24 left-0 right-16 p-6">
+                          <h2 className="text-white text-2xl font-black mb-1 drop-shadow-lg">{res!.name}</h2>
+                          <div className="flex items-center gap-2 text-white/90 text-sm mb-2">
+                            <span>{res!.cuisine}</span>
+                            <span>•</span>
+                            <span>{res!.priceLevel}</span>
+                            <span>•</span>
+                            <span>{res!.distance}</span>
+                            {res!.address && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const destination = encodeURIComponent(res!.address);
+                                  window.open(`https://www.google.com/maps/dir/?api=1&destination=${destination}`, '_blank');
+                                }}
+                                className="hover:opacity-70 transition-opacity"
+                                aria-label="Open in Google Maps"
+                              >
+                                <MapPin size={12} className="text-white" />
+                              </button>
+                            )}
+                          </div>
+                          {res!.rating && (
+                            <div className="flex items-center gap-1">
+                              <Star size={14} className="text-yellow-400 fill-yellow-400" />
+                              <span className="text-white text-sm font-semibold">{res!.rating}</span>
+                              {res!.totalReviews > 0 && (
+                                <span className="text-white/70 text-xs">({res!.totalReviews})</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+            )}
+          </div>
+        </div>
+      )}
       
       {/* Search Modal */}
       {showSearch && (

@@ -144,6 +144,21 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
     `)
     .not('restaurant_name', 'is', null)
     .order('created_at', { ascending: false });
+  
+  // Filter out partners with expired trial (no active subscription)
+  const now = new Date();
+  const activePartners = partners?.filter(p => {
+    // Has active Stripe subscription
+    if (p.subscription_status === 'active' && p.subscription_end_date) {
+      return new Date(p.subscription_end_date) > now;
+    }
+    // Has active trial
+    if (p.trial_ends_at) {
+      return new Date(p.trial_ends_at) > now;
+    }
+    // No subscription or trial
+    return false;
+  }) || [];
 
   if (error) {
     console.error('Error fetching partner restaurants:', error);
@@ -151,14 +166,15 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
   }
 
   console.log('[PartnerRestaurants] Raw partners from DB:', partners?.length || 0);
-  if (partners && partners.length > 0) {
-    partners.forEach(p => {
+  console.log('[PartnerRestaurants] Active partners (trial not expired):', activePartners.length);
+  if (activePartners && activePartners.length > 0) {
+    activePartners.forEach(p => {
       console.log(`  - ${p.restaurant_name}: ${p.menu_items?.length || 0} items, lat: ${p.latitude}, lng: ${p.longitude}`);
     });
   }
 
   // Transform partner data to Restaurant format
-  const filtered = (partners || [])
+  const filtered = (activePartners || [])
     .filter(p => {
       const hasName = !!p.restaurant_name;
       const hasItems = p.menu_items && p.menu_items.length > 0;
@@ -168,20 +184,39 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
 
   console.log('[PartnerRestaurants] After filter:', filtered.length);
 
-  return filtered.map(p => {
+  // Map and calculate distances first
+  const restaurantsWithDistance = filtered.map(p => {
     // Calculate real distance if coordinates are available
     let distance = '0.5 km'; // Default
+    let distanceKm = 0.5; // For sorting
+    
     if (userLat && userLng && p.latitude && p.longitude) {
-      const distKm = calculateDistance(userLat, userLng, p.latitude, p.longitude);
-      distance = distKm < 1 
-        ? `${Math.round(distKm * 1000)}m` 
-        : `${distKm.toFixed(1)} km`;
-      console.log(`[Distance] ${p.restaurant_name}: ${distance} (${distKm.toFixed(2)} km)`);
+      distanceKm = calculateDistance(userLat, userLng, p.latitude, p.longitude);
+      distance = distanceKm < 1 
+        ? `${Math.round(distanceKm * 1000)}m` 
+        : `${distanceKm.toFixed(1)} km`;
+      console.log(`[Distance] ${p.restaurant_name}: ${distance} (${distanceKm.toFixed(2)} km)`);
     } else {
       console.log(`[Distance] ${p.restaurant_name}: using default ${distance} (missing coords: user=${!!(userLat && userLng)}, partner=${!!(p.latitude && p.longitude)})`);
     }
 
+    // Check if partner has active premium subscription
+    const now = new Date();
+    const isPremium = (p.subscription_status === 'active' && p.subscription_end_date && new Date(p.subscription_end_date) > now) ||
+                      (p.trial_ends_at && new Date(p.trial_ends_at) > now);
+
+    // Calculate priority score: Premium gets 1000 boost, then sorted by distance
+    // Formula: (isPremium ? 1000 : 0) + (maxDistance - distance) * 10
+    const maxDistance = 10; // 10km max for scoring
+    const priorityScore = (isPremium ? 1000 : 0) + (maxDistance - Math.min(distanceKm, maxDistance)) * 10;
+
+    console.log(`[Priority] ${p.restaurant_name}: isPremium=${isPremium}, distance=${distanceKm.toFixed(2)}km, score=${priorityScore.toFixed(0)}`);
+
     return {
+      partner: p,
+      distanceKm,
+      isPremium,
+      priorityScore,
       id: p.id,
       name: p.restaurant_name,
       cuisine: p.cuisine || 'Various',
@@ -220,6 +255,17 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
       reviewSnippets: [],
     };
   });
+
+  // Sort by priority score (premium + distance)
+  // Higher score = appears first in feed
+  const sorted = restaurantsWithDistance.sort((a, b) => b.priorityScore - a.priorityScore);
+  
+  console.log('[PartnerRestaurants] Sorted by priority:');
+  sorted.slice(0, 5).forEach((r, idx) => {
+    console.log(`  ${idx + 1}. ${r.name} - Premium: ${r.isPremium}, Distance: ${r.distanceKm.toFixed(2)}km, Score: ${r.priorityScore.toFixed(0)}`);
+  });
+
+  return sorted;
 }
 
 // Get all restaurants (both regular and partner)

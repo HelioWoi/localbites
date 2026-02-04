@@ -8,6 +8,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { PartnerUser } from './PartnerPortal';
 import SubscriptionManager from './SubscriptionManager';
+import OnboardingModal from './OnboardingModal';
 
 interface PartnerDashboardProps {
   user: PartnerUser;
@@ -97,9 +98,13 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
+  // Onboarding state
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
   // Trial calculation from partner subscription data
   const [subscriptionDaysLeft, setSubscriptionDaysLeft] = useState(0);
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
+  const [hasPaidSubscription, setHasPaidSubscription] = useState(false); // Stripe subscription
   
   useEffect(() => {
     const loadSubscriptionStatus = async () => {
@@ -107,10 +112,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       
       const { data: partner } = await supabase
         .from('partners')
-        .select('subscription_status, subscription_end_date')
+        .select('subscription_status, subscription_end_date, trial_ends_at')
         .eq('id', partnerData.id)
         .single();
       
+      // Priority 1: Active Stripe subscription (PAID)
       if (partner?.subscription_status === 'active' && partner?.subscription_end_date) {
         const endDate = new Date(partner.subscription_end_date);
         const today = new Date();
@@ -118,16 +124,38 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         setSubscriptionDaysLeft(Math.max(0, diffDays));
         setHasActiveSubscription(true);
+        setHasPaidSubscription(true); // User has PAID subscription
+      } 
+      // Priority 2: Trial period (FREE - no Stripe subscription yet)
+      else if (partner?.trial_ends_at) {
+        const endDate = new Date(partner.trial_ends_at);
+        const today = new Date();
+        const diffTime = endDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays > 0) {
+          setSubscriptionDaysLeft(diffDays);
+          setHasActiveSubscription(true);
+          setHasPaidSubscription(false); // Still on FREE trial
+        } else {
+          // Trial expired
+          setSubscriptionDaysLeft(0);
+          setHasActiveSubscription(false);
+          setHasPaidSubscription(false);
+        }
       } else {
         setSubscriptionDaysLeft(0);
         setHasActiveSubscription(false);
+        setHasPaidSubscription(false);
       }
     };
     
     loadSubscriptionStatus();
   }, [partnerData?.id]);
   
-  const isTrialActive = hasActiveSubscription && subscriptionDaysLeft > 0 && subscriptionDaysLeft <= 14;
+  // Trial is active only if user is on FREE trial (not paid subscription)
+  const isTrialActive = hasActiveSubscription && !hasPaidSubscription && subscriptionDaysLeft > 0 && subscriptionDaysLeft <= 14;
+  const isTrialExpired = !hasActiveSubscription && subscriptionDaysLeft === 0;
   const maxVideos = hasActiveSubscription ? Infinity : 5;
 
   useEffect(() => {
@@ -184,6 +212,12 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           website: currentPartner.website || ''
         });
 
+        // Check if this is first time (no restaurant name set) and hasn't seen onboarding
+        const hasSeenOnboarding = localStorage.getItem(`onboarding_completed_${user.id}`);
+        if (!currentPartner.restaurant_name && !hasSeenOnboarding) {
+          setShowOnboarding(true);
+        }
+
         // Load menu items
         const { data: items, error: itemsError } = await supabase
           .from('menu_items')
@@ -201,17 +235,72 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         }
       }
 
-      // Load stats (mock for now)
+      // Initialize stats at zero for new partners
       setStats({
-        views: Math.floor(Math.random() * 2000) + 500,
-        saves: Math.floor(Math.random() * 150) + 30,
-        clicks: Math.floor(Math.random() * 300) + 50,
+        views: 0,
+        saves: 0,
+        clicks: 0,
       });
     } catch (error) {
       console.error('Load data error:', error);
     } finally {
       console.log('loadData finished, setting isLoading false');
       setIsLoading(false);
+    }
+  };
+
+  const handleOnboardingComplete = async (data: { restaurantName: string; cuisine: string; address: string }) => {
+    if (!partnerData) return;
+
+    try {
+      // Generate slug from restaurant name
+      const slug = data.restaurantName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+
+      const { error } = await supabase
+        .from('partners')
+        .update({
+          restaurant_name: data.restaurantName,
+          cuisine: data.cuisine,
+          address: data.address || null,
+          slug: slug,
+        })
+        .eq('id', partnerData.id);
+
+      if (error) {
+        console.error('Error saving onboarding data:', error);
+        alert('Error saving: ' + error.message);
+        return;
+      }
+
+      // Update local state
+      setPartnerData({ 
+        ...partnerData, 
+        restaurant_name: data.restaurantName, 
+        cuisine: data.cuisine, 
+        address: data.address,
+        slug 
+      });
+      setRestaurantForm({ 
+        name: data.restaurantName, 
+        cuisine: data.cuisine, 
+        address: data.address,
+        phone: '',
+        website: ''
+      });
+
+      // Mark onboarding as completed
+      localStorage.setItem(`onboarding_completed_${user.id}`, 'true');
+      setShowOnboarding(false);
+
+      // Optionally open the upload modal to encourage first video upload
+      setTimeout(() => {
+        setShowMenuUploadModal(true);
+      }, 500);
+    } catch (error) {
+      console.error('Error in onboarding:', error);
     }
   };
 
@@ -262,6 +351,14 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   // Menu item handlers
   const handleMenuUpload = async () => {
     if (!uploadFile || !menuItemName.trim() || !partnerData) return;
+
+    // Block upload if trial expired
+    if (isTrialExpired) {
+      alert('Your trial has ended. Please upgrade to Pro to continue uploading videos.');
+      setShowMenuUploadModal(false);
+      setActiveTab('subscription');
+      return;
+    }
 
     // Determine the final category name
     const finalCategory = menuItemCategory === '__new__' ? newCategory.trim() : menuItemCategory.trim();
@@ -454,8 +551,18 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
   return (
     <div className="min-h-screen bg-zinc-50 partner-portal">
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        isOpen={showOnboarding}
+        onClose={() => {
+          setShowOnboarding(false);
+          localStorage.setItem(`onboarding_completed_${user.id}`, 'true');
+        }}
+        onComplete={handleOnboardingComplete}
+      />
+
       {/* Header */}
-      <header className="bg-white border-b border-zinc-200 sticky top-0 z-40 pt-2">
+      <header className="bg-white border-b border-zinc-200 sticky top-0 z-40 pt-4">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
@@ -501,28 +608,29 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         </div>
       </header>
 
-      {/* Trial/Upgrade Banner */}
-      {(isTrialActive || hasActiveSubscription) && (
-        <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white">
+      {/* Trial/Upgrade Banner - Only show for FREE trial or expired trial, NOT for paid subscriptions */}
+      {(isTrialActive || isTrialExpired) && (
+        <div className={`${isTrialExpired ? 'bg-gradient-to-r from-red-500 to-orange-500' : 'bg-gradient-to-r from-orange-500 to-amber-500'} text-white`}>
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {isTrialActive ? (
+              {isTrialExpired ? (
+                <>
+                  <AlertCircle size={16} />
+                  <span className="text-sm font-medium">Your trial has ended</span>
+                </>
+              ) : isTrialActive ? (
                 <>
                   <Calendar size={16} />
                   <span className="text-sm font-medium">Premium Trial: {subscriptionDaysLeft} days remaining</span>
                 </>
-              ) : hasActiveSubscription ? (
-                <>
-                  <Crown size={16} />
-                  <span className="text-sm font-medium">Premium Active</span>
-                </>
               ) : null}
             </div>
-            {!hasActiveSubscription && (
-              <button className="px-4 py-1.5 bg-white text-orange-600 text-sm font-bold rounded-lg hover:bg-orange-50 transition-colors">
-                Upgrade to Pro
-              </button>
-            )}
+            <button 
+              onClick={() => setActiveTab('subscription')}
+              className="px-4 py-1.5 bg-white text-orange-600 text-sm font-bold rounded-lg hover:bg-orange-50 transition-colors"
+            >
+              {isTrialExpired ? 'Upgrade to Pro' : 'Upgrade Now'}
+            </button>
           </div>
         </div>
       )}
@@ -568,7 +676,6 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                   <span className="text-xs font-medium">Views</span>
                 </div>
                 <p className="text-2xl font-bold text-zinc-900">{stats.views.toLocaleString()}</p>
-                <p className="text-xs text-emerald-600 font-medium mt-1">+12% this week</p>
               </div>
               <div className="bg-white rounded-xl p-4 border border-zinc-200">
                 <div className="flex items-center gap-2 text-zinc-500 mb-2">
@@ -576,7 +683,6 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                   <span className="text-xs font-medium">Saves</span>
                 </div>
                 <p className="text-2xl font-bold text-zinc-900">{stats.saves}</p>
-                <p className="text-xs text-emerald-600 font-medium mt-1">+8% this week</p>
               </div>
               <div className="bg-white rounded-xl p-4 border border-zinc-200">
                 <div className="flex items-center gap-2 text-zinc-500 mb-2">
@@ -584,7 +690,6 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                   <span className="text-xs font-medium">Directions</span>
                 </div>
                 <p className="text-2xl font-bold text-zinc-900">{stats.clicks}</p>
-                <p className="text-xs text-emerald-600 font-medium mt-1">+23% this week</p>
               </div>
             </div>
 
@@ -852,8 +957,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                             <p className="text-xs text-zinc-500">{item.category}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm font-semibold text-zinc-900">{Math.floor(Math.random() * 500) + 100} views</p>
-                            <p className="text-xs text-emerald-600">+{Math.floor(Math.random() * 30) + 5}%</p>
+                            <p className="text-sm font-semibold text-zinc-900">0 views</p>
                           </div>
                         </div>
                       ))}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Mic, Sparkles } from 'lucide-react';
+import { X, Mic, Sparkles, Send } from 'lucide-react';
 import { chatWithBitesBuddy, getInitialMessage, ChatMessage, TriageData, logBuddyIntent, logBuddyAction } from '../services/aiAssistant';
 import { UserIntent, initializeIntent } from '../types/intent';
 
@@ -225,9 +225,27 @@ const BitesAI: React.FC<BitesAIProps> = ({ onClose, onSearchTrigger, onApplyInte
             <h1 className="text-2xl font-light text-zinc-400 mb-2">
               {isListening ? 'Listening...' : 'Start talking'}
             </h1>
-            <p className="text-sm text-zinc-400 text-center max-w-xs">
+            <p className="text-sm text-zinc-400 text-center max-w-xs mb-6">
               Tell me what you're craving and I'll find the perfect spot for you
             </p>
+            
+            {/* Text input option */}
+            <div className="w-full max-w-md">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 relative">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Or type your message..."
+                    className="w-full px-5 py-3 bg-zinc-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition-all"
+                    disabled={isTyping}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           /* Chat Interface */
@@ -285,7 +303,7 @@ const BitesAI: React.FC<BitesAIProps> = ({ onClose, onSearchTrigger, onApplyInte
       {/* Input - Only show when conversation started */}
       {hasStarted && (
         <div className="p-4 border-t border-zinc-100">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <div className="flex-1 relative">
               <input
                 ref={inputRef}
@@ -299,13 +317,21 @@ const BitesAI: React.FC<BitesAIProps> = ({ onClose, onSearchTrigger, onApplyInte
               />
             </div>
             <button
+              onClick={() => handleSendMessage(inputValue)}
+              disabled={!inputValue.trim() || isTyping}
+              className="w-11 h-11 bg-orange-500 text-white rounded-full flex items-center justify-center hover:bg-orange-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Send message"
+            >
+              <Send size={18} />
+            </button>
+            <button
               onClick={handleVoiceInput}
-              className={`w-12 h-12 bg-orange-500 text-white rounded-full flex items-center justify-center hover:bg-orange-600 active:scale-95 transition-all shadow-lg ${
+              className={`w-11 h-11 bg-orange-500 text-white rounded-full flex items-center justify-center hover:bg-orange-600 active:scale-95 transition-all ${
                 isListening ? 'animate-pulse' : ''
               }`}
               title="Voice input"
             >
-              <Mic size={20} />
+              <Mic size={18} />
             </button>
           </div>
         </div>

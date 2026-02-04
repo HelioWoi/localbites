@@ -186,7 +186,8 @@ const LocationSelectorMapSimple: React.FC<LocationSelectorMapSimpleProps> = ({ o
   };
 
   const getRestaurantCount = async (lat: number, lng: number): Promise<number> => {
-    return Math.floor(Math.random() * 20) + 5;
+    // Return 0 for now - will be updated with real count when implemented
+    return 0;
   };
 
   const handleUseCurrentLocation = () => {
