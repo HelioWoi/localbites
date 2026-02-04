@@ -241,9 +241,30 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onClose, onCo
                 </div>
               </div>
 
-              <div className="flex items-center justify-center gap-2 text-sm text-zinc-500">
-                <Video size={16} />
-                <span>Tip: Keep videos under 10 seconds for best results</span>
+              <div className="space-y-3">
+                <div className="flex items-center justify-center gap-2 text-sm text-zinc-600">
+                  <Video size={16} />
+                  <span>Tip: Keep videos under 10 seconds for best results</span>
+                </div>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-zinc-700">
+                  <p className="font-semibold text-amber-900 mb-1">📹 Video Requirements:</p>
+                  <ul className="space-y-1 ml-4">
+                    <li>• Maximum: 10 seconds duration</li>
+                    <li>• Maximum: 5MB file size</li>
+                    <li>• Recommended: 720p quality (perfect for mobile)</li>
+                  </ul>
+                  <p className="mt-2 text-zinc-600">
+                    Need to compress? Use{' '}
+                    <a 
+                      href="https://www.freeconvert.com/video-compressor" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-orange-600 hover:text-orange-700 font-semibold underline"
+                    >
+                      this free tool
+                    </a>
+                  </p>
+                </div>
               </div>
             </div>
           )}

@@ -368,9 +368,37 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     // Validate file size (5MB max)
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (uploadFile.size > maxSize) {
-      alert('Video must be less than 5MB');
+      const sizeMB = (uploadFile.size / (1024 * 1024)).toFixed(1);
+      alert(`Video is too large (${sizeMB}MB). Maximum size is 5MB.\n\nTip: Compress your video to 720p quality.\nUse this free tool: https://www.freeconvert.com/video-compressor`);
       return;
     }
+
+    // Validate video duration (10 seconds max)
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => {
+        window.URL.revokeObjectURL(video.src);
+        const duration = video.duration;
+        
+        if (duration > 10) {
+          alert(`Video is too long (${Math.round(duration)}s). Please upload a video of 10 seconds or less for best engagement.`);
+          reject(new Error('Video too long'));
+        } else {
+          resolve();
+        }
+      };
+      
+      video.onerror = () => {
+        reject(new Error('Error loading video'));
+      };
+      
+      video.src = URL.createObjectURL(uploadFile);
+    }).catch((error) => {
+      console.error('Video validation error:', error);
+      return;
+    });
 
     setIsUploading(true);
     setUploadProgress(10);
@@ -1131,41 +1159,52 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-lg">
                 <div>
                   <p className="font-semibold text-zinc-900">
-                    {user.plan === 'pro' ? 'Pro Plan' : 'Trial Plan'}
+                    {hasPaidSubscription ? 'Pro Plan' : isTrialActive ? 'Trial Plan' : 'Free Plan'}
                   </p>
                   <p className="text-xs text-zinc-500">
-                    {user.plan === 'pro' 
-                      ? '$29/month • Renews monthly' 
+                    {hasPaidSubscription 
+                      ? '$29.90/month • Renews automatically' 
                       : isTrialActive 
                         ? `${subscriptionDaysLeft} days remaining`
                         : 'Trial ended'}
                   </p>
                 </div>
-                {user.plan !== 'pro' && (
-                  <button className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-bold rounded-lg hover:opacity-90 transition-opacity">
+                {!hasPaidSubscription && (
+                  <button 
+                    onClick={() => setActiveTab('subscription')}
+                    className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-bold rounded-lg hover:opacity-90 transition-opacity"
+                  >
                     Upgrade
+                  </button>
+                )}
+                {hasPaidSubscription && (
+                  <button 
+                    onClick={() => setActiveTab('subscription')}
+                    className="px-4 py-2 border border-zinc-300 text-zinc-700 text-sm font-semibold rounded-lg hover:bg-zinc-50 transition-colors"
+                  >
+                    Manage Plan
                   </button>
                 )}
               </div>
 
-              {/* Plan comparison */}
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className={`p-4 rounded-lg border ${user.plan === 'trial' ? 'border-orange-200 bg-orange-50' : 'border-zinc-200'}`}>
-                  <p className="font-semibold text-zinc-900 mb-2">Free</p>
-                  <ul className="text-xs text-zinc-600 space-y-1">
-                    <li>• Up to 5 videos</li>
-                    <li>• Basic stats</li>
-                    <li>• 14 days trial</li>
-                  </ul>
-                </div>
-                <div className={`p-4 rounded-lg border ${user.plan === 'pro' ? 'border-amber-300 bg-amber-50' : 'border-zinc-200'}`}>
-                  <p className="font-semibold text-zinc-900 mb-2">Pro <span className="text-amber-600">$29/mo</span></p>
+              {/* Plan details */}
+              <div className="mt-4">
+                <div className={`p-4 rounded-lg border ${hasPaidSubscription ? 'border-amber-300 bg-amber-50' : isTrialActive ? 'border-orange-200 bg-orange-50' : 'border-zinc-200'}`}>
+                  <p className="font-semibold text-zinc-900 mb-2">
+                    {hasPaidSubscription ? 'Pro Plan Active' : isTrialActive ? 'Trial Period' : 'No Active Plan'}
+                    {hasPaidSubscription && <span className="text-amber-600 ml-2">$29.90/month</span>}
+                  </p>
                   <ul className="text-xs text-zinc-600 space-y-1">
                     <li>• Unlimited videos</li>
                     <li>• Full analytics</li>
                     <li>• Partner badge</li>
                     <li>• Priority in feed</li>
                   </ul>
+                  {hasPaidSubscription && (
+                    <p className="text-xs text-zinc-500 mt-3 pt-3 border-t border-zinc-200">
+                      Your subscription renews automatically. Cancel anytime from the Subscription tab.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

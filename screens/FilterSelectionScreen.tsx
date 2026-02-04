@@ -206,6 +206,14 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
                 contact@localbites.com.au
               </a>
             </p>
+            <div className="mt-4 pt-3 border-t border-zinc-200">
+              <a 
+                href="/partner" 
+                className="text-[10px] text-zinc-400 hover:text-orange-500 transition-colors font-medium"
+              >
+                Partner Login
+              </a>
+            </div>
           </div>
         </div>
       </div>
