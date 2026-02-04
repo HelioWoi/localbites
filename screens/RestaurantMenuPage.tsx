@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Volume2, VolumeX, ChevronUp, Star, MapPin, Globe, Navigation, Heart, Bookmark, X, ChevronLeft, MessageSquare, Home, Search, Sparkles, Filter, Clock } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, ChevronUp, Star, MapPin, Globe, Navigation, Heart, Bookmark, X, ChevronLeft, MessageSquare, Home, Search, Sparkles, Filter, Clock, Send } from 'lucide-react';
 
 interface MenuItem {
   id: string;
@@ -71,6 +71,37 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     loadLikesCounts();
   }, [restaurant.id, restaurant.menuItems]);
   
+  // Share dish
+  const shareDish = async (item: MenuItem) => {
+    const shareUrl = `${window.location.origin}/restaurant/${restaurant.slug}?dish=${item.id}`;
+    const shareText = `Check out this ${item.name} from ${restaurant.name}! 🍽️`;
+
+    // Use Web Share API if available (mobile)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${item.name} - ${restaurant.name}`,
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (error) {
+        // User cancelled or error occurred
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.error('Error sharing:', error);
+        }
+      }
+    } else {
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        alert('Link copied to clipboard! Share it with your friends.');
+      } catch (error) {
+        console.error('Error copying to clipboard:', error);
+        alert('Could not copy link. Please try again.');
+      }
+    }
+  };
+
   // Toggle like
   const toggleLike = async (itemId: string) => {
     const { likeRestaurant, unlikeRestaurant } = await import('../services/interactionService');
@@ -368,6 +399,17 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                 <span className="text-white text-[10px] font-medium">
                   {savedItems.has(item.id) ? 'Saved' : 'Save'}
                 </span>
+              </button>
+              
+              {/* Share button */}
+              <button 
+                onClick={() => shareDish(item)}
+                className="flex flex-col items-center gap-1"
+              >
+                <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-md">
+                  <Send size={24} className="text-white" />
+                </div>
+                <span className="text-white text-[10px] font-medium">Share</span>
               </button>
               
               {/* Mute button */}

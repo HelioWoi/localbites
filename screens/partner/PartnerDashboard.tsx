@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase';
 import { PartnerUser } from './PartnerPortal';
 import SubscriptionManager from './SubscriptionManager';
 import OnboardingModal from './OnboardingModal';
+import { compressVideo, shouldCompressVideo } from '../../utils/videoCompression';
 
 interface PartnerDashboardProps {
   user: PartnerUser;
@@ -100,6 +101,16 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(false);
+
+  // Edit category state
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editCategoryName, setEditCategoryName] = useState('');
+
+  // Edit menu item state
+  const [editingMenuItem, setEditingMenuItem] = useState<MenuItem | null>(null);
+
+  // Analytics state - views tracking will be implemented when interactions table is created
+  const [menuItemsWithViews, setMenuItemsWithViews] = useState<Map<string, number>>(new Map());
 
   // Trial calculation from partner subscription data
   const [subscriptionDaysLeft, setSubscriptionDaysLeft] = useState(0);
@@ -350,6 +361,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
   // Menu item handlers
   const handleMenuUpload = async () => {
+    // If editing, use update function instead
+    if (editingMenuItem) {
+      return handleUpdateMenuItem();
+    }
+
     if (!uploadFile || !menuItemName.trim() || !partnerData) return;
 
     // Block upload if trial expired
@@ -404,12 +420,36 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     setUploadProgress(10);
 
     try {
-      const fileName = `${partnerData.id}/${Date.now()}-${uploadFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-      setUploadProgress(30);
+      // Check if video needs compression
+      let fileToUpload = uploadFile;
+      const needsCompression = await shouldCompressVideo(uploadFile);
+      
+      if (needsCompression) {
+        setUploadProgress(15);
+        console.log('Compressing video for optimal mobile playback...');
+        
+        // Compress video with progress callback
+        fileToUpload = await compressVideo(uploadFile, {
+          maxWidth: 720,
+          maxHeight: 1280,
+          quality: 0.8,
+          onProgress: (progress) => {
+            // Map compression progress to 15-50% of total progress
+            setUploadProgress(15 + (progress * 0.35));
+          },
+        });
+        
+        console.log(`Video compressed: ${(uploadFile.size / 1024 / 1024).toFixed(2)}MB → ${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`);
+        setUploadProgress(50);
+      } else {
+        setUploadProgress(30);
+      }
+
+      const fileName = `${partnerData.id}/${Date.now()}-${fileToUpload.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
 
       const { error: uploadError } = await supabase.storage
         .from('menu-videos')
-        .upload(fileName, uploadFile);
+        .upload(fileName, fileToUpload);
 
       if (uploadError) throw uploadError;
       setUploadProgress(70);
@@ -453,6 +493,51 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     }
   };
 
+  const handleUpdateMenuItem = async () => {
+    if (!editingMenuItem || !menuItemName.trim() || !partnerData) return;
+
+    const finalCategory = menuItemCategory === '__new__' ? newCategory.trim() : menuItemCategory.trim();
+    if (!finalCategory) return;
+
+    setIsUploading(true);
+    setUploadProgress(50);
+
+    try {
+      const { error } = await supabase
+        .from('menu_items')
+        .update({
+          name: menuItemName.trim(),
+          category: finalCategory,
+          description: menuItemDescription.trim() || null,
+          price: menuItemPrice ? parseFloat(menuItemPrice) : null,
+        })
+        .eq('id', editingMenuItem.id);
+
+      if (error) throw error;
+      setUploadProgress(100);
+
+      // Update local state
+      setMenuItems(menuItems.map(i => 
+        i.id === editingMenuItem.id 
+          ? { ...i, name: menuItemName.trim(), category: finalCategory, description: menuItemDescription.trim() || null, price: menuItemPrice ? parseFloat(menuItemPrice) : null }
+          : i
+      ));
+
+      // Update categories if new category was added
+      if (!categories.includes(finalCategory)) {
+        setCategories([...categories, finalCategory]);
+      }
+
+      resetMenuUploadModal();
+      alert('Menu item updated successfully!');
+    } catch (error) {
+      console.error('Update error:', error);
+      alert('Failed to update menu item. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const resetMenuUploadModal = () => {
     setShowMenuUploadModal(false);
     setUploadFile(null);
@@ -463,6 +548,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     setMenuItemPrice('');
     setNewCategory('');
     setUploadProgress(0);
+    setEditingMenuItem(null);
   };
 
   const handleDeleteMenuItem = async (itemId: string) => {
@@ -471,6 +557,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     try {
       await supabase.from('menu_items').delete().eq('id', itemId);
       setMenuItems(menuItems.filter(i => i.id !== itemId));
+      
+      // Close modal if deleting from edit mode
+      if (editingMenuItem?.id === itemId) {
+        resetMenuUploadModal();
+      }
     } catch (error) {
       console.error('Delete error:', error);
     }
@@ -515,6 +606,13 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const handleDeleteCategory = async (category: string) => {
     if (!partnerData) return;
 
+    const categoryItems = menuItems.filter(i => i.category === category);
+    const confirmMessage = categoryItems.length > 0
+      ? `Delete category "${category}"?\n\nThis will also delete ${categoryItems.length} video${categoryItems.length > 1 ? 's' : ''} in this category. This action cannot be undone.`
+      : `Delete empty category "${category}"?`;
+
+    if (!window.confirm(confirmMessage)) return;
+
     try {
       // Delete all menu items in this category
       const { error } = await supabase
@@ -528,11 +626,48 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       // Update local state
       setMenuItems(menuItems.filter(i => i.category !== category));
       setCategories(categories.filter(c => c !== category));
+      setEditingCategory(null);
       
       alert(`Category "${category}" deleted successfully`);
     } catch (error) {
       console.error('Delete category error:', error);
       alert('Failed to delete category. Please try again.');
+    }
+  };
+
+  const handleEditCategory = async () => {
+    if (!partnerData || !editingCategory || !editCategoryName.trim()) return;
+
+    const newName = editCategoryName.trim();
+    
+    // Check if new name already exists
+    if (newName !== editingCategory && categories.includes(newName)) {
+      alert('A category with this name already exists.');
+      return;
+    }
+
+    try {
+      // Update all menu items in this category
+      const { error } = await supabase
+        .from('menu_items')
+        .update({ category: newName })
+        .eq('partner_id', partnerData.id)
+        .eq('category', editingCategory);
+
+      if (error) throw error;
+
+      // Update local state
+      setMenuItems(menuItems.map(i => 
+        i.category === editingCategory ? { ...i, category: newName } : i
+      ));
+      setCategories(categories.map(c => c === editingCategory ? newName : c));
+      setEditingCategory(null);
+      setEditCategoryName('');
+      
+      alert(`Category renamed to "${newName}" successfully`);
+    } catch (error) {
+      console.error('Edit category error:', error);
+      alert('Failed to rename category. Please try again.');
     }
   };
 
@@ -898,20 +1033,13 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                       </div>
                       <button
                         onClick={() => {
-                          if (categoryItems.length > 0) {
-                            if (window.confirm(`Delete category "${category}"?\n\nThis will also delete ${categoryItems.length} video${categoryItems.length > 1 ? 's' : ''} in this category. This action cannot be undone.`)) {
-                              handleDeleteCategory(category);
-                            }
-                          } else {
-                            if (window.confirm(`Delete empty category "${category}"?`)) {
-                              handleDeleteCategory(category);
-                            }
-                          }
+                          setEditingCategory(category);
+                          setEditCategoryName(category);
                         }}
-                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete category"
+                        className="p-2 text-zinc-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors"
+                        title="Edit category"
                       >
-                        <Trash2 size={16} />
+                        <Edit2 size={16} />
                       </button>
                     </div>
                     <div className="p-4 grid grid-cols-3 sm:grid-cols-4 gap-3">
@@ -945,10 +1073,19 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                                 <Star size={14} fill={item.is_featured ? 'white' : 'none'} />
                               </button>
                               <button
-                                onClick={(e) => { e.stopPropagation(); handleDeleteMenuItem(item.id); }}
-                                className="p-2 bg-red-500/90 backdrop-blur-sm rounded-full text-white hover:bg-red-600 transition-colors shadow-lg"
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  setEditingMenuItem(item);
+                                  setMenuItemName(item.name);
+                                  setMenuItemCategory(item.category);
+                                  setMenuItemDescription(item.description || '');
+                                  setMenuItemPrice(item.price?.toString() || '');
+                                  setShowMenuUploadModal(true);
+                                }}
+                                className="p-2 bg-orange-500/90 backdrop-blur-sm rounded-full text-white hover:bg-orange-600 transition-colors shadow-lg"
+                                title="Edit menu item"
                               >
-                                <Trash2 size={14} />
+                                <Edit2 size={14} />
                               </button>
                             </div>
                             
@@ -1020,7 +1157,14 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                   <h3 className="text-sm font-semibold text-zinc-900 mb-4">Top Performing Videos</h3>
                   {menuItems.length > 0 ? (
                     <div className="space-y-3">
-                      {menuItems.slice(0, 5).map((item, idx) => (
+                      {menuItems
+                        .map(item => ({
+                          ...item,
+                          viewCount: menuItemsWithViews.get(item.id) || 0
+                        }))
+                        .sort((a, b) => b.viewCount - a.viewCount)
+                        .slice(0, 5)
+                        .map((item, idx) => (
                         <div key={item.id} className="flex items-center gap-3">
                           <span className="text-lg font-bold text-zinc-400 w-6">#{idx + 1}</span>
                           <div className="w-12 h-12 bg-zinc-100 rounded-lg overflow-hidden">
@@ -1031,7 +1175,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                             <p className="text-xs text-zinc-500">{item.category}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm font-semibold text-zinc-900">0 views</p>
+                            <p className="text-sm font-semibold text-zinc-900">{item.viewCount} views</p>
                           </div>
                         </div>
                       ))}
@@ -1297,14 +1441,16 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-lg rounded-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="p-5 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white">
-              <h2 className="text-lg font-bold text-zinc-900">Add Menu Item</h2>
+              <h2 className="text-lg font-bold text-zinc-900">{editingMenuItem ? 'Edit Menu Item' : 'Add Menu Item'}</h2>
               <button onClick={resetMenuUploadModal} className="p-2 text-zinc-400 hover:text-zinc-600 rounded-lg">
                 <X size={20} />
               </button>
             </div>
 
             <div className="p-5 space-y-4">
-              {/* Video Preview */}
+              {/* Video Preview - Only show in add mode */}
+              {!editingMenuItem && (
+                <>
               {uploadPreview ? (
                 <div className="relative aspect-[9/16] max-h-64 bg-zinc-900 rounded-xl overflow-hidden mx-auto">
                   <video src={uploadPreview} className="w-full h-full object-contain" controls />
@@ -1334,6 +1480,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                 onChange={handleFileSelect}
                 className="hidden"
               />
+              </>
+              )}
 
               {/* Item Name */}
               <div>
@@ -1437,32 +1585,105 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               )}
             </div>
 
-            <div className="p-5 border-t border-zinc-100 flex gap-3 sticky bottom-0 bg-white">
-              <button
-                onClick={resetMenuUploadModal}
-                className="flex-1 py-3 border border-zinc-200 text-zinc-700 font-semibold rounded-xl hover:bg-zinc-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleMenuUpload}
-                disabled={!uploadFile || !menuItemName.trim() || (menuItemCategory === '__new__' ? !newCategory.trim() : !menuItemCategory.trim()) || isUploading}
-                className="flex-1 py-3 bg-orange-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-orange-600 transition-colors"
-              >
-                {isUploading ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : uploadProgress === 100 ? (
-                  <>
-                    <Check size={18} />
-                    Done!
-                  </>
-                ) : (
-                  <>
-                    <Plus size={18} />
-                    Add Item
-                  </>
+            <div className="p-5 border-t border-zinc-100 sticky bottom-0 bg-white">
+              <div className="flex gap-3">
+                <button
+                  onClick={resetMenuUploadModal}
+                  className="px-6 py-3 border border-zinc-200 text-zinc-700 font-semibold rounded-xl hover:bg-zinc-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleMenuUpload}
+                  disabled={isUploading || (!editingMenuItem && !uploadFile) || !menuItemName.trim() || (!menuItemCategory.trim() && menuItemCategory !== '__new__') || (menuItemCategory === '__new__' && !newCategory.trim())}
+                  className="flex-1 py-3 bg-orange-500 text-white font-semibold rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span className="text-sm">{editingMenuItem ? 'Updating...' : 'Uploading...'} {uploadProgress}%</span>
+                    </>
+                  ) : (
+                    <>
+                      {editingMenuItem ? (
+                        <>
+                          <Save size={16} />
+                          <span className="text-sm">Save</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={16} />
+                          <span className="text-sm">Add Item</span>
+                        </>
+                      )}
+                    </>
+                  )}
+                </button>
+                {editingMenuItem && (
+                  <button
+                    onClick={() => handleDeleteMenuItem(editingMenuItem.id)}
+                    className="px-6 py-3 border-2 border-red-500 text-red-500 font-semibold rounded-xl hover:bg-red-50 transition-colors flex items-center gap-2"
+                    title="Delete menu item"
+                  >
+                    <Trash2 size={18} />
+                    Delete
+                  </button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Category Modal */}
+      {editingCategory && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-zinc-100 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-zinc-900">Edit Category</h2>
+              <button 
+                onClick={() => {
+                  setEditingCategory(null);
+                  setEditCategoryName('');
+                }}
+                className="p-2 text-zinc-400 hover:text-zinc-600 rounded-lg"
+              >
+                <X size={20} />
               </button>
+            </div>
+            
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-zinc-700 mb-2">
+                  Category Name
+                </label>
+                <input
+                  type="text"
+                  value={editCategoryName}
+                  onChange={(e) => setEditCategoryName(e.target.value)}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Enter category name"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={handleEditCategory}
+                  disabled={!editCategoryName.trim()}
+                  className="flex-1 py-3 bg-orange-500 text-white font-semibold rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Save Changes
+                </button>
+                <button
+                  onClick={() => handleDeleteCategory(editingCategory)}
+                  className="px-4 py-3 border-2 border-red-500 text-red-500 font-semibold rounded-xl hover:bg-red-50 transition-colors flex items-center gap-2"
+                  title="Delete category"
+                >
+                  <Trash2 size={18} />
+                  Delete
+                </button>
+              </div>
             </div>
           </div>
         </div>

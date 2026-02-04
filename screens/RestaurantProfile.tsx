@@ -449,11 +449,9 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                       webkit-playsinline="true"
                       crossOrigin="anonymous"
                       preload="auto"
+                      autoPlay
+                      loop
                       poster={dish.thumbnailUrl || restaurant.mainPhotoUrl}
-                      onLoadedData={(e) => {
-                        // Seek to 0.1s to show a valid frame
-                        e.currentTarget.currentTime = 0.1;
-                      }}
                       onError={(e) => {
                         console.error('Video failed to load:', dish.videoUrl);
                         // Fallback to thumbnail if video fails
