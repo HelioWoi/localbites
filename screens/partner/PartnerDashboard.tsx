@@ -512,6 +512,30 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     }
   };
 
+  const handleDeleteCategory = async (category: string) => {
+    if (!partnerData) return;
+
+    try {
+      // Delete all menu items in this category
+      const { error } = await supabase
+        .from('menu_items')
+        .delete()
+        .eq('partner_id', partnerData.id)
+        .eq('category', category);
+
+      if (error) throw error;
+
+      // Update local state
+      setMenuItems(menuItems.filter(i => i.category !== category));
+      setCategories(categories.filter(c => c !== category));
+      
+      alert(`Category "${category}" deleted successfully`);
+    } catch (error) {
+      console.error('Delete category error:', error);
+      alert('Failed to delete category. Please try again.');
+    }
+  };
+
   // Photo upload handler
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -590,7 +614,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       />
 
       {/* Header */}
-      <header className="bg-white border-b border-zinc-200 sticky top-0 z-40 pt-4">
+      <header className="bg-white border-b border-zinc-200 sticky top-0 z-40 pt-8 pb-2">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
@@ -863,11 +887,32 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             {/* Menu Items by Category */}
             {categories.length > 0 ? (
               <div className="space-y-6">
-                {categories.map(category => (
+                {categories.map(category => {
+                  const categoryItems = menuItems.filter(i => i.category === category);
+                  return (
                   <div key={category} className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-                    <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-200">
-                      <h3 className="font-semibold text-zinc-900">{category}</h3>
-                      <p className="text-xs text-zinc-500">{menuItems.filter(i => i.category === category).length} items</p>
+                    <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold text-zinc-900">{category}</h3>
+                        <p className="text-xs text-zinc-500">{categoryItems.length} items</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (categoryItems.length > 0) {
+                            if (window.confirm(`Delete category "${category}"?\n\nThis will also delete ${categoryItems.length} video${categoryItems.length > 1 ? 's' : ''} in this category. This action cannot be undone.`)) {
+                              handleDeleteCategory(category);
+                            }
+                          } else {
+                            if (window.confirm(`Delete empty category "${category}"?`)) {
+                              handleDeleteCategory(category);
+                            }
+                          }
+                        }}
+                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete category"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                     <div className="p-4 grid grid-cols-3 sm:grid-cols-4 gap-3">
                       {menuItems.filter(i => i.category === category).map(item => (
@@ -916,7 +961,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                       ))}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-12 bg-white rounded-xl border border-zinc-200">

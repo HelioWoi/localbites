@@ -208,10 +208,16 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                   ref={el => videoRefs.current[idx] = el}
                   src={dish.videoUrl}
                   className="w-full h-full object-cover"
-                  autoPlay={idx === 0}
+                  autoPlay={idx === activeVideoIndex}
                   loop
                   muted={isMuted}
                   playsInline
+                  webkit-playsinline="true"
+                  crossOrigin="anonymous"
+                  preload="auto"
+                  onError={(e) => {
+                    console.error('Video failed to load:', dish.videoUrl);
+                  }}
                 />
                 
                 {/* Right side action buttons */}
@@ -424,7 +430,8 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         {/* MENU VIDEOS - Clean grid */}
         {restaurant.isSubscribed && (
           <section>
-            <h2 className="text-lg font-bold text-zinc-900 mb-3">Menu Videos</h2>
+            <h2 className="text-lg font-bold text-zinc-900 mb-1">Menu Videos</h2>
+            <p className="text-xs text-zinc-500 mb-3">Choose your menu through a video feed.</p>
             
             <div className="grid grid-cols-2 gap-2">
               {dishesWithVideo.map((dish, index) => (
@@ -439,20 +446,27 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                       className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" 
                       muted 
                       playsInline
-                      preload="metadata"
-                      onLoadedMetadata={(e) => {
+                      webkit-playsinline="true"
+                      crossOrigin="anonymous"
+                      preload="auto"
+                      poster={dish.thumbnailUrl || restaurant.mainPhotoUrl}
+                      onLoadedData={(e) => {
                         // Seek to 0.1s to show a valid frame
                         e.currentTarget.currentTime = 0.1;
                       }}
                       onError={(e) => {
                         console.error('Video failed to load:', dish.videoUrl);
-                        // Fallback to placeholder if video fails
+                        // Fallback to thumbnail if video fails
                         const target = e.currentTarget;
                         target.style.display = 'none';
-                        const placeholder = document.createElement('div');
-                        placeholder.className = 'w-full h-full bg-zinc-200 flex items-center justify-center';
-                        placeholder.innerHTML = '<span class="text-zinc-400 text-xs">Video unavailable</span>';
-                        target.parentNode?.appendChild(placeholder);
+                        const parent = target.parentNode as HTMLElement;
+                        if (parent) {
+                          const img = document.createElement('img');
+                          img.src = dish.thumbnailUrl || restaurant.mainPhotoUrl || '';
+                          img.className = 'w-full h-full object-cover';
+                          img.alt = dish.name;
+                          parent.insertBefore(img, target);
+                        }
                       }}
                     />
                   ) : (

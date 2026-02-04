@@ -304,7 +304,13 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               loop
               muted={isMuted}
               playsInline
-              preload="metadata"
+              webkit-playsinline="true"
+              crossOrigin="anonymous"
+              preload="auto"
+              autoPlay={index === activeVideoIndex}
+              onError={(e) => {
+                console.error('Video failed to load:', item.videoUrl);
+              }}
             />
 
             {/* Gradient overlay */}
