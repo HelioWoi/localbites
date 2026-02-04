@@ -27,7 +27,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
     const t2 = setTimeout(() => setStage(2), 500);
     const t3 = setTimeout(() => setStage(3), 900);
     const t4 = setTimeout(() => setShowGps(true), 2000);
-    const t5 = setTimeout(onFinish, 10000); // 8 segundos de GPS (2s logo + 8s GPS = 10s total)
+    const t5 = setTimeout(onFinish, 7000); // 5 segundos de GPS (2s logo + 5s GPS = 7s total)
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); clearTimeout(t5); };
   }, [onFinish]);
 

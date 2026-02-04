@@ -20,23 +20,47 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
   const [processingCheckout, setProcessingCheckout] = useState(false);
 
   const PRICE_IDS = {
-    monthly: 'price_1SvzbsIG1T8Ip1Z0zLOzEVBR',
+    monthly: 'price_1SwsaOIG1T8Ip1Z0QZUp224w',
     annual: 'price_1SvzdrIG1T8Ip1Z0EQGKZjer',
   };
 
   useEffect(() => {
     loadSubscription();
+    
+    // Check if returning from successful checkout
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success') === 'true') {
+      // Reload subscription data after a short delay to ensure webhook has processed
+      setTimeout(() => {
+        loadSubscription();
+      }, 2000);
+      
+      // Clean up URL
+      window.history.replaceState({}, '', '/partner');
+    }
   }, [partnerId]);
 
   const loadSubscription = async () => {
     try {
-      const { data: partner } = await supabase
+      console.log('[SubscriptionManager] Loading subscription for partner:', partnerId);
+      const { data: partner, error } = await supabase
         .from('partners')
-        .select('subscription_status, subscription_plan, subscription_end_date, stripe_subscription_id')
+        .select('subscription_status, subscription_plan, subscription_end_date, subscription_start_date, stripe_subscription_id')
         .eq('id', partnerId)
         .single();
 
+      if (error) {
+        console.error('[SubscriptionManager] Error loading partner:', error);
+      }
+
+      console.log('[SubscriptionManager] Partner data:', partner);
+
       if (partner && partner.subscription_status && partner.subscription_status !== 'inactive' && partner.stripe_subscription_id) {
+        console.log('[SubscriptionManager] Setting subscription:', {
+          status: partner.subscription_status,
+          plan: partner.subscription_plan,
+          endDate: partner.subscription_end_date
+        });
         setSubscription({
           status: partner.subscription_status,
           plan: partner.subscription_plan || 'None',
@@ -44,10 +68,11 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
           cancelAtPeriodEnd: false,
         });
       } else {
+        console.log('[SubscriptionManager] No active subscription found');
         setSubscription(null);
       }
     } catch (error) {
-      console.error('Error loading subscription:', error);
+      console.error('[SubscriptionManager] Error loading subscription:', error);
     } finally {
       setLoading(false);
     }
@@ -126,6 +151,21 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
   }
 
   const isActive = subscription?.status === 'active' || subscription?.status === 'trialing';
+  
+  // Calculate days remaining
+  const getDaysRemaining = () => {
+    if (!subscription?.currentPeriodEnd) return 0;
+    const endDate = new Date(subscription.currentPeriodEnd);
+    const today = new Date();
+    const diffTime = endDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(0, diffDays);
+  };
+  
+  const daysRemaining = getDaysRemaining();
+  
+  // Detect trial: if days remaining is <= 14, it's likely a trial period
+  const isTrialing = isActive && daysRemaining > 0 && daysRemaining <= 14;
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -139,8 +179,12 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
           <div className="flex items-center gap-3 mb-4">
             <Crown size={32} />
             <div>
-              <h3 className="text-2xl font-bold">Premium Active</h3>
-              <p className="text-white/80">You're all set!</p>
+              <h3 className="text-2xl font-bold">
+                {isTrialing ? 'Premium Trial Active' : 'Premium Active'}
+              </h3>
+              <p className="text-white/80">
+                {isTrialing ? `${daysRemaining} days remaining in your free trial` : "You're all set!"}
+              </p>
             </div>
           </div>
           
@@ -150,7 +194,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
               <p className="font-bold text-lg">{subscription.plan}</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-              <p className="text-white/60 text-sm mb-1">Renews</p>
+              <p className="text-white/60 text-sm mb-1">{isTrialing ? 'Trial Ends' : 'Renews'}</p>
               <p className="font-bold text-lg">
                 {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
               </p>

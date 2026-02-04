@@ -1,16 +1,5 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
-import Stripe from "https://esm.sh/stripe@14.11.0?target=deno&no-check";
-
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-  apiVersion: "2023-10-16",
-  httpClient: Stripe.createFetchHttpClient(),
-});
-
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,135 +12,141 @@ serve(async (req) => {
   }
 
   try {
-    console.log("[Checkout] Starting checkout session creation");
+    // Get env vars inside handler
+    const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
-    const body = await req.json();
-    console.log("[Checkout] Request body:", JSON.stringify(body));
+    console.log("[Checkout] Env check - STRIPE:", !!STRIPE_SECRET_KEY, "SUPABASE:", !!SUPABASE_URL);
     
-    const { partnerId, priceId, successUrl, cancelUrl } = body;
+    if (!STRIPE_SECRET_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Missing env vars",
+          stripe: !!STRIPE_SECRET_KEY,
+          supabaseUrl: !!SUPABASE_URL,
+          supabaseKey: !!SUPABASE_SERVICE_KEY
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
+    
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    
+    const { partnerId, priceId, successUrl, cancelUrl } = await req.json();
+    console.log("[Checkout] Partner:", partnerId, "Price:", priceId);
 
     if (!partnerId || !priceId) {
-      console.error("[Checkout] Missing parameters:", { partnerId, priceId });
       return new Response(
-        JSON.stringify({ error: "Missing required parameters" }),
+        JSON.stringify({ error: "Missing partnerId or priceId" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
 
-    console.log("[Checkout] Fetching partner:", partnerId);
-    
-    // Get partner data
+    // Get partner
     const { data: partner, error: partnerError } = await supabase
       .from("partners")
       .select("*")
       .eq("id", partnerId)
       .single();
 
-    if (partnerError) {
-      console.error("[Checkout] Partner fetch error:", partnerError);
+    if (partnerError || !partner) {
+      console.error("[Checkout] Partner error:", partnerError);
       return new Response(
-        JSON.stringify({ error: "Partner not found", details: partnerError.message }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 }
-      );
-    }
-
-    if (!partner) {
-      console.error("[Checkout] Partner not found");
-      return new Response(
-        JSON.stringify({ error: "Partner not found" }),
+        JSON.stringify({ error: "Partner not found", details: partnerError?.message }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 }
       );
     }
 
     console.log("[Checkout] Partner found:", partner.email);
 
-    // Create or retrieve Stripe customer
+    // Get or create Stripe customer
     let customerId = partner.stripe_customer_id;
 
     if (!customerId) {
-      console.log("[Checkout] Creating Stripe customer for:", partner.email);
-      try {
-        const customer = await stripe.customers.create({
-          email: partner.email,
-          name: partner.name,
-          metadata: {
-            partner_id: partnerId,
-          },
-        });
-
-        customerId = customer.id;
-        console.log("[Checkout] Stripe customer created:", customerId);
-
-        // Save customer ID to database
-        await supabase
-          .from("partners")
-          .update({ stripe_customer_id: customerId })
-          .eq("id", partnerId);
-      } catch (error) {
-        console.error("[Checkout] Error creating Stripe customer:", error);
+      console.log("[Checkout] Creating Stripe customer...");
+      
+      const customerParams = new URLSearchParams({
+        email: partner.email,
+        name: partner.name || partner.email,
+        'metadata[partner_id]': partnerId,
+      });
+      
+      const customerRes = await fetch('https://api.stripe.com/v1/customers', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${STRIPE_SECRET_KEY}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: customerParams.toString(),
+      });
+      
+      const customer = await customerRes.json();
+      
+      if (!customerRes.ok) {
+        console.error("[Checkout] Stripe customer error:", customer);
         return new Response(
-          JSON.stringify({ error: "Failed to create Stripe customer", details: error.message }),
+          JSON.stringify({ error: "Failed to create customer", stripe: customer.error?.message }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );
       }
-    } else {
-      console.log("[Checkout] Using existing Stripe customer:", customerId);
+      
+      customerId = customer.id;
+      console.log("[Checkout] Customer created:", customerId);
+      
+      await supabase
+        .from("partners")
+        .update({ stripe_customer_id: customerId })
+        .eq("id", partnerId);
     }
 
-    // Create checkout session with 14-day free trial
-    console.log("[Checkout] Creating checkout session with price:", priceId);
+    console.log("[Checkout] Creating checkout session with customer:", customerId);
     
-    let session;
-    try {
-      session = await stripe.checkout.sessions.create({
-        customer: customerId,
-        mode: "subscription",
-        payment_method_types: ["card"],
-        line_items: [
-          {
-            price: priceId,
-            quantity: 1,
-          },
-        ],
-        success_url: successUrl || `${req.headers.get("origin")}/partner?success=true`,
-        cancel_url: cancelUrl || `${req.headers.get("origin")}/partner?canceled=true`,
-        metadata: {
-          partner_id: partnerId,
-        },
-        subscription_data: {
-          trial_period_days: 14,
-          metadata: {
-            partner_id: partnerId,
-          },
-        },
-      });
-      console.log("[Checkout] Checkout session created:", session.id);
-    } catch (error) {
-      console.error("[Checkout] Error creating checkout session:", error);
+    // Create checkout session
+    const sessionParams = new URLSearchParams({
+      customer: customerId,
+      mode: 'subscription',
+      'payment_method_types[0]': 'card',
+      'line_items[0][price]': priceId,
+      'line_items[0][quantity]': '1',
+      success_url: successUrl || 'https://localbites.com.au/partner?success=true',
+      cancel_url: cancelUrl || 'https://localbites.com.au/partner?canceled=true',
+      'metadata[partner_id]': partnerId,
+      'subscription_data[trial_period_days]': '14',
+      'subscription_data[metadata][partner_id]': partnerId,
+    });
+    
+    const sessionRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${STRIPE_SECRET_KEY}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: sessionParams.toString(),
+    });
+    
+    const session = await sessionRes.json();
+    
+    if (!sessionRes.ok) {
+      console.error("[Checkout] Stripe session error:", session);
       return new Response(
-        JSON.stringify({ error: "Failed to create checkout session", details: error.message }),
+        JSON.stringify({ error: "Failed to create session", stripe: session.error?.message }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
 
-    const responseData = { sessionId: session.id, url: session.url };
-    console.log("[Checkout] Returning success response:", responseData);
+    console.log("[Checkout] Session created:", session.id);
     
     return new Response(
-      JSON.stringify(responseData),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      }
+      JSON.stringify({ sessionId: session.id, url: session.url }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
+    
   } catch (error) {
-    console.error("[Stripe Checkout] Error:", error);
+    console.error("[Checkout] Unhandled error:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
-      }
+      JSON.stringify({ error: error.message || "Unknown error" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
 });

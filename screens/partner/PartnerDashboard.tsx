@@ -97,12 +97,38 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  // Trial calculation
-  const trialDaysLeft = user.trial_ends_at 
-    ? Math.max(0, Math.ceil((new Date(user.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : 0;
-  const isTrialActive = user.plan === 'trial' && trialDaysLeft > 0;
-  const maxVideos = user.plan === 'pro' ? Infinity : 5;
+  // Trial calculation from partner subscription data
+  const [subscriptionDaysLeft, setSubscriptionDaysLeft] = useState(0);
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
+  
+  useEffect(() => {
+    const loadSubscriptionStatus = async () => {
+      if (!partnerData?.id) return;
+      
+      const { data: partner } = await supabase
+        .from('partners')
+        .select('subscription_status, subscription_end_date')
+        .eq('id', partnerData.id)
+        .single();
+      
+      if (partner?.subscription_status === 'active' && partner?.subscription_end_date) {
+        const endDate = new Date(partner.subscription_end_date);
+        const today = new Date();
+        const diffTime = endDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        setSubscriptionDaysLeft(Math.max(0, diffDays));
+        setHasActiveSubscription(true);
+      } else {
+        setSubscriptionDaysLeft(0);
+        setHasActiveSubscription(false);
+      }
+    };
+    
+    loadSubscriptionStatus();
+  }, [partnerData?.id]);
+  
+  const isTrialActive = hasActiveSubscription && subscriptionDaysLeft > 0 && subscriptionDaysLeft <= 14;
+  const maxVideos = hasActiveSubscription ? Infinity : 5;
 
   useEffect(() => {
     console.log('PartnerDashboard mounted, loading data...');
@@ -429,7 +455,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   return (
     <div className="min-h-screen bg-zinc-50 partner-portal">
       {/* Header */}
-      <header className="bg-white border-b border-zinc-200 sticky top-0 z-40">
+      <header className="bg-white border-b border-zinc-200 sticky top-0 z-40 pt-2">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
@@ -452,7 +478,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                 </span>
               ) : isTrialActive ? (
                 <span className="hidden sm:flex items-center gap-1 px-3 py-1 bg-orange-100 text-orange-700 text-xs font-semibold rounded-full">
-                  <Clock size={12} /> {trialDaysLeft} days left
+                  <Clock size={12} /> {subscriptionDaysLeft} days left
                 </span>
               ) : null}
 
@@ -476,25 +502,27 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       </header>
 
       {/* Trial/Upgrade Banner */}
-      {user.plan === 'trial' && (
+      {(isTrialActive || hasActiveSubscription) && (
         <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               {isTrialActive ? (
                 <>
                   <Calendar size={16} />
-                  <span className="text-sm font-medium">Trial: {trialDaysLeft} days remaining</span>
+                  <span className="text-sm font-medium">Premium Trial: {subscriptionDaysLeft} days remaining</span>
                 </>
-              ) : (
+              ) : hasActiveSubscription ? (
                 <>
-                  <AlertCircle size={16} />
-                  <span className="text-sm font-medium">Your trial has ended</span>
+                  <Crown size={16} />
+                  <span className="text-sm font-medium">Premium Active</span>
                 </>
-              )}
+              ) : null}
             </div>
-            <button className="px-4 py-1.5 bg-white text-orange-600 text-sm font-bold rounded-lg hover:bg-orange-50 transition-colors">
-              Upgrade to Pro
-            </button>
+            {!hasActiveSubscription && (
+              <button className="px-4 py-1.5 bg-white text-orange-600 text-sm font-bold rounded-lg hover:bg-orange-50 transition-colors">
+                Upgrade to Pro
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -778,7 +806,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           <div className="space-y-6">
             <h2 className="text-lg font-bold text-zinc-900">Analytics</h2>
             
-            {user.plan !== 'pro' ? (
+            {!hasActiveSubscription ? (
               <div className="bg-white rounded-xl border border-zinc-200 p-8 text-center">
                 <Crown size={48} className="text-amber-500 mx-auto mb-4" />
                 <h3 className="text-lg font-bold text-zinc-900 mb-2">Unlock Full Analytics</h3>
@@ -799,7 +827,10 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                     <p className="text-xs text-zinc-500">Direction clicks</p>
                   </div>
                 </div>
-                <button className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl hover:opacity-90 transition-opacity">
+                <button 
+                  onClick={() => setActiveTab('subscription')}
+                  className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl hover:opacity-90 transition-opacity"
+                >
                   Upgrade to Pro - $29/month
                 </button>
               </div>
@@ -998,11 +1029,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                   <p className="font-semibold text-zinc-900">
                     {user.plan === 'pro' ? 'Pro Plan' : 'Trial Plan'}
                   </p>
-                  <p className="text-sm text-zinc-500">
+                  <p className="text-xs text-zinc-500">
                     {user.plan === 'pro' 
                       ? '$29/month • Renews monthly' 
                       : isTrialActive 
-                        ? `${trialDaysLeft} days remaining`
+                        ? `${subscriptionDaysLeft} days remaining`
                         : 'Trial ended'}
                   </p>
                 </div>
