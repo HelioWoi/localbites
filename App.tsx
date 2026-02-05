@@ -7,6 +7,7 @@ import LocationSelector from './screens/LocationSelector';
 import RestaurantProfile from './screens/RestaurantProfile';
 import AdminDashboard from './screens/AdminDashboard';
 import PartnerPortal from './screens/partner/PartnerPortal';
+import SuperAdminPortal from './screens/admin/SuperAdminPortal';
 import RestaurantMenuLoader from './components/RestaurantMenuLoader';
 import RestaurantProfileLoader from './components/RestaurantProfileLoader';
 import MediaContainer from './components/MediaContainer';
@@ -19,6 +20,10 @@ import { CUISINES, PRICES, DIETARY_OPTIONS, AMBIANCE_OPTIONS } from './constants
 import { calculateIsOpenNow } from './utils/filterHelpers';
 import { Home, Search, MessageSquare, Filter, Bookmark, ExternalLink, Info, Loader2, X, ArrowRight, Globe, MapPin, ChevronUp, Crown, PlayCircle, Heart, Star, Clock, Sparkles, Eye, Car, PersonStanding } from 'lucide-react';
 import { useLazyLoading } from './hooks/useLazyLoading';
+import { supabase } from './services/supabaseClient';
+
+// Check if we're on the admin route
+const isAdminRoute = window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin');
 
 // Check if we're on the partner route
 const isPartnerRoute = window.location.pathname === '/partner' || window.location.pathname.startsWith('/partner');
@@ -36,6 +41,11 @@ if (isRestaurantRoute) {
 }
 
 const App: React.FC = () => {
+  // If on admin route, render Super Admin Portal
+  if (isAdminRoute) {
+    return <SuperAdminPortal />;
+  }
+
   // If on partner route, render Partner Portal
   if (isPartnerRoute) {
     return <PartnerPortal />;

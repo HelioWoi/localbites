@@ -145,9 +145,10 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   const openVideoReels = (startIndex: number) => {
     // Navigate to menu page with categories instead of opening modal
     if (restaurant.isSubscribed && onNavigateToPartner) {
-      // For partner restaurants, navigate to their menu page
+      // For partner restaurants, navigate to their menu page with dish ID
       const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      window.location.href = `/r/${slug}/menu`;
+      const dishId = dishesWithVideo[startIndex]?.id;
+      window.location.href = `/r/${slug}/menu${dishId ? `?dish=${dishId}` : ''}`;
     } else {
       // Fallback to modal for non-partner restaurants
       setActiveVideoIndex(startIndex);

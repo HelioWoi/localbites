@@ -38,6 +38,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   const [showSavedOnly, setShowSavedOnly] = useState(false); // Filter for saved videos
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [loadedVideos, setLoadedVideos] = useState<Set<number>>(new Set([0, 1])); // Load first 2 videos initially
   
   // Likes and saves state
   const [likedItems, setLikedItems] = useState<Set<string>>(new Set());
@@ -51,10 +52,30 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
       setSavedItems(new Set(JSON.parse(saved)));
     }
     
-    // Check if URL has ?saved=true parameter
+    // Check URL params
     const urlParams = new URLSearchParams(window.location.search);
+    
+    // Check if URL has ?saved=true parameter
     if (urlParams.get('saved') === 'true') {
       setShowSavedOnly(true);
+    }
+    
+    // Check if URL has ?dish=id parameter to open specific video
+    const dishId = urlParams.get('dish');
+    if (dishId) {
+      const dishIndex = restaurant.menuItems.findIndex(item => item.id === dishId);
+      if (dishIndex !== -1) {
+        setActiveVideoIndex(dishIndex);
+        // Scroll to the video
+        setTimeout(() => {
+          if (scrollRef.current) {
+            scrollRef.current.scrollTo({ 
+              top: dishIndex * window.innerHeight, 
+              behavior: 'smooth' 
+            });
+          }
+        }, 100);
+      }
     }
     
     // Load likes counts from Supabase
@@ -161,6 +182,35 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     }
   };
 
+  // Lazy loading: Load current video + next video, unload distant videos
+  useEffect(() => {
+    const videosToLoad = new Set<number>();
+    
+    // Always load current video
+    videosToLoad.add(activeVideoIndex);
+    
+    // Load next video for smooth transition
+    if (activeVideoIndex + 1 < filteredItems.length) {
+      videosToLoad.add(activeVideoIndex + 1);
+    }
+    
+    // Optionally load previous video if user scrolls back
+    if (activeVideoIndex - 1 >= 0) {
+      videosToLoad.add(activeVideoIndex - 1);
+    }
+    
+    setLoadedVideos(videosToLoad);
+    
+    // Unload videos that are far from current index to free memory
+    videoRefs.current.forEach((video, index) => {
+      if (video && !videosToLoad.has(index)) {
+        // Remove src to unload video from memory
+        video.src = '';
+        video.load();
+      }
+    });
+  }, [activeVideoIndex, filteredItems.length]);
+
   // Play/pause videos based on active index
   useEffect(() => {
     // Small delay to ensure video refs are ready after category change
@@ -232,6 +282,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   // Reset video index when category changes
   useEffect(() => {
     setActiveVideoIndex(0);
+    setLoadedVideos(new Set([0, 1])); // Reset to load first 2 videos of new category
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -330,7 +381,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
             {/* Video */}
             <video
               ref={el => videoRefs.current[index] = el}
-              src={item.videoUrl}
+              src={loadedVideos.has(index) ? item.videoUrl : ''}
               className="absolute inset-0 w-full h-full object-cover"
               loop
               muted={isMuted}
