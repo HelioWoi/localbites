@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Restaurant, Dish, Review } from '../types';
 import { ChevronLeft, Globe, MapPin, Navigation, Bookmark, PlayCircle, Camera, X, Crown, Play, Pause, Volume2, VolumeX, Star, ChevronRight, ChevronUp, ExternalLink, Home, Search, MessageSquare, Filter, Clock, Heart, Trash2, Phone, Sparkles } from 'lucide-react';
 import { getPlaceDetails } from '../services/googlePlacesProxy';
+import DesktopBanner from '../components/DesktopBanner';
 
 interface RestaurantProfileProps {
   restaurant: Restaurant;
@@ -181,6 +182,9 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
 
   return (
     <div className="h-screen w-full bg-white flex flex-col profile-scroll">
+      {/* Desktop Banner - Only visible on desktop */}
+      <DesktopBanner />
+      
       {/* Video Reels Modal - scroll vertical like TikTok/Reels */}
       {showVideoReels && dishesWithVideo.length > 0 && (
         <div className="fixed inset-0 z-50 bg-black">
@@ -434,7 +438,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
             <h2 className="text-lg font-bold text-zinc-900 mb-1">Menu Videos</h2>
             <p className="text-xs text-zinc-500 mb-3">Choose your menu through a video feed.</p>
             
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-3">
               {dishesWithVideo.map((dish, index) => (
                 <button 
                   key={dish.id} 

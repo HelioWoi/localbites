@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Utensils, Coffee, Wine, Sparkles, Search, MapPin } from 'lucide-react';
+import DesktopBanner from '../components/DesktopBanner';
 
 interface FilterSelectionScreenProps {
   onSelect: (category: 'restaurants' | 'cafes' | 'bars' | 'all') => void;
@@ -88,8 +89,11 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      <div className="flex-1 flex flex-col items-center justify-start pt-12 px-6">
-        <div className="w-full max-w-md">
+      {/* Desktop Banner - Only visible on desktop */}
+      <DesktopBanner />
+      
+      <div className="flex-1 flex flex-col items-center justify-start pt-12 px-6 lg:pt-20">
+        <div className="w-full max-w-md lg:max-w-4xl">
           {/* Logo */}
           <div className="flex items-center justify-center mb-6">
             <h2 className="text-2xl font-black text-zinc-900 tracking-tight">LocalBites</h2>
@@ -152,7 +156,7 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
           </form>
 
           {/* Categories Grid */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
             {categories.map((category) => {
               const Icon = category.icon;
               return (
@@ -195,7 +199,7 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
 
       {/* Footer */}
       <div className="w-full px-6 pb-8 mt-auto">
-        <div className="w-full max-w-md mx-auto bg-zinc-50 rounded-2xl p-6">
+        <div className="w-full max-w-md lg:max-w-4xl mx-auto bg-zinc-50 rounded-2xl p-6">
           <div className="text-center space-y-3 opacity-70">
             <p className="text-[10px] text-zinc-500 leading-relaxed">
               LocalBites is a discovery platform that supports local businesses. We do not take responsibility for products, services, pricing, or customer experiences provided by listed venues.

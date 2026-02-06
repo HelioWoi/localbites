@@ -10,6 +10,7 @@ import { PartnerUser } from './PartnerPortal';
 import SubscriptionManager from './SubscriptionManager';
 import OnboardingModal from './OnboardingModal';
 import { compressVideo, shouldCompressVideo } from '../../utils/videoCompression';
+import { sanitizeFileName } from '../../utils/fileUtils';
 
 interface PartnerDashboardProps {
   user: PartnerUser;
@@ -445,7 +446,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         setUploadProgress(30);
       }
 
-      const fileName = `${partnerData.id}/${Date.now()}-${fileToUpload.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      // Sanitizar nome do arquivo para garantir URLs seguras
+      const sanitizedName = sanitizeFileName(fileToUpload.name, menuItemName.trim());
+      const fileName = `${partnerData.id}/${sanitizedName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('menu-videos')
@@ -691,7 +694,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     setIsUploadingPhoto(true);
 
     try {
-      const fileName = `${partnerData.id}/photo-${Date.now()}.${file.name.split('.').pop()}`;
+      // Sanitizar nome do arquivo para garantir URLs seguras
+      const sanitizedName = sanitizeFileName(file.name, 'restaurant-photo');
+      const fileName = `${partnerData.id}/${sanitizedName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('menu-videos')

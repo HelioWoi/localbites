@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Utensils, Mail, Lock, ArrowRight, CheckCircle, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Utensils, Mail, Lock, ArrowRight, CheckCircle, Loader2, Eye, EyeOff, Building2, Hash, AlertCircle, MapPin, Phone, Globe } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { verifyABN, formatABN, isValidABNFormat } from '../../services/abnVerification';
 
 interface PartnerAuthProps {
   onAuthSuccess: () => void;
@@ -13,6 +14,15 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // ABN verification fields (only for signup)
+  const [restaurantName, setRestaurantName] = useState('');
+  const [abn, setAbn] = useState('');
+  const [address, setAddress] = useState('');
+  const [phone, setPhone] = useState('');
+  const [website, setWebsite] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<any>(null);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +48,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim()) return;
+    if (!email.trim() || !password.trim() || !restaurantName.trim() || !address.trim() || !phone.trim()) return;
     if (password.length < 6) {
       setError('Password must be at least 6 characters');
       return;
@@ -48,6 +58,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
     setError('');
 
     try {
+      // Create Supabase auth account
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password: password.trim(),
@@ -57,13 +68,19 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
       
       // If email confirmation is disabled, user is automatically logged in
       if (data.user && data.session) {
-        // Create partner record
+        // Create partner record with all business info
         await supabase.from('partners').insert({
           user_id: data.user.id,
           email: email.trim(),
+          restaurant_name: restaurantName.trim(),
+          abn: abn.trim() || null,
+          address: address.trim(),
+          phone: phone.trim(),
+          website: website.trim() || null,
           plan: 'trial',
           trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
           subscription_status: 'active',
+          is_verified: false, // Manual verification for now
         });
         onAuthSuccess();
       } else {
@@ -162,6 +179,93 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
 
             <form onSubmit={mode === 'signup' ? handleSignup : mode === 'magic' ? handleMagicLink : handleEmailLogin}>
               <div className="space-y-4">
+                {mode === 'signup' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                        Restaurant Name
+                      </label>
+                      <div className="relative">
+                        <Building2 size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="text"
+                          value={restaurantName}
+                          onChange={(e) => setRestaurantName(e.target.value)}
+                          placeholder="Your Restaurant Name"
+                          className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                        ABN (Australian Business Number)
+                      </label>
+                      <div className="relative">
+                        <Hash size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="text"
+                          value={abn}
+                          onChange={(e) => setAbn(e.target.value)}
+                          placeholder="XX XXX XXX XXX (Optional)"
+                          className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                        Address
+                      </label>
+                      <div className="relative">
+                        <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="text"
+                          value={address}
+                          onChange={(e) => setAddress(e.target.value)}
+                          placeholder="16 Smith Street, Mooloolaba, QLD"
+                          className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                        Phone
+                      </label>
+                      <div className="relative">
+                        <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="tel"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="+61 4XX XXX XXX"
+                          className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                        Website
+                      </label>
+                      <div className="relative">
+                        <Globe size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="url"
+                          value={website}
+                          onChange={(e) => setWebsite(e.target.value)}
+                          placeholder="https://yourrestaurant.com (Optional)"
+                          className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
                 <div>
                   <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
                     Email
@@ -206,7 +310,10 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
                 )}
 
                 {error && (
-                  <p className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{error}</p>
+                  <div className="bg-red-50 border border-red-200 p-3 rounded-lg flex items-start gap-2">
+                    <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-900">{error}</p>
+                  </div>
                 )}
 
                 <button
