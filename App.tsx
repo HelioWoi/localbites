@@ -972,7 +972,6 @@ const App: React.FC = () => {
 
       {/* Fixed Bottom Navigation Bar */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-lg border-t border-white/10 px-6 py-4 pb-8">
-        <p className="text-center text-[9px] text-white/20 font-medium mb-2 tracking-wider">Beta V.0</p>
         <div className="flex items-center justify-between max-w-md mx-auto">
           <button onClick={() => setState('FILTER_SELECTION')} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
             <Home size={24} />
