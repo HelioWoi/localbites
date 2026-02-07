@@ -20,8 +20,8 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
   const [processingCheckout, setProcessingCheckout] = useState(false);
 
   const PRICE_IDS = {
-    monthly: 'price_1SwsaOIG1T8Ip1Z0QZUp224w',
-    annual: 'price_1SvzdrIG1T8Ip1Z0EQGKZjer',
+    monthly: 'price_1SxxClIG1T8Ip1Z0i9rOM0gj', // Live Mode - Monthly $29.90
+    annual: 'price_1SxxDjIG1T8Ip1Z0cgTPEV7Z',  // Live Mode - Annual $308.90
   };
 
   useEffect(() => {
@@ -274,16 +274,16 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
             {/* Annual Plan */}
             <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-3xl p-8 relative overflow-hidden">
               <div className="absolute top-4 right-4 bg-white text-orange-500 px-3 py-1 rounded-full text-xs font-bold">
-                SAVE 14%
+                SAVE 19%
               </div>
 
               <div className="text-center mb-6">
                 <h3 className="text-xl font-bold mb-2">Annual</h3>
                 <div className="flex items-baseline justify-center gap-1">
-                  <span className="text-5xl font-bold">$308.90</span>
+                  <span className="text-5xl font-bold">$290</span>
                   <span className="text-white/80">/year</span>
                 </div>
-                <p className="text-white/60 text-sm mt-1">$25.74/month</p>
+                <p className="text-white/60 text-sm mt-1">$24.17/month</p>
               </div>
 
               <ul className="space-y-3 mb-6">
@@ -309,7 +309,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
                 </li>
                 <li className="flex items-center gap-2">
                   <Check size={20} className="text-white font-bold" />
-                  <span className="font-bold">Save $49.90/year</span>
+                  <span className="font-bold">Save $68.80/year</span>
                 </li>
               </ul>
 
