@@ -49,7 +49,7 @@ interface PlaceReview {
 export async function searchNearbyRestaurants(
   lat: number,
   lng: number,
-  radius: number = 10000, // Default 10km
+  radius: number = 5000, // Default 5km
   category: string = 'all'
 ): Promise<PlaceResult[]> {
   try {
@@ -87,11 +87,11 @@ export async function searchNearbyRestaurants(
 export async function textSearchRestaurants(
   lat: number,
   lng: number,
-  radius: number = 10000,
+  radius: number = 5000,
   query: string
 ): Promise<PlaceResult[]> {
   try {
-    console.log('[GooglePlaces] Text search for:', query);
+    console.log('[GooglePlaces] Text search for:', query, 'at', lat, lng, 'radius:', radius);
     
     const { data, error } = await supabase.functions.invoke('google-places', {
       body: { action: 'textSearch', lat, lng, radius, query },
@@ -102,13 +102,13 @@ export async function textSearchRestaurants(
       return [];
     }
 
-    if (data.error) {
+    if (data?.error) {
       console.error('[GooglePlaces] Text search API error:', data.error);
       return [];
     }
 
     // Add distance calculation
-    const results = (data || []).map((place: any) => ({
+    const results = (Array.isArray(data) ? data : []).map((place: any) => ({
       ...place,
       distance: formatDistance(calculateDistance(lat, lng, place.location?.lat, place.location?.lng)),
     }));

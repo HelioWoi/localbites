@@ -123,7 +123,7 @@ export async function getNearbyRestaurants(
     console.log('[LocalBites] ⚠️ Daily Google API search limit reached. Showing partners only.');
   } else if (location.lat && location.lng) {
     try {
-      const radius = location.radius || 10000; // Default 10km
+      const radius = location.radius || 5000; // Default 5km
       console.log('[LocalBites] Searching Google Places (LIMITED TO', GOOGLE_API_LIMIT, 'results)');
       
       // Increment search count BEFORE making the API call
@@ -238,7 +238,7 @@ export async function searchRestaurantsByQuery(
   }
 
   try {
-    const radius = location.radius || 10000; // Default 10km
+    const radius = location.radius || 5000; // Default 5km
     const googlePlaces = await textSearchRestaurants(location.lat, location.lng, radius, query);
     
     // Convert Google Places to Restaurant format

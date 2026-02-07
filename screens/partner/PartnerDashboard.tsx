@@ -124,9 +124,17 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       
       const { data: partner } = await supabase
         .from('partners')
-        .select('subscription_status, subscription_end_date, trial_ends_at')
+        .select('subscription_status, subscription_end_date, trial_ends_at, lifetime_access')
         .eq('id', partnerData.id)
         .single();
+      
+      // Priority 0: Lifetime Access (NEVER EXPIRES)
+      if (partner?.lifetime_access === true) {
+        setSubscriptionDaysLeft(999); // Show as unlimited
+        setHasActiveSubscription(true);
+        setHasPaidSubscription(true); // Treat as premium
+        return;
+      }
       
       // Priority 1: Active Stripe subscription (PAID)
       if (partner?.subscription_status === 'active' && partner?.subscription_end_date) {
@@ -182,7 +190,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       const { data: partner, error: partnerError } = await supabase
         .from('partners')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('id', user.id)
         .maybeSingle();
 
       console.log('Partner loaded:', partner, partnerError);
@@ -198,10 +206,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         const { data: newPartner, error: createError } = await supabase
           .from('partners')
           .insert({
-            user_id: user.id,
+            id: user.id,
             email: user.email,
             plan: 'trial',
             trial_ends_at: trialEnds.toISOString(),
+            subscription_status: 'active',
           })
           .select()
           .single();

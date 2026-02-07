@@ -96,7 +96,7 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
         <div className="w-full max-w-md lg:max-w-4xl">
           {/* Logo */}
           <div className="flex items-center justify-center mb-6">
-            <h2 className="text-2xl font-black text-zinc-900 tracking-tight">LocalBites</h2>
+            <h2 className="text-2xl font-black text-zinc-900 tracking-tight">Local Bites</h2>
           </div>
 
           {/* Header */}
@@ -151,7 +151,7 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
             </div>
             <div className="flex items-center justify-center gap-2 mt-3">
               <MapPin size={14} className="text-zinc-400" />
-              <span className="text-xs text-zinc-400 font-medium">Search radius: 10km</span>
+              <span className="text-xs text-zinc-400 font-medium">Search radius: 5km</span>
             </div>
           </form>
 
@@ -202,7 +202,7 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
         <div className="w-full max-w-md lg:max-w-4xl mx-auto bg-zinc-50 rounded-2xl p-6">
           <div className="text-center space-y-3 opacity-70">
             <p className="text-[10px] text-zinc-500 leading-relaxed">
-              LocalBites helps you discover and support local businesses. All products, services, pricing, and customer experiences are provided by the listed venues. Visit our{' '}
+              Local Bites helps you discover and support local businesses. All products, services, pricing, and customer experiences are provided by the listed venues. Visit our{' '}
               <a href="/policy" className="text-orange-500 hover:text-orange-600 transition-colors font-medium">
                 policy
               </a>{' '}

@@ -126,6 +126,9 @@ const App: React.FC = () => {
   const [feedReviews, setFeedReviews] = useState<any[]>([]);
   const [loadingFeedReviews, setLoadingFeedReviews] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Restaurant[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [openProfileReviews, setOpenProfileReviews] = useState(false);
   const [likesCounts, setLikesCounts] = useState<Map<string, number>>(new Map());
   const lastTapRef = useRef<{ id: string; time: number } | null>(null);
@@ -476,7 +479,7 @@ const App: React.FC = () => {
       keyword: intent.keyword,
       category: targetCategory,
       openNow: intent.openNow || false,
-      radiusKm: intent.radiusKm || 10,
+      radiusKm: intent.radiusKm || 5,
     });
     
     // If keyword exists, trigger text search
@@ -969,6 +972,7 @@ const App: React.FC = () => {
 
       {/* Fixed Bottom Navigation Bar */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-lg border-t border-white/10 px-6 py-4 pb-8">
+        <p className="text-center text-[9px] text-white/20 font-medium mb-2 tracking-wider">Beta V.0</p>
         <div className="flex items-center justify-between max-w-md mx-auto">
           <button onClick={() => setState('FILTER_SELECTION')} className="flex flex-col items-center gap-1 text-white/60 hover:text-white transition-colors">
             <Home size={24} />
@@ -1363,18 +1367,30 @@ const App: React.FC = () => {
         {!isLoading && error ? (
           <div className="h-full w-full flex flex-col items-center justify-center p-12 text-center bg-white">
             <div className="w-20 h-20 bg-zinc-50 rounded-full flex items-center justify-center mb-6">
-              <Info className="text-zinc-300" size={32} />
+              <Search className="text-zinc-300" size={32} />
             </div>
-            <h2 className="text-2xl font-black text-zinc-900 mb-2">Couldn’t load results</h2>
-            <p className="text-zinc-500 font-medium mb-8">{error}</p>
-            <div className="flex flex-col sm:flex-row gap-3">
+            <h2 className="text-2xl font-black text-zinc-900 mb-2">Nothing found nearby</h2>
+            <p className="text-zinc-500 font-medium mb-2">{error}</p>
+            <p className="text-zinc-400 text-sm mb-8">Want to explore other options?</p>
+            <div className="flex flex-col gap-3 w-full max-w-xs">
               <button
                 onClick={() => {
+                  setError(null);
                   if (location) fetchRestaurants(location);
                 }}
                 className="px-8 py-4 bg-zinc-900 text-white font-bold rounded-2xl active:scale-95 transition-all"
               >
-                Try Again
+                See All Nearby
+              </button>
+              <button
+                onClick={() => {
+                  setError(null);
+                  setShowBitesAI(true);
+                }}
+                className="px-8 py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold rounded-2xl active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                <Sparkles size={18} />
+                Ask Bites
               </button>
               <button
                 onClick={() => setState('FILTER_SELECTION')}
@@ -1582,7 +1598,7 @@ const App: React.FC = () => {
         <div className="fixed inset-0 z-[70] bg-black/90 backdrop-blur-lg flex flex-col animate-in fade-in duration-300">
           <div className="p-6 pt-12">
             <div className="flex items-center gap-4 mb-6">
-              <button onClick={() => setShowSearch(false)} className="p-2 text-white">
+              <button onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults([]); }} className="p-2 text-white">
                 <X size={24} />
               </button>
               <div className="flex-1 relative">
@@ -1591,7 +1607,31 @@ const App: React.FC = () => {
                   type="text"
                   placeholder="Search restaurants, cuisines, dishes..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSearchQuery(value);
+                    
+                    // Clear previous timeout
+                    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+                    
+                    if (value.trim().length >= 2 && location) {
+                      setIsSearching(true);
+                      searchTimeoutRef.current = setTimeout(async () => {
+                        try {
+                          const results = await searchRestaurantsByQuery(location, value.trim());
+                          setSearchResults(results);
+                        } catch (err) {
+                          console.error('[Search] Error:', err);
+                          setSearchResults([]);
+                        } finally {
+                          setIsSearching(false);
+                        }
+                      }, 500);
+                    } else {
+                      setSearchResults([]);
+                      setIsSearching(false);
+                    }
+                  }}
                   className="w-full bg-white/10 border border-white/20 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-white/40 focus:outline-none focus:border-orange-500"
                   autoFocus
                 />
@@ -1606,6 +1646,8 @@ const App: React.FC = () => {
                   onClick={() => {
                     handleFilterUpdate({ cuisine: c });
                     setShowSearch(false);
+                    setSearchQuery('');
+                    setSearchResults([]);
                   }}
                   className="px-4 py-2 bg-white/10 rounded-full text-white text-sm font-medium hover:bg-white/20 transition-colors"
                 >
@@ -1615,51 +1657,49 @@ const App: React.FC = () => {
             </div>
             
             {/* Search results */}
-            {searchQuery && (
+            {searchQuery.trim().length >= 2 && (
               <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-                {(() => {
-                  const query = searchQuery.toLowerCase();
-                  const filtered = restaurants.filter(r => 
-                    r.name.toLowerCase().includes(query) ||
-                    r.cuisine.toLowerCase().includes(query) ||
-                    r.address?.toLowerCase().includes(query)
-                  );
-                  
-                  if (filtered.length === 0) {
-                    return (
-                      <div className="text-center py-8">
-                        <p className="text-white/60 text-sm">No restaurants found for "{searchQuery}"</p>
-                        <p className="text-white/40 text-xs mt-2">Try searching by name or cuisine type</p>
-                      </div>
-                    );
-                  }
-                  
-                  return filtered.map(restaurant => (
-                    <button
-                      key={restaurant.id}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        // Store reference before closing modal
-                        const targetRestaurant = restaurant;
-                        setShowSearch(false);
-                        setSearchQuery('');
-                        // Use requestAnimationFrame to ensure state updates properly
-                        requestAnimationFrame(() => {
-                          setSelectedRestaurant(targetRestaurant);
-                          setState('PROFILE');
-                        });
-                      }}
-                      className="w-full flex items-center gap-4 p-4 bg-white/10 rounded-2xl text-left hover:bg-white/20 transition-colors"
-                    >
-                      <img src={restaurant.mainPhotoUrl} className="w-16 h-16 rounded-xl object-cover" alt={restaurant.name} />
-                      <div>
-                        <h4 className="text-white font-bold">{restaurant.name}</h4>
-                        <p className="text-white/60 text-sm">{restaurant.cuisine} • {restaurant.distance}</p>
-                      </div>
-                    </button>
-                  ));
-                })()}
+                {isSearching ? (
+                  <div className="text-center py-8">
+                    <Loader2 size={24} className="text-orange-500 animate-spin mx-auto mb-2" />
+                    <p className="text-white/60 text-sm">Searching for "{searchQuery}"...</p>
+                  </div>
+                ) : searchResults.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-white/60 text-sm">No restaurants found for "{searchQuery}"</p>
+                    <p className="text-white/40 text-xs mt-2">Try a different search term</p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-white/50 text-xs font-medium mb-2">
+                      Found {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for "{searchQuery}" within 5km
+                    </p>
+                    {searchResults.map(restaurant => (
+                      <button
+                        key={restaurant.id}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const targetRestaurant = restaurant;
+                          setShowSearch(false);
+                          setSearchQuery('');
+                          setSearchResults([]);
+                          requestAnimationFrame(() => {
+                            setSelectedRestaurant(targetRestaurant);
+                            setState('PROFILE');
+                          });
+                        }}
+                        className="w-full flex items-center gap-4 p-4 bg-white/10 rounded-2xl text-left hover:bg-white/20 transition-colors"
+                      >
+                        <img src={restaurant.mainPhotoUrl} className="w-16 h-16 rounded-xl object-cover" alt={restaurant.name} />
+                        <div>
+                          <h4 className="text-white font-bold">{restaurant.name}</h4>
+                          <p className="text-white/60 text-sm">{restaurant.cuisine} • {restaurant.distance}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                )}
               </div>
             )}
           </div>

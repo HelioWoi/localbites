@@ -148,11 +148,15 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
   // Filter out partners with expired trial (no active subscription)
   const now = new Date();
   const activePartners = partners?.filter(p => {
-    // Has active Stripe subscription
+    // Priority 0: Lifetime access (never expires)
+    if (p.lifetime_access === true) {
+      return true;
+    }
+    // Priority 1: Has active Stripe subscription
     if (p.subscription_status === 'active' && p.subscription_end_date) {
       return new Date(p.subscription_end_date) > now;
     }
-    // Has active trial
+    // Priority 2: Has active trial
     if (p.trial_ends_at) {
       return new Date(p.trial_ends_at) > now;
     }
@@ -202,7 +206,8 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
 
     // Check if partner has active premium subscription
     const now = new Date();
-    const isPremium = (p.subscription_status === 'active' && p.subscription_end_date && new Date(p.subscription_end_date) > now) ||
+    const isPremium = p.lifetime_access === true ||
+                      (p.subscription_status === 'active' && p.subscription_end_date && new Date(p.subscription_end_date) > now) ||
                       (p.trial_ends_at && new Date(p.trial_ends_at) > now);
 
     // Calculate priority score: Premium gets 1000 boost, then sorted by distance

@@ -545,7 +545,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               </div>
 
               <p className="text-white/40 text-xs mt-8">
-                Powered by LocalBites
+                Powered by Local Bites
               </p>
             </div>
           </div>

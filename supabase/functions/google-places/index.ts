@@ -187,72 +187,76 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number,
   const allPlaces: any[] = [];
   const seenIds = new Set<string>();
 
-  // Determine which types to search based on category
-  let includedTypes: string[];
+  // Determine which type groups to search based on category
+  // For 'all', we make separate requests per type to get more results (up to 20 per type)
+  let typeGroups: string[][];
   switch (category) {
     case 'restaurants':
-      includedTypes = ["restaurant"];
+      typeGroups = [["restaurant"]];
       break;
     case 'cafes':
-      includedTypes = ["cafe", "bakery"];
+      typeGroups = [["cafe", "bakery"]];
       break;
     case 'bars':
-      includedTypes = ["bar", "night_club"];
+      typeGroups = [["bar", "night_club"]];
       break;
     case 'all':
     default:
-      includedTypes = ["restaurant", "cafe", "bar", "bakery"];
+      // Split into separate requests to get more results (up to 20 each = 60 total)
+      typeGroups = [["restaurant"], ["cafe", "bakery"], ["bar"]];
       break;
   }
 
-  try {
-    const response = await fetch(
-      "https://places.googleapis.com/v1/places:searchNearby",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": GOOGLE_API_KEY!,
-          // Optimized fields - removed reviews from initial search (fetch on demand)
-          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.photos,places.location,places.types,places.googleMapsUri",
-        },
-        body: JSON.stringify({
-          // Search based on selected category
-          includedTypes: includedTypes,
-          maxResultCount: 20, // API limit is 20 per request
-          locationRestriction: {
-            circle: {
-              center: { latitude: lat, longitude: lng },
-              radius: radius,
-            },
-          },
-          rankPreference: "DISTANCE",
-        }),
-      }
-    );
+  const excludedTypes = [
+    'supermarket', 'grocery_store', 'convenience_store', 'gym', 
+    'fitness_center', 'gas_station', 'hotel', 'lodging', 
+    'shopping_mall', 'department_store', 'pharmacy', 'hospital',
+    'school', 'university', 'bank', 'atm', 'car_wash', 'car_repair'
+  ];
 
-    if (response.ok) {
-      const data = await response.json();
-      for (const place of (data.places || [])) {
-        // Filter out non-food establishments
-        const excludedTypes = [
-          'supermarket', 'grocery_store', 'convenience_store', 'gym', 
-          'fitness_center', 'gas_station', 'hotel', 'lodging', 
-          'shopping_mall', 'department_store', 'pharmacy', 'hospital',
-          'school', 'university', 'bank', 'atm', 'car_wash', 'car_repair'
-        ];
-        const placeTypes = place.types || [];
-        const isExcluded = placeTypes.some((t: string) => excludedTypes.includes(t));
-        
-        if (!seenIds.has(place.id) && !isExcluded) {
-          seenIds.add(place.id);
-          allPlaces.push(place);
+  for (const includedTypes of typeGroups) {
+    try {
+      const response = await fetch(
+        "https://places.googleapis.com/v1/places:searchNearby",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": GOOGLE_API_KEY!,
+            "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.photos,places.location,places.types,places.googleMapsUri",
+          },
+          body: JSON.stringify({
+            includedTypes: includedTypes,
+            maxResultCount: 20,
+            locationRestriction: {
+              circle: {
+                center: { latitude: lat, longitude: lng },
+                radius: radius,
+              },
+            },
+            rankPreference: "DISTANCE",
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        for (const place of (data.places || [])) {
+          const placeTypes = place.types || [];
+          const isExcluded = placeTypes.some((t: string) => excludedTypes.includes(t));
+          
+          if (!seenIds.has(place.id) && !isExcluded) {
+            seenIds.add(place.id);
+            allPlaces.push(place);
+          }
         }
       }
+    } catch (error) {
+      console.error("Search error for types", includedTypes, ":", error);
     }
-  } catch (error) {
-    console.error("Search error:", error);
   }
+  
+  console.log(`[Nearby] Found ${allPlaces.length} total places for category "${category}"`);
 
   // Transform places to response format
   const result = (allPlaces || []).map((place: any) => {

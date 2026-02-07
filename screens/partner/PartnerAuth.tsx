@@ -19,10 +19,14 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
   const [restaurantName, setRestaurantName] = useState('');
   const [abn, setAbn] = useState('');
   const [address, setAddress] = useState('');
+  const [postalCode, setPostalCode] = useState('');
   const [phone, setPhone] = useState('');
   const [website, setWebsite] = useState('');
+  const [promoCode, setPromoCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<any>(null);
+  const [isValidatingPromo, setIsValidatingPromo] = useState(false);
+  const [promoValidation, setPromoValidation] = useState<{ valid: boolean; type?: string; error?: string } | null>(null);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +52,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim() || !restaurantName.trim() || !address.trim() || !phone.trim()) return;
+    if (!email.trim() || !password.trim() || !restaurantName.trim() || !address.trim() || !postalCode.trim() || !phone.trim()) return;
     if (password.length < 6) {
       setError('Password must be at least 6 characters');
       return;
@@ -58,6 +62,18 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
     setError('');
 
     try {
+      // Validate promo code if provided
+      let hasLifetimeAccess = false;
+      if (promoCode.trim()) {
+        const { data: promoResult } = await supabase.functions.invoke('validate-promo-code', {
+          body: { code: promoCode.trim() }
+        });
+        
+        if (promoResult?.valid && promoResult.type === 'lifetime') {
+          hasLifetimeAccess = true;
+        }
+      }
+
       // Create Supabase auth account
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
@@ -70,18 +86,40 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
       if (data.user && data.session) {
         // Create partner record with all business info
         await supabase.from('partners').insert({
-          user_id: data.user.id,
+          id: data.user.id,
           email: email.trim(),
           restaurant_name: restaurantName.trim(),
           abn: abn.trim() || null,
           address: address.trim(),
+          postal_code: postalCode.trim(),
           phone: phone.trim(),
           website: website.trim() || null,
-          plan: 'trial',
-          trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+          plan: hasLifetimeAccess ? 'lifetime' : 'trial',
+          trial_ends_at: hasLifetimeAccess ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
           subscription_status: 'active',
+          lifetime_access: hasLifetimeAccess,
           is_verified: false, // Manual verification for now
         });
+
+        // Record promo code usage if valid
+        if (hasLifetimeAccess && promoCode.trim()) {
+          const { data: promoData } = await supabase
+            .from('promo_codes')
+            .select('id')
+            .eq('code', promoCode.trim().toUpperCase())
+            .single();
+          
+          if (promoData) {
+            await supabase.from('promo_code_usage').insert({
+              promo_code_id: promoData.id,
+              partner_id: data.user.id
+            });
+            
+            // Increment usage count
+            await supabase.rpc('increment_promo_usage', { promo_id: promoData.id });
+          }
+        }
+
         onAuthSuccess();
       } else {
         // Email confirmation required
@@ -156,7 +194,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
             <Utensils size={20} className="text-white" />
           </div>
           <div>
-            <span className="text-xl font-bold text-zinc-900">LocalBites</span>
+            <span className="text-xl font-bold text-zinc-900">Local Bites</span>
             <span className="text-xl font-light text-zinc-400 ml-1">Partner</span>
           </div>
         </a>
@@ -182,8 +220,8 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
                 {mode === 'signup' && (
                   <>
                     <div>
-                      <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
-                        Restaurant Name
+                      <label className="block text-xs font-medium text-zinc-500 mb-2">
+                        Restaurant name
                       </label>
                       <div className="relative">
                         <Building2 size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
@@ -191,7 +229,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
                           type="text"
                           value={restaurantName}
                           onChange={(e) => setRestaurantName(e.target.value)}
-                          placeholder="Your Restaurant Name"
+                          placeholder="Your restaurant name"
                           className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                           required
                         />
@@ -199,8 +237,8 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
-                        ABN (Australian Business Number)
+                      <label className="block text-xs font-medium text-zinc-500 mb-2">
+                        ABN <span className="text-zinc-400">(optional)</span>
                       </label>
                       <div className="relative">
                         <Hash size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
@@ -208,14 +246,14 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
                           type="text"
                           value={abn}
                           onChange={(e) => setAbn(e.target.value)}
-                          placeholder="XX XXX XXX XXX (Optional)"
+                          placeholder="12 345 678 901"
                           className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                      <label className="block text-xs font-medium text-zinc-500 mb-2">
                         Address
                       </label>
                       <div className="relative">
@@ -224,7 +262,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
                           type="text"
                           value={address}
                           onChange={(e) => setAddress(e.target.value)}
-                          placeholder="16 Smith Street, Mooloolaba, QLD"
+                          placeholder="Your address"
                           className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                           required
                         />
@@ -232,7 +270,24 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                      <label className="block text-xs font-medium text-zinc-500 mb-2">
+                        Postal code
+                      </label>
+                      <div className="relative">
+                        <Hash size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="text"
+                          value={postalCode}
+                          onChange={(e) => setPostalCode(e.target.value)}
+                          placeholder="4557"
+                          className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-500 mb-2">
                         Phone
                       </label>
                       <div className="relative">
@@ -240,8 +295,11 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
                         <input
                           type="tel"
                           value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          placeholder="+61 4XX XXX XXX"
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^0-9+]/g, '');
+                            setPhone(value);
+                          }}
+                          placeholder="+61 400 000 000"
                           className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                           required
                         />
@@ -249,17 +307,33 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
-                        Website
+                      <label className="block text-xs font-medium text-zinc-500 mb-2">
+                        Website <span className="text-zinc-400">(optional)</span>
                       </label>
                       <div className="relative">
                         <Globe size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
                         <input
-                          type="url"
+                          type="text"
                           value={website}
                           onChange={(e) => setWebsite(e.target.value)}
-                          placeholder="https://yourrestaurant.com (Optional)"
+                          placeholder="www.yourrestaurant.com.au"
                           className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-500 mb-2">
+                        Promo code <span className="text-zinc-400">(optional)</span>
+                      </label>
+                      <div className="relative">
+                        <Hash size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="text"
+                          value={promoCode}
+                          onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                          placeholder="Enter promo code"
+                          className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all uppercase"
                         />
                       </div>
                     </div>
@@ -267,7 +341,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
                 )}
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-medium text-zinc-500 mb-2">
                     Email
                   </label>
                   <div className="relative">
@@ -285,7 +359,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
 
                 {mode !== 'magic' && (
                   <div>
-                    <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-medium text-zinc-500 mb-2">
                       Password
                     </label>
                     <div className="relative">
@@ -294,7 +368,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
                         type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder={mode === 'signup' ? 'Min 6 characters' : '••••••••'}
+                        placeholder={mode === 'signup' ? 'Minimum 6 characters' : '••••••••'}
                         className="w-full pl-12 pr-12 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                         required
                       />
@@ -377,7 +451,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
               <ul className="text-sm text-orange-700 space-y-1">
                 <li>• Upload up to 5 menu videos</li>
                 <li>• Basic analytics dashboard</li>
-                <li>• Appear in LocalBites feed</li>
+                <li>• Appear in Local Bites feed</li>
                 <li>• No credit card required</li>
               </ul>
             </div>

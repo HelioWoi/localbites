@@ -261,7 +261,7 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ user, onLogou
               </div>
               <div>
                 <h1 className="text-xl font-black text-zinc-900">Super Admin</h1>
-                <p className="text-xs text-zinc-500">LocalBites Control Panel</p>
+                <p className="text-xs text-zinc-500">Local Bites Control Panel</p>
               </div>
             </div>
             <div className="flex items-center gap-3">

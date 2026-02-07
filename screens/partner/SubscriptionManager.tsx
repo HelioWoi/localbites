@@ -45,7 +45,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
       console.log('[SubscriptionManager] Loading subscription for partner:', partnerId);
       const { data: partner, error } = await supabase
         .from('partners')
-        .select('subscription_status, subscription_plan, subscription_end_date, subscription_start_date, stripe_subscription_id')
+        .select('subscription_status, subscription_plan, subscription_end_date, subscription_start_date, stripe_subscription_id, lifetime_access, trial_ends_at')
         .eq('id', partnerId)
         .single();
 
@@ -55,7 +55,16 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
 
       console.log('[SubscriptionManager] Partner data:', partner);
 
-      if (partner && partner.subscription_status && partner.subscription_status !== 'inactive' && partner.stripe_subscription_id) {
+      // Check for lifetime access first
+      if (partner?.lifetime_access === true) {
+        console.log('[SubscriptionManager] Partner has lifetime access');
+        setSubscription({
+          status: 'lifetime',
+          plan: 'Lifetime',
+          currentPeriodEnd: '2099-12-31',
+          cancelAtPeriodEnd: false,
+        });
+      } else if (partner && partner.subscription_status && partner.subscription_status !== 'inactive' && partner.stripe_subscription_id) {
         console.log('[SubscriptionManager] Setting subscription:', {
           status: partner.subscription_status,
           plan: partner.subscription_plan,
@@ -150,7 +159,8 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
     );
   }
 
-  const isActive = subscription?.status === 'active' || subscription?.status === 'trialing';
+  const isLifetime = subscription?.status === 'lifetime';
+  const isActive = subscription?.status === 'active' || subscription?.status === 'trialing' || isLifetime;
   
   // Calculate days remaining
   const getDaysRemaining = () => {
@@ -165,16 +175,52 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
   const daysRemaining = getDaysRemaining();
   
   // Detect trial: if days remaining is <= 14, it's likely a trial period
-  const isTrialing = isActive && daysRemaining > 0 && daysRemaining <= 14;
+  const isTrialing = isActive && !isLifetime && daysRemaining > 0 && daysRemaining <= 14;
 
   return (
     <div className="max-w-4xl mx-auto p-6">
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-zinc-900 mb-2">Subscription</h2>
-        <p className="text-zinc-600">Manage your LocalBites premium subscription</p>
+        <p className="text-zinc-600">Manage your Local Bites premium subscription</p>
       </div>
 
-      {isActive && (
+      {isLifetime && (
+        <div className="bg-gradient-to-br from-purple-600 via-purple-500 to-pink-500 rounded-3xl p-8 text-white mb-8 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full -ml-24 -mb-24"></div>
+          
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-4">
+              <Crown size={40} className="text-yellow-300" />
+              <div>
+                <h3 className="text-3xl font-bold">🎉 Lifetime Access</h3>
+                <p className="text-white/90 text-lg">You have unlimited premium access forever!</p>
+              </div>
+            </div>
+            
+            <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 mt-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-white/70 text-sm mb-1">Plan</p>
+                  <p className="font-bold text-xl">Lifetime Premium</p>
+                </div>
+                <div>
+                  <p className="text-white/70 text-sm mb-1">Expires</p>
+                  <p className="font-bold text-xl">Never ∞</p>
+                </div>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-white/20">
+                <p className="text-sm text-white/80">✅ All premium features unlocked</p>
+                <p className="text-sm text-white/80">✅ No recurring payments</p>
+                <p className="text-sm text-white/80">✅ Priority support included</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isActive && !isLifetime && (
         <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-8 text-white mb-8">
           <div className="flex items-center gap-3 mb-4">
             <Crown size={32} />
