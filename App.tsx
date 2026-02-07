@@ -28,6 +28,14 @@ const isAdminRoute = window.location.pathname === '/admin' || window.location.pa
 // Check if we're on the partner route
 const isPartnerRoute = window.location.pathname === '/partner' || window.location.pathname.startsWith('/partner');
 
+// Check if we're on legal pages routes
+const isLegalRoute = window.location.pathname === '/policy' || 
+                     window.location.pathname === '/terms' || 
+                     window.location.pathname === '/content-moderation';
+
+// Check if we're on contact page
+const isContactRoute = window.location.pathname === '/contact';
+
 // Check if we're on a restaurant route
 const isRestaurantRoute = window.location.pathname.startsWith('/r/');
 const isMenuRoute = isRestaurantRoute && window.location.pathname.endsWith('/menu');
@@ -41,6 +49,23 @@ if (isRestaurantRoute) {
 }
 
 const App: React.FC = () => {
+  // If on contact page route, redirect to static HTML
+  if (isContactRoute) {
+    window.location.href = '/contact.html';
+    return null;
+  }
+
+  // If on legal pages route, redirect to static HTML
+  if (isLegalRoute) {
+    const legalPageMap: { [key: string]: string } = {
+      '/policy': '/legal/privacy-policy.html',
+      '/terms': '/legal/terms-of-service.html',
+      '/content-moderation': '/legal/content-moderation.html'
+    };
+    window.location.href = legalPageMap[window.location.pathname];
+    return null;
+  }
+
   // If on admin route, render Super Admin Portal
   if (isAdminRoute) {
     return <SuperAdminPortal />;

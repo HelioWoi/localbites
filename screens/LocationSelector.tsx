@@ -204,7 +204,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
       setIsSearching(true);
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          // Show animation for 3 seconds before navigating
+          // Show animation for 5 seconds before navigating
           setTimeout(() => {
             onLocationSelect({
               lat: pos.coords.latitude,
@@ -212,7 +212,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
               name: 'Current Location',
               radius: selectedRadius * 1000
             });
-          }, 3000);
+          }, 5000);
         },
         () => {
           // If geolocation fails, use saved location or default (Mooloolaba)
@@ -225,7 +225,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
               name: 'Current Location',
               radius: selectedRadius * 1000
             });
-          }, 3000);
+          }, 5000);
         }
       );
     } else {
@@ -240,19 +240,19 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
           name: 'Current Location',
           radius: selectedRadius * 1000
         });
-      }, 3000);
+      }, 5000);
     }
   };
 
   const handleRegionSelect = (loc: { lat: number; lng: number; name: string }) => {
     setIsSearching(true);
-    // Show animation for 3 seconds before navigating
+    // Show animation for 5 seconds before navigating
     setTimeout(() => {
       onLocationSelect({
         ...loc,
         radius: selectedRadius * 1000
       });
-    }, 3000);
+    }, 5000);
   };
 
   // GPS Animation Overlay - Same as SplashScreen intro animation

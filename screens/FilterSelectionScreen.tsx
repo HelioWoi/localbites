@@ -202,12 +202,16 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
         <div className="w-full max-w-md lg:max-w-4xl mx-auto bg-zinc-50 rounded-2xl p-6">
           <div className="text-center space-y-3 opacity-70">
             <p className="text-[10px] text-zinc-500 leading-relaxed">
-              LocalBites is a discovery platform that supports local businesses. We do not take responsibility for products, services, pricing, or customer experiences provided by listed venues.
+              LocalBites helps you discover and support local businesses. All products, services, pricing, and customer experiences are provided by the listed venues. Visit our{' '}
+              <a href="/policy" className="text-orange-500 hover:text-orange-600 transition-colors font-medium">
+                policy
+              </a>{' '}
+              page to learn more.
             </p>
             <p className="text-[10px] text-zinc-500 leading-relaxed">
-              Contact us at{' '}
-              <a href="mailto:contact@localbites.com.au" className="text-orange-500 hover:text-orange-600 transition-colors font-medium">
-                contact@localbites.com.au
+              Contact us for any questions -{' '}
+              <a href="/contact" className="text-orange-500 hover:text-orange-600 transition-colors font-medium underline">
+                Click here
               </a>
             </p>
             <div className="mt-4 pt-3 border-t border-zinc-200">
@@ -216,6 +220,20 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
                 className="text-[10px] text-zinc-400 hover:text-orange-500 transition-colors font-medium"
               >
                 Partner Login
+              </a>
+              <span className="text-zinc-400"> | </span>
+              <a 
+                href="/terms" 
+                className="text-[10px] text-zinc-400 hover:text-orange-500 transition-colors font-medium"
+              >
+                Terms
+              </a>
+              <span className="text-zinc-400"> | </span>
+              <a 
+                href="/content-moderation" 
+                className="text-[10px] text-zinc-400 hover:text-orange-500 transition-colors font-medium"
+              >
+                Content Moderation
               </a>
             </div>
           </div>
