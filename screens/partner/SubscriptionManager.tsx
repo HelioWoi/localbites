@@ -232,11 +232,11 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
             <Crown size={32} />
             <div>
               <h3 className="text-2xl font-bold">
-                {isTrialing ? 'Premium Trial Active' : 'Premium Active'}
+                {isTrialing ? "You're Premium!" : 'Premium Active'}
               </h3>
               <p className="text-white/80">
                 {isTrialing 
-                  ? `${daysRemaining} days remaining in your free trial` 
+                  ? `Enjoy all features free for ${daysRemaining} days` 
                   : "You're all set!"}
               </p>
             </div>
