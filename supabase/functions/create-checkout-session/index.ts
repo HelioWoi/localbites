@@ -68,7 +68,7 @@ serve(async (req) => {
       
       const customerParams = new URLSearchParams({
         email: partner.email,
-        name: partner.name || partner.email,
+        name: partner.restaurant_name || partner.email,
         'metadata[partner_id]': partnerId,
       });
       

@@ -110,20 +110,26 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
         },
       });
 
-      console.log('Checkout response:', { data, error });
+      console.log('Checkout response:', JSON.stringify({ data, error }, null, 2));
 
       if (error) {
-        console.error('Checkout error details:', error);
-        throw error;
+        console.error('Checkout error details:', JSON.stringify(error, null, 2));
+        throw new Error(typeof error === 'object' ? JSON.stringify(error) : error);
+      }
+
+      if (data?.error) {
+        console.error('Checkout API error:', data.error, data.stripe);
+        throw new Error(data.stripe || data.error || 'Checkout failed');
       }
 
       if (data?.url) {
         console.log('Redirecting to:', data.url);
         window.location.href = data.url;
       } else {
-        throw new Error('No checkout URL returned');
+        console.error('No URL in response. Full data:', JSON.stringify(data));
+        throw new Error('No checkout URL returned. Check console for details.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating checkout session:', error);
       alert(`Failed to start checkout: ${error.message || 'Please try again.'}`);
     } finally {
