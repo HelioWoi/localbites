@@ -20,7 +20,7 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug 
           .from('partners')
           .select('*')
           .eq('slug', slug)
-          .eq('subscription_status', 'active')
+          .in('subscription_status', ['active', 'trialing', 'canceled'])
           .single();
 
         if (partnerError || !partnerData) {
@@ -57,8 +57,8 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug 
           rating: partnerData.rating || 4.5,
           totalReviews: partnerData.total_reviews || 0,
           logoUrl: partnerData.logo_url,
-          coverPhotoUrl: partnerData.photo_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800',
-          mainPhotoUrl: partnerData.photo_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800',
+          coverPhotoUrl: partnerData.photo_url || null,
+          mainPhotoUrl: partnerData.photo_url || null,
           googleMapsUrl: partnerData.google_maps_url,
           website: partnerData.website,
           phone: partnerData.phone,

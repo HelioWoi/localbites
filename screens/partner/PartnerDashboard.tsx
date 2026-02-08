@@ -10,6 +10,7 @@ import { PartnerUser } from './PartnerPortal';
 import SubscriptionManager from './SubscriptionManager';
 import OnboardingModal from './OnboardingModal';
 import { compressVideo, shouldCompressVideo } from '../../utils/videoCompression';
+import { QRCodeSVG } from 'qrcode.react';
 import { sanitizeFileName } from '../../utils/fileUtils';
 
 interface PartnerDashboardProps {
@@ -963,8 +964,18 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl p-5 text-white">
               <div className="flex items-start gap-4">
                 {/* QR Code - Left */}
-                <div className="w-20 h-20 bg-white rounded-xl flex items-center justify-center flex-shrink-0">
-                  <QrCode size={52} className="text-orange-500" />
+                <div className="w-20 h-20 bg-white rounded-xl flex items-center justify-center flex-shrink-0 p-1.5">
+                  {partnerData?.slug ? (
+                    <QRCodeSVG 
+                      value={`${window.location.origin}/r/${partnerData.slug}`}
+                      size={68}
+                      fgColor="#f97316"
+                      bgColor="#ffffff"
+                      level="M"
+                    />
+                  ) : (
+                    <QrCode size={52} className="text-orange-500" />
+                  )}
                 </div>
                 
                 {/* Content - Right */}

@@ -18,6 +18,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [processingCheckout, setProcessingCheckout] = useState(false);
+  const [wasCanceled, setWasCanceled] = useState(false);
 
   const PRICE_IDS = {
     monthly: 'price_1SxxClIG1T8Ip1Z0i9rOM0gj', // Live Mode - Monthly $29.90
@@ -64,7 +65,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
           currentPeriodEnd: '2099-12-31',
           cancelAtPeriodEnd: false,
         });
-      } else if (partner && partner.subscription_status && partner.subscription_status !== 'inactive' && partner.stripe_subscription_id) {
+      } else if (partner && partner.subscription_status && partner.subscription_status !== 'inactive' && partner.subscription_status !== 'canceled' && partner.stripe_subscription_id) {
         console.log('[SubscriptionManager] Setting subscription:', {
           status: partner.subscription_status,
           plan: partner.subscription_plan,
@@ -77,7 +78,9 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
           cancelAtPeriodEnd: false,
         });
       } else {
-        console.log('[SubscriptionManager] No active subscription found');
+        const isCanceled = partner?.subscription_status === 'canceled';
+        console.log('[SubscriptionManager] No active subscription found, canceled:', isCanceled);
+        setWasCanceled(isCanceled);
         setSubscription(null);
       }
     } catch (error) {
@@ -267,6 +270,13 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
           >
             Manage Subscription
           </button>
+        </div>
+      )}
+
+      {!isActive && !isLifetime && wasCanceled && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-6 mb-6">
+          <p className="text-red-700 font-semibold">Your subscription has been canceled.</p>
+          <p className="text-red-600 text-sm mt-1">Choose a plan below to reactivate your premium features.</p>
         </div>
       )}
 

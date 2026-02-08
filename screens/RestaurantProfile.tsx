@@ -403,7 +403,14 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
       )}
 
       <div className="relative h-[45vh] shrink-0">
-        <img src={restaurant.mainPhotoUrl} className="w-full h-full object-cover" alt={restaurant.name} />
+        {restaurant.mainPhotoUrl ? (
+          <img src={restaurant.mainPhotoUrl} className="w-full h-full object-cover" alt={restaurant.name} />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-900 flex flex-col items-center justify-center">
+            <Camera size={48} className="text-zinc-600 mb-3" />
+            <p className="text-zinc-500 text-sm font-medium">Cover photo coming soon</p>
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
         
         {/* Header buttons */}
@@ -438,6 +445,16 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
             <h2 className="text-lg font-bold text-zinc-900 mb-1">Menu Videos</h2>
             <p className="text-xs text-zinc-500 mb-3">Choose your menu through a video feed.</p>
             
+            {dishesWithVideo.length === 0 && (
+              <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-8 flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mb-4">
+                  <PlayCircle size={32} className="text-zinc-400" />
+                </div>
+                <p className="text-zinc-500 font-medium">Menu videos coming soon!</p>
+                <p className="text-zinc-400 text-xs mt-1">This restaurant is setting up their video menu.</p>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-3">
               {dishesWithVideo.map((dish, index) => (
                 <button 

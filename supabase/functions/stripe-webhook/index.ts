@@ -40,12 +40,17 @@ serve(async (req) => {
     }
 
     const planName = interval === "year" ? "Annual" : "Monthly";
+    
+    // If cancel_at_period_end is true, user canceled but subscription is still active until period end
+    const effectiveStatus = subscription.cancel_at_period_end ? "canceled" : status;
+
+    console.log(`[Webhook] Subscription status: ${status}, cancel_at_period_end: ${subscription.cancel_at_period_end}, effective: ${effectiveStatus}`);
 
     await supabase
       .from("partners")
       .update({
         stripe_subscription_id: subscriptionId,
-        subscription_status: status,
+        subscription_status: effectiveStatus,
         subscription_plan: planName,
         subscription_start_date: new Date(subscription.current_period_start * 1000).toISOString(),
         subscription_end_date: new Date(subscription.current_period_end * 1000).toISOString(),

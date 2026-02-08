@@ -20,7 +20,7 @@ const RestaurantMenuLoader: React.FC<RestaurantMenuLoaderProps> = ({ slug }) => 
           .from('partners')
           .select('*')
           .eq('slug', slug)
-          .eq('subscription_status', 'active')
+          .in('subscription_status', ['active', 'trialing', 'canceled'])
           .single();
 
         if (partnerError || !partnerData) {
