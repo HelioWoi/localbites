@@ -235,12 +235,20 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
                 {isTrialing ? 'Premium Trial Active' : 'Premium Active'}
               </h3>
               <p className="text-white/80">
-                {isTrialing ? `${daysRemaining} days remaining in your free trial` : "You're all set!"}
+                {isTrialing 
+                  ? `${daysRemaining} days remaining in your free trial` 
+                  : "You're all set!"}
               </p>
             </div>
           </div>
+
+          {isTrialing && (
+            <p className="text-white/70 text-sm mb-4">
+              Your card will be charged A${subscription.plan === 'Monthly' ? '29.90/month' : '290/year'} after the trial ends. You can cancel anytime.
+            </p>
+          )}
           
-          <div className="grid grid-cols-2 gap-4 mt-6">
+          <div className="grid grid-cols-2 gap-4 mt-2">
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
               <p className="text-white/60 text-sm mb-1">Plan</p>
               <p className="font-bold text-lg">{subscription.plan}</p>
@@ -262,6 +270,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
         </div>
       )}
 
+      {!isActive && !isLifetime && (
       <div className="grid md:grid-cols-2 gap-6 mb-8">
             {/* Monthly Plan */}
             <div className="bg-white border-2 border-zinc-200 rounded-3xl p-8 hover:border-orange-500 transition-all">
@@ -386,7 +395,9 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
               </button>
             </div>
           </div>
+      )}
 
+      {!isActive && !isLifetime && (
         <div className="bg-zinc-50 rounded-2xl p-6">
           <h4 className="font-bold text-zinc-900 mb-3">What's included:</h4>
           <div className="grid md:grid-cols-3 gap-4 text-sm text-zinc-600">
@@ -404,6 +415,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
             </div>
           </div>
         </div>
+      )}
     </div>
   );
 };
