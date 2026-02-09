@@ -409,7 +409,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         window.URL.revokeObjectURL(video.src);
         const duration = video.duration;
         
-        if (duration > 10) {
+        if (duration > 12) {
           alert(`Video is too long (${Math.round(duration)}s). Please upload a video of 10 seconds or less for best engagement.`);
           reject(new Error('Video too long'));
         } else {
