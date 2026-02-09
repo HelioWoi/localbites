@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { textSearchRestaurants } from '../services/googlePlacesProxy';
 import RestaurantProfile from '../screens/RestaurantProfile';
 import { Loader2 } from 'lucide-react';
 
@@ -48,14 +49,32 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug 
         // Get unique categories
         const categories = [...new Set((menuItems || []).map(item => item.category))].filter(Boolean);
 
+        // Fetch real Google rating for partner restaurant
+        let googleRating = partnerData.rating || 4.5;
+        let googleTotalReviews = partnerData.total_reviews || 0;
+        if (googleTotalReviews === 0 && partnerData.restaurant_name) {
+          try {
+            const query = partnerData.address 
+              ? `${partnerData.restaurant_name} ${partnerData.address}` 
+              : partnerData.restaurant_name;
+            const results = await textSearchRestaurants(0, 0, 50000, query);
+            if (results.length > 0 && results[0].rating) {
+              googleRating = results[0].rating;
+              googleTotalReviews = results[0].totalReviews || 0;
+            }
+          } catch (e) {
+            console.error('[ProfileLoader] Google rating fetch error:', e);
+          }
+        }
+
         setRestaurant({
           id: partnerData.id,
           name: partnerData.restaurant_name || partnerData.email?.split('@')[0] || 'Restaurant',
           slug: partnerData.slug,
           cuisine: partnerData.cuisine || 'Restaurant',
           address: partnerData.address || '',
-          rating: partnerData.rating || 4.5,
-          totalReviews: partnerData.total_reviews || 0,
+          rating: googleRating,
+          totalReviews: googleTotalReviews,
           logoUrl: partnerData.logo_url,
           coverPhotoUrl: partnerData.photo_url || null,
           mainPhotoUrl: partnerData.photo_url || null,

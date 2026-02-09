@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Restaurant, Dish, Review } from '../types';
-import { ChevronLeft, Globe, MapPin, Navigation, Bookmark, PlayCircle, Camera, X, Crown, Play, Pause, Volume2, VolumeX, Star, ChevronRight, ChevronUp, ExternalLink, Home, Search, MessageSquare, Filter, Clock, Heart, Trash2, Phone, Sparkles } from 'lucide-react';
+import { ChevronLeft, Globe, MapPin, Navigation, Bookmark, PlayCircle, Camera, X, Crown, Play, Pause, Volume2, VolumeX, Star, ChevronRight, ChevronUp, ExternalLink, Home, Search, MessageSquare, Filter, Clock, Heart, Trash2, Phone, Sparkles, UtensilsCrossed, Video } from 'lucide-react';
 import { getPlaceDetails, textSearchRestaurants } from '../services/googlePlacesProxy';
 import DesktopBanner from '../components/DesktopBanner';
 
@@ -534,30 +534,36 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                   </div>
                 </button>
               ))}
+              {/* See Full Menu Card */}
+              <a 
+                href={`/r/${restaurant.slug}/full-menu`}
+                className="relative aspect-square rounded-xl overflow-hidden bg-gradient-to-br from-zinc-100 to-zinc-50 border-2 border-dashed border-zinc-300 flex flex-col items-center justify-center gap-2 hover:border-orange-400 hover:from-orange-50 hover:to-white transition-all group"
+              >
+                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center group-hover:bg-orange-200 transition-colors">
+                  <UtensilsCrossed size={22} className="text-orange-500" />
+                </div>
+                <span className="text-xs font-bold text-zinc-700 group-hover:text-orange-600 transition-colors">See Full Menu</span>
+              </a>
             </div>
           </section>
         )}
 
         {/* Your Picks - Card style */}
-        {savedDishes.length > 0 && (
-          <button 
-            onClick={() => {
-              // Navigate to menu page with saved filter
-              const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-              window.location.href = `/r/${slug}/menu?saved=true`;
-            }}
+        {savedDishIds.size > 0 && (
+          <a 
+            href={`/r/${(restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/saved`}
             className="w-full bg-white rounded-2xl border border-zinc-200 p-4 flex items-center justify-between active:bg-zinc-50 transition-colors"
           >
             <div className="flex items-center gap-3">
               <Bookmark size={20} className="text-orange-500" fill="currentColor" />
               <span className="text-base font-bold text-zinc-900">Your Picks</span>
-              <span className="text-sm text-orange-500 font-medium">({savedDishes.length})</span>
+              <span className="text-sm text-orange-500 font-medium">({savedDishIds.size})</span>
             </div>
             <div className="flex items-center gap-1 text-orange-500">
               <span className="text-xs font-semibold">See more</span>
               <ChevronRight size={16} />
             </div>
-          </button>
+          </a>
         )}
 
         {/* REVIEWS - Card style */}

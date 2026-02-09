@@ -33,6 +33,7 @@ interface MenuItem {
   description?: string;
   category: string;
   video_url: string;
+  photo_url?: string;
   thumbnail_url?: string;
   price?: number;
   sort_order: number;
@@ -92,6 +93,12 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   
   // Video preview state
   const [previewVideo, setPreviewVideo] = useState<string | null>(null);
+
+  // Photo upload for menu items
+  const [menuPhotoFile, setMenuPhotoFile] = useState<File | null>(null);
+  const [menuPhotoPreview, setMenuPhotoPreview] = useState<string | null>(null);
+  const menuPhotoInputRef = useRef<HTMLInputElement>(null);
+  const [mediaType, setMediaType] = useState<'video' | 'photo'>('video');
 
   // Settings state
   const [editingRestaurant, setEditingRestaurant] = useState(false);
@@ -377,11 +384,14 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       return handleUpdateMenuItem();
     }
 
-    if (!uploadFile || !menuItemName.trim() || !partnerData) return;
+    const hasVideo = mediaType === 'video' && uploadFile;
+    const hasPhoto = mediaType === 'photo' && menuPhotoFile;
+    
+    if ((!hasVideo && !hasPhoto) || !menuItemName.trim() || !partnerData) return;
 
     // Block upload if trial expired
     if (isTrialExpired) {
-      alert('Your trial has ended. Please upgrade to Pro to continue uploading videos.');
+      alert('Your trial has ended. Please upgrade to Pro to continue uploading.');
       setShowMenuUploadModal(false);
       setActiveTab('subscription');
       return;
@@ -391,6 +401,66 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     const finalCategory = menuItemCategory === '__new__' ? newCategory.trim() : menuItemCategory.trim();
     
     if (!finalCategory) return;
+
+    // === PHOTO UPLOAD ===
+    if (mediaType === 'photo' && menuPhotoFile) {
+      setIsUploading(true);
+      setUploadProgress(20);
+
+      try {
+        const sanitizedName = sanitizeFileName(menuPhotoFile.name, menuItemName.trim());
+        const fileName = `${partnerData.id}/photos/${sanitizedName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('menu-videos')
+          .upload(fileName, menuPhotoFile);
+
+        if (uploadError) throw uploadError;
+        setUploadProgress(60);
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('menu-videos')
+          .getPublicUrl(fileName);
+
+        const { data: item, error: itemError } = await supabase
+          .from('menu_items')
+          .insert({
+            partner_id: partnerData.id,
+            name: menuItemName.trim(),
+            category: finalCategory,
+            description: menuItemDescription.trim() || null,
+            price: menuItemPrice ? parseFloat(menuItemPrice) : null,
+            photo_url: publicUrl,
+            video_url: '',
+            sort_order: menuItems.filter(i => i.category === finalCategory).length,
+          })
+          .select()
+          .single();
+
+        if (itemError) throw itemError;
+        setUploadProgress(100);
+
+        setMenuItems([...menuItems, item]);
+        if (!categories.includes(finalCategory)) {
+          setCategories([...categories, finalCategory]);
+        }
+        
+        setTimeout(() => {
+          resetMenuUploadModal();
+        }, 800);
+
+      } catch (error: any) {
+        console.error('Photo upload error:', error);
+        alert('Upload failed: ' + error.message);
+        setUploadProgress(0);
+      } finally {
+        setIsUploading(false);
+      }
+      return;
+    }
+
+    // === VIDEO UPLOAD ===
+    if (!uploadFile) return;
 
     // Validate file size (5MB max)
     const maxSize = 5 * 1024 * 1024; // 5MB
@@ -555,6 +625,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     setShowMenuUploadModal(false);
     setUploadFile(null);
     setUploadPreview(null);
+    setMenuPhotoFile(null);
+    setMenuPhotoPreview(null);
+    setMediaType('video');
     setMenuItemName('');
     setMenuItemCategory('');
     setMenuItemDescription('');
@@ -562,6 +635,19 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     setNewCategory('');
     setUploadProgress(0);
     setEditingMenuItem(null);
+  };
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file size (2MB max for photos)
+      if (file.size > 2 * 1024 * 1024) {
+        alert('Photo is too large. Maximum size is 2MB.');
+        return;
+      }
+      setMenuPhotoFile(file);
+      setMenuPhotoPreview(URL.createObjectURL(file));
+    }
   };
 
   const handleDeleteMenuItem = async (itemId: string) => {
@@ -1032,7 +1118,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             {/* Add Menu Item */}
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-bold text-zinc-900">Menu Videos</h2>
+                <h2 className="text-lg font-bold text-zinc-900">Menu Items</h2>
                 <p className="text-sm text-zinc-500">{menuItems.length} items • {categories.length} categories</p>
               </div>
               <button
@@ -1068,16 +1154,31 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                       </button>
                     </div>
                     <div className="p-4 grid grid-cols-3 sm:grid-cols-4 gap-3">
-                      {menuItems.filter(i => i.category === category).map(item => (
+                      {menuItems.filter(i => i.category === category).map(item => {
+                        const hasVideo = item.video_url && item.video_url !== '';
+                        const hasPhoto = !!item.photo_url;
+                        return (
                         <div key={item.id} className="relative group">
                           <div 
                             className="aspect-square bg-zinc-100 rounded-xl overflow-hidden cursor-pointer"
-                            onClick={() => setPreviewVideo(item.video_url)}
+                            onClick={() => hasVideo ? setPreviewVideo(item.video_url) : null}
                           >
-                            <video src={item.video_url} className="w-full h-full object-cover" muted />
+                            {hasVideo ? (
+                              <video src={item.video_url} className="w-full h-full object-cover" muted />
+                            ) : hasPhoto ? (
+                              <img src={item.photo_url} className="w-full h-full object-cover" alt={item.name} />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-zinc-200">
+                                <Camera size={24} className="text-zinc-400" />
+                              </div>
+                            )}
                             <div className="absolute inset-0 flex items-center justify-center">
                               <div className="w-12 h-12 bg-black/50 rounded-full flex items-center justify-center">
-                                <Play size={20} className="text-white ml-1" fill="white" />
+                                {hasVideo ? (
+                                  <Play size={20} className="text-white ml-1" fill="white" />
+                                ) : (
+                                  <Camera size={20} className="text-white" />
+                                )}
                               </div>
                             </div>
                             {/* Featured badge - always visible if featured */}
@@ -1120,7 +1221,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                             </div>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                   );
@@ -1473,38 +1575,100 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             </div>
 
             <div className="p-5 space-y-4">
-              {/* Video Preview - Only show in add mode */}
+              {/* Media Type Toggle - Only show in add mode */}
               {!editingMenuItem && (
                 <>
-              {uploadPreview ? (
-                <div className="relative aspect-[9/16] max-h-64 bg-zinc-900 rounded-xl overflow-hidden mx-auto">
-                  <video src={uploadPreview} className="w-full h-full object-contain" controls />
-                  <button
-                    onClick={() => { setUploadFile(null); setUploadPreview(null); }}
-                    className="absolute top-2 right-2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              ) : (
+              <div className="flex bg-zinc-100 rounded-xl p-1">
                 <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full aspect-[9/16] max-h-64 bg-zinc-100 border-2 border-dashed border-zinc-200 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-orange-300 transition-colors"
+                  onClick={() => { setMediaType('video'); setMenuPhotoFile(null); setMenuPhotoPreview(null); }}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    mediaType === 'video' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'
+                  }`}
                 >
-                  <Upload size={32} className="text-zinc-400" />
-                  <p className="text-sm font-medium text-zinc-600">Click to select video</p>
-                  <p className="text-xs text-zinc-400">MP4, MOV • Max 10 seconds • Max 5MB</p>
+                  <Video size={16} />
+                  Video
                 </button>
+                <button
+                  onClick={() => { setMediaType('photo'); setUploadFile(null); setUploadPreview(null); }}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    mediaType === 'photo' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'
+                  }`}
+                >
+                  <Image size={16} />
+                  Photo
+                </button>
+              </div>
+
+              {/* Video Upload */}
+              {mediaType === 'video' && (
+                <>
+                  {uploadPreview ? (
+                    <div className="relative aspect-[9/16] max-h-64 bg-zinc-900 rounded-xl overflow-hidden mx-auto">
+                      <video src={uploadPreview} className="w-full h-full object-contain" controls />
+                      <button
+                        onClick={() => { setUploadFile(null); setUploadPreview(null); }}
+                        className="absolute top-2 right-2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full aspect-[9/16] max-h-64 bg-zinc-100 border-2 border-dashed border-zinc-200 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-orange-300 transition-colors"
+                    >
+                      <Upload size={32} className="text-zinc-400" />
+                      <p className="text-sm font-medium text-zinc-600">Click to select video</p>
+                      <p className="text-xs text-zinc-400">MP4, MOV • Max 10 seconds • Max 5MB</p>
+                    </button>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="video/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </>
               )}
-              
-              {/* Hidden file input */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="video/*"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
+
+              {/* Photo Upload */}
+              {mediaType === 'photo' && (
+                <>
+                  {menuPhotoPreview ? (
+                    <div className="relative aspect-square max-h-64 bg-zinc-100 rounded-xl overflow-hidden mx-auto">
+                      <img src={menuPhotoPreview} className="w-full h-full object-cover" alt="Preview" />
+                      <button
+                        onClick={() => { setMenuPhotoFile(null); setMenuPhotoPreview(null); }}
+                        className="absolute top-2 right-2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => menuPhotoInputRef.current?.click()}
+                      className="w-full aspect-square max-h-64 bg-zinc-100 border-2 border-dashed border-zinc-200 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-orange-300 transition-colors"
+                    >
+                      <Image size={32} className="text-zinc-400" />
+                      <p className="text-sm font-medium text-zinc-600">Click to select photo</p>
+                      <p className="text-xs text-zinc-400">JPG, PNG • Max 2MB</p>
+                    </button>
+                  )}
+                  <input
+                    ref={menuPhotoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoSelect}
+                    className="hidden"
+                  />
+                </>
+              )}
+              <p className="text-xs text-zinc-400 text-center">
+                {mediaType === 'video' 
+                  ? 'Videos appear in the video feed and full menu' 
+                  : 'Photos appear only in the full menu'}
+              </p>
               </>
               )}
 

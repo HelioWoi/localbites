@@ -10,6 +10,8 @@ import PartnerPortal from './screens/partner/PartnerPortal';
 import SuperAdminPortal from './screens/admin/SuperAdminPortal';
 import RestaurantMenuLoader from './components/RestaurantMenuLoader';
 import RestaurantProfileLoader from './components/RestaurantProfileLoader';
+import FullMenuLoader from './components/FullMenuLoader';
+import SavedPicksLoader from './components/SavedPicksLoader';
 import MediaContainer from './components/MediaContainer';
 import FloatingFilters from './components/FloatingFilters';
 import BitesAI from './components/BitesAI';
@@ -39,7 +41,9 @@ const isContactRoute = window.location.pathname === '/contact';
 // Check if we're on a restaurant route
 const isRestaurantRoute = window.location.pathname.startsWith('/r/');
 const isMenuRoute = isRestaurantRoute && window.location.pathname.endsWith('/menu');
-const isProfileRoute = isRestaurantRoute && !isMenuRoute;
+const isFullMenuRoute = isRestaurantRoute && window.location.pathname.endsWith('/full-menu');
+const isSavedRoute = isRestaurantRoute && window.location.pathname.endsWith('/saved');
+const isProfileRoute = isRestaurantRoute && !isMenuRoute && !isFullMenuRoute && !isSavedRoute;
 
 // Extract slug from URL
 let restaurantSlug = null;
@@ -74,6 +78,16 @@ const App: React.FC = () => {
   // If on partner route, render Partner Portal
   if (isPartnerRoute) {
     return <PartnerPortal />;
+  }
+
+  // If on restaurant saved picks route, render saved picks page
+  if (isSavedRoute && restaurantSlug) {
+    return <SavedPicksLoader slug={restaurantSlug} />;
+  }
+
+  // If on restaurant full menu route, render full menu page
+  if (isFullMenuRoute && restaurantSlug) {
+    return <FullMenuLoader slug={restaurantSlug} />;
   }
 
   // If on restaurant menu route, render menu page

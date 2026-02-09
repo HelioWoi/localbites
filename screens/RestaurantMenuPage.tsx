@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Volume2, VolumeX, ChevronUp, Star, MapPin, Globe, Navigation, Heart, Bookmark, X, ChevronLeft, MessageSquare, Home, Search, Sparkles, Filter, Clock, Send, Video } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, ChevronUp, Star, MapPin, Globe, Navigation, Heart, Bookmark, X, ChevronLeft, MessageSquare, Home, Search, Sparkles, Filter, Clock, Send, Video, UtensilsCrossed } from 'lucide-react';
 import DesktopBanner from '../components/DesktopBanner';
 
 interface MenuItem {
@@ -277,8 +277,15 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
           {/* Back button */}
           <button 
             onClick={() => {
-              // Navigate to restaurant profile page
-              window.location.href = `/r/${restaurant.slug}`;
+              const params = new URLSearchParams(window.location.search);
+              const from = params.get('from');
+              if (from === 'full-menu') {
+                window.location.href = `/r/${restaurant.slug}/full-menu`;
+              } else if (from === 'saved') {
+                window.location.href = `/r/${restaurant.slug}/saved`;
+              } else {
+                window.location.href = `/r/${restaurant.slug}`;
+              }
             }}
             className="p-2 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all flex-shrink-0"
           >
@@ -286,8 +293,15 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
           </button>
           {/* Logo - clickable to go back */}
           <button onClick={() => {
-            // Navigate to restaurant profile page
-            window.location.href = `/r/${restaurant.slug}`;
+            const params = new URLSearchParams(window.location.search);
+            const from = params.get('from');
+            if (from === 'full-menu') {
+              window.location.href = `/r/${restaurant.slug}/full-menu`;
+            } else if (from === 'saved') {
+              window.location.href = `/r/${restaurant.slug}/saved`;
+            } else {
+              window.location.href = `/r/${restaurant.slug}`;
+            }
           }} className="flex-shrink-0">
             {restaurant.logoUrl ? (
               <img src={restaurant.logoUrl} alt={restaurant.name} className="w-12 h-12 rounded-full object-cover border-2 border-white/20" />
@@ -347,6 +361,14 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                 {category}
               </button>
             ))}
+            {/* Full Menu Link */}
+            <a
+              href={`/r/${restaurant.slug}/full-menu`}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap bg-white/10 text-orange-400 hover:bg-white/20 transition-all border border-orange-400/30"
+            >
+              <UtensilsCrossed size={12} />
+              Full Menu
+            </a>
           </div>
         )}
       </div>

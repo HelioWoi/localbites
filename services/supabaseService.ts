@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { Restaurant, Dish, Review } from '../types';
+import { textSearchRestaurants } from './googlePlacesProxy';
 
 // Fetch all restaurants with their dishes and reviews
 export async function getRestaurantsFromSupabase(): Promise<Restaurant[]> {
@@ -187,6 +188,25 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
     });
 
   console.log('[PartnerRestaurants] After filter:', filtered.length);
+
+  // Fetch Google ratings for partners that don't have them yet
+  for (const p of filtered) {
+    if ((!p.total_reviews || p.total_reviews === 0) && p.restaurant_name) {
+      try {
+        const query = p.address 
+          ? `${p.restaurant_name} ${p.address}` 
+          : p.restaurant_name;
+        const results = await textSearchRestaurants(0, 0, 50000, query);
+        if (results.length > 0 && results[0].rating) {
+          p.rating = results[0].rating;
+          p.total_reviews = results[0].totalReviews || 0;
+          console.log(`[PartnerRestaurants] Google rating for ${p.restaurant_name}: ${p.rating} (${p.total_reviews} reviews)`);
+        }
+      } catch (e) {
+        console.error(`[PartnerRestaurants] Failed to fetch Google rating for ${p.restaurant_name}:`, e);
+      }
+    }
+  }
 
   // Map and calculate distances first
   const restaurantsWithDistance = filtered.map(p => {
