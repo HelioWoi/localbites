@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Restaurant, Dish, Review } from '../types';
 import { ChevronLeft, Globe, MapPin, Navigation, Bookmark, PlayCircle, Camera, X, Crown, Play, Pause, Volume2, VolumeX, Star, ChevronRight, ChevronUp, ExternalLink, Home, Search, MessageSquare, Filter, Clock, Heart, Trash2, Phone, Sparkles } from 'lucide-react';
-import { getPlaceDetails } from '../services/googlePlacesProxy';
+import { getPlaceDetails, textSearchRestaurants } from '../services/googlePlacesProxy';
 import DesktopBanner from '../components/DesktopBanner';
 
 interface RestaurantProfileProps {
@@ -57,7 +57,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   const dishesWithVideo = restaurant.dishes.filter(d => d.videoUrl);
   const savedDishes = restaurant.dishes.filter(d => savedDishIds.has(d.id));
   
-  // Load Google reviews for non-partner restaurants
+  // Load Google reviews for all restaurants
   useEffect(() => {
     const loadGoogleReviews = async () => {
       // Google Place IDs start with "ChIJ" or "places/"
@@ -68,16 +68,38 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
       console.log('[RestaurantProfile] Is Google restaurant:', isGoogleRestaurant);
       console.log('[RestaurantProfile] Needs reviews:', needsReviews);
       
-      if (isGoogleRestaurant && needsReviews) {
-        setLoadingReviews(true);
-        try {
-          console.log('[RestaurantProfile] Fetching reviews for:', restaurant.id);
-          const details = await getPlaceDetails(restaurant.id);
+      if (!needsReviews) return;
+      
+      setLoadingReviews(true);
+      try {
+        let placeId = isGoogleRestaurant ? restaurant.id : null;
+        
+        // For partner restaurants, find Google Place ID by name search
+        if (!placeId && restaurant.name) {
+          console.log('[RestaurantProfile] Partner restaurant - searching Google for:', restaurant.name);
+          const searchQuery = restaurant.address 
+            ? `${restaurant.name} ${restaurant.address}` 
+            : restaurant.name;
+          const searchResults = await textSearchRestaurants(0, 0, 50000, searchQuery);
+          if (searchResults.length > 0) {
+            placeId = searchResults[0].id;
+            console.log('[RestaurantProfile] Found Google Place ID:', placeId);
+            // Also update rating/totalReviews from Google
+            if (searchResults[0].rating) {
+              restaurant.rating = searchResults[0].rating;
+              restaurant.totalReviews = searchResults[0].totalReviews || 0;
+            }
+          }
+        }
+        
+        if (placeId) {
+          console.log('[RestaurantProfile] Fetching reviews for:', placeId);
+          const details = await getPlaceDetails(placeId);
           console.log('[RestaurantProfile] Got details:', details);
           
           if (details?.reviews && details.reviews.length > 0) {
             console.log('[RestaurantProfile] Setting', details.reviews.length, 'reviews');
-            setGoogleReviews(details.reviews.map((r, i) => ({
+            setGoogleReviews(details.reviews.map((r: any, i: number) => ({
               id: `google-${i}`,
               authorName: r.authorName,
               authorPhotoUrl: r.authorPhotoUrl,
@@ -89,11 +111,13 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
           } else {
             console.log('[RestaurantProfile] No reviews in response');
           }
-        } catch (error) {
-          console.error('[RestaurantProfile] Error loading Google reviews:', error);
-        } finally {
-          setLoadingReviews(false);
+        } else {
+          console.log('[RestaurantProfile] Could not find Google Place ID');
         }
+      } catch (error) {
+        console.error('[RestaurantProfile] Error loading Google reviews:', error);
+      } finally {
+        setLoadingReviews(false);
       }
     };
     loadGoogleReviews();
