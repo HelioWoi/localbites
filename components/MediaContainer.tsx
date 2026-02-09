@@ -22,13 +22,13 @@ const MediaContainer: React.FC<MediaContainerProps> = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const touchStartY = useRef<number | null>(null);
 
-  // Timeout to prevent infinite spinner - show content after 5 seconds even if not loaded
+  // Timeout to prevent infinite spinner - show content after 3 seconds even if not loaded
   useEffect(() => {
     if (!isLoaded) {
       const timeout = setTimeout(() => {
         console.log('[MediaContainer] Loading timeout - forcing loaded state');
         setIsLoaded(true);
-      }, 5000);
+      }, 3000);
       return () => clearTimeout(timeout);
     }
   }, [isLoaded]);
@@ -84,7 +84,7 @@ const MediaContainer: React.FC<MediaContainerProps> = ({
           muted
           playsInline
           preload="auto"
-          onLoadedData={() => setIsLoaded(true)}
+          onCanPlay={() => setIsLoaded(true)}
         />
       ) : photoUrl ? (
         <img

@@ -39,7 +39,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   const [showSavedOnly, setShowSavedOnly] = useState(false); // Filter for saved videos
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [loadedVideos, setLoadedVideos] = useState<Set<number>>(new Set([0, 1, 2])); // Load first 3 videos initially
+  const [loadedVideos, setLoadedVideos] = useState<Set<number>>(new Set([0, 1, 2])); // Preload first 3 videos
+  const [videoReady, setVideoReady] = useState<Set<number>>(new Set()); // Track which videos are ready to play
   
   // Likes and saves state
   const [likedItems, setLikedItems] = useState<Set<string>>(new Set());
@@ -184,7 +185,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     }
   };
 
-  // Lazy loading: Load current video + nearby videos for smooth scrolling
+  // Lazy loading: Preload nearby videos for smooth scrolling
   useEffect(() => {
     const videosToLoad = new Set<number>();
     
@@ -193,9 +194,21 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
       videosToLoad.add(i);
     }
     
-    setLoadedVideos(videosToLoad);
+    setLoadedVideos(prev => {
+      const merged = new Set(prev);
+      videosToLoad.forEach(i => merged.add(i));
+      return merged;
+    });
     
-    // Pause distant videos to free resources (but keep src cached)
+    // Trigger load on newly added videos
+    videosToLoad.forEach(i => {
+      const video = videoRefs.current[i];
+      if (video && video.readyState === 0 && video.src) {
+        video.load();
+      }
+    });
+    
+    // Pause distant videos to free resources
     videoRefs.current.forEach((video, index) => {
       if (video && !videosToLoad.has(index)) {
         video.pause();
@@ -275,6 +288,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   useEffect(() => {
     setActiveVideoIndex(0);
     setLoadedVideos(new Set([0, 1, 2])); // Reset to load first 3 videos of new category
+    setVideoReady(new Set()); // Reset ready state
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -374,20 +388,26 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
         {filteredItems.map((item, index) => (
           <div key={item.id} className="h-screen w-full snap-start relative">
             {/* Video */}
+            {/* Loading spinner */}
+            {!videoReady.has(index) && index === activeVideoIndex && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
+                <div className="w-10 h-10 border-3 border-zinc-700 border-t-orange-500 rounded-full animate-spin" />
+              </div>
+            )}
             <video
               ref={el => videoRefs.current[index] = el}
-              src={loadedVideos.has(index) ? item.videoUrl : ''}
+              src={item.videoUrl}
               className="absolute inset-0 w-full h-full object-cover"
               loop
               muted={isMuted}
               playsInline
-              webkit-playsinline="true"
-              crossOrigin="anonymous"
-              preload="auto"
+              preload={loadedVideos.has(index) ? 'auto' : 'none'}
               autoPlay={index === activeVideoIndex}
+              onCanPlay={() => {
+                setVideoReady(prev => new Set(prev).add(index));
+              }}
               onError={(e) => {
                 console.error('Video failed to load:', item.videoUrl);
-                // Auto-retry: reload video after short delay
                 const video = e.currentTarget;
                 if (!videoErrors.has(index)) {
                   setVideoErrors(prev => new Set(prev).add(index));
@@ -396,7 +416,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                     if (index === activeVideoIndex) {
                       video.play().catch(() => {});
                     }
-                  }, 1000);
+                  }, 2000);
                 }
               }}
             />
