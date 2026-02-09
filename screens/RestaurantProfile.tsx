@@ -88,6 +88,16 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
             if (searchResults[0].rating) {
               restaurant.rating = searchResults[0].rating;
               restaurant.totalReviews = searchResults[0].totalReviews || 0;
+              // Save to DB so feed shows real values
+              const { supabase } = await import('../lib/supabase');
+              await supabase
+                .from('partners')
+                .update({ 
+                  rating: searchResults[0].rating, 
+                  total_reviews: searchResults[0].totalReviews || 0 
+                })
+                .eq('id', restaurant.id);
+              console.log('[RestaurantProfile] Saved Google rating to DB:', searchResults[0].rating, searchResults[0].totalReviews);
             }
           }
         }
