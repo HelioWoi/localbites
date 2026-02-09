@@ -1636,7 +1636,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               {mediaType === 'photo' && (
                 <>
                   {menuPhotoPreview ? (
-                    <div className="relative aspect-square max-h-64 bg-zinc-100 rounded-xl overflow-hidden mx-auto">
+                    <div className="relative w-64 aspect-square bg-zinc-100 rounded-xl overflow-hidden mx-auto">
                       <img src={menuPhotoPreview} className="w-full h-full object-cover" alt="Preview" />
                       <button
                         onClick={() => { setMenuPhotoFile(null); setMenuPhotoPreview(null); }}
@@ -1784,7 +1784,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                 </button>
                 <button
                   onClick={handleMenuUpload}
-                  disabled={isUploading || (!editingMenuItem && !uploadFile) || !menuItemName.trim() || (!menuItemCategory.trim() && menuItemCategory !== '__new__') || (menuItemCategory === '__new__' && !newCategory.trim())}
+                  disabled={isUploading || (!editingMenuItem && !uploadFile && !menuPhotoFile) || !menuItemName.trim() || (!menuItemCategory.trim() && menuItemCategory !== '__new__') || (menuItemCategory === '__new__' && !newCategory.trim())}
                   className="flex-1 py-3 bg-orange-500 text-white font-semibold rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
                 >
                   {isUploading ? (
