@@ -34,12 +34,11 @@ interface RestaurantMenuPageProps {
 const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) => {
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(false); // Start with sound ON
+  const [isMuted, setIsMuted] = useState(true); // Start muted - Safari blocks autoplay with sound
   const [isPlaying, setIsPlaying] = useState(true);
   const [showSavedOnly, setShowSavedOnly] = useState(false); // Filter for saved videos
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [loadedVideos, setLoadedVideos] = useState<Set<number>>(new Set([0, 1, 2])); // Preload first 3 videos
   const [videoReady, setVideoReady] = useState<Set<number>>(new Set()); // Track which videos are ready to play
   
   // Likes and saves state
@@ -185,64 +184,38 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     }
   };
 
-  // Lazy loading: Preload nearby videos for smooth scrolling
+  // Play/pause and load management based on active index
   useEffect(() => {
-    const videosToLoad = new Set<number>();
-    
-    // Load current + 2 ahead + 1 behind for smooth transitions
-    for (let i = Math.max(0, activeVideoIndex - 1); i <= Math.min(filteredItems.length - 1, activeVideoIndex + 2); i++) {
-      videosToLoad.add(i);
-    }
-    
-    setLoadedVideos(prev => {
-      const merged = new Set(prev);
-      videosToLoad.forEach(i => merged.add(i));
-      return merged;
-    });
-    
-    // Trigger load on newly added videos
-    videosToLoad.forEach(i => {
-      const video = videoRefs.current[i];
-      if (video && video.readyState === 0 && video.src) {
-        video.load();
-      }
-    });
-    
-    // Pause distant videos to free resources
     videoRefs.current.forEach((video, index) => {
-      if (video && !videosToLoad.has(index)) {
+      if (!video) return;
+      
+      if (index === activeVideoIndex) {
+        // ACTIVE VIDEO: force load and play
+        video.muted = isMuted;
+        if (video.readyState < 3) {
+          video.load();
+        }
+        if (isPlaying) {
+          video.play().catch(() => {});
+        }
+      } else {
+        // INACTIVE: pause to free bandwidth
         video.pause();
       }
     });
-  }, [activeVideoIndex, filteredItems.length]);
-
-  // Play/pause videos based on active index
-  useEffect(() => {
-    // Small delay to ensure video refs are ready after category change
-    const timer = setTimeout(() => {
-      videoRefs.current.forEach((video, index) => {
-        if (video) {
-          if (index === activeVideoIndex && isPlaying) {
-            // Ensure video is loaded before playing
-            if (video.readyState >= 2) {
-              video.play().catch(() => {});
-            } else {
-              // Wait for video to be ready
-              video.addEventListener('loadeddata', () => {
-                if (index === activeVideoIndex && isPlaying) {
-                  video.play().catch(() => {});
-                }
-              }, { once: true });
-            }
-          } else {
-            video.pause();
-          }
-          video.muted = isMuted;
-        }
-      });
-    }, 100);
     
-    return () => clearTimeout(timer);
+    // Retry play every 500ms until video is actually playing (mobile 4G fix)
+    const retryInterval = setInterval(() => {
+      const activeVideo = videoRefs.current[activeVideoIndex];
+      if (activeVideo && isPlaying && activeVideo.paused && activeVideo.readyState >= 2) {
+        activeVideo.play().catch(() => {});
+      }
+      if (activeVideo && !activeVideo.paused) {
+        clearInterval(retryInterval);
+      }
+    }, 500);
+    
+    return () => clearInterval(retryInterval);
   }, [activeVideoIndex, isMuted, isPlaying, filteredItems]);
   
   // Auto-play next video when current ends
@@ -287,7 +260,6 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   // Reset video index when category changes
   useEffect(() => {
     setActiveVideoIndex(0);
-    setLoadedVideos(new Set([0, 1, 2])); // Reset to load first 3 videos of new category
     setVideoReady(new Set()); // Reset ready state
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
@@ -399,12 +371,16 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               src={item.videoUrl}
               className="absolute inset-0 w-full h-full object-cover"
               loop
-              muted={isMuted}
+              muted
               playsInline
-              preload={loadedVideos.has(index) ? 'auto' : 'none'}
-              autoPlay={index === activeVideoIndex}
+              preload={index === activeVideoIndex ? 'auto' : index === activeVideoIndex + 1 ? 'metadata' : 'none'}
               onCanPlay={() => {
                 setVideoReady(prev => new Set(prev).add(index));
+                // Auto-play if this is the active video
+                const video = videoRefs.current[index];
+                if (index === activeVideoIndex && isPlaying && video) {
+                  video.play().catch(() => {});
+                }
               }}
               onError={(e) => {
                 console.error('Video failed to load:', item.videoUrl);
