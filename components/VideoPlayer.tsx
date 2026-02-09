@@ -52,6 +52,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, isActive }) => {
         loop
         muted
         playsInline
+        preload="auto"
         onLoadedData={() => setIsLoaded(true)}
       />
 

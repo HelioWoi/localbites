@@ -83,6 +83,7 @@ const MediaContainer: React.FC<MediaContainerProps> = ({
           loop
           muted
           playsInline
+          preload="auto"
           onLoadedData={() => setIsLoaded(true)}
         />
       ) : photoUrl ? (
