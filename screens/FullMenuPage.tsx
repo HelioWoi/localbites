@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, Play, Search, Bookmark } from 'lucide-react';
+import { ChevronLeft, Play, Search, Bookmark, X } from 'lucide-react';
 import DesktopBanner from '../components/DesktopBanner';
 
 // Component to generate a thumbnail from a video
@@ -111,10 +111,10 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
     window.location.href = `/r/${restaurant.slug}`;
   };
 
-  const handleVideoClick = (item: MenuItem) => {
-    if (item.videoUrl) {
-      window.location.href = `/r/${restaurant.slug}/menu?from=full-menu&dish=${item.id}`;
-    }
+  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+
+  const handleItemClick = (item: MenuItem) => {
+    setSelectedItem(item);
   };
 
   return (
@@ -122,8 +122,8 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
       <DesktopBanner />
       
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-white border-b border-zinc-100">
-        <div className="flex items-center gap-3 px-4 py-3">
+      <div className="sticky top-0 z-30 bg-white border-b border-zinc-100" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 48px)' }}>
+        <div className="flex items-center gap-3 px-4 pt-3 pb-3">
           <button 
             onClick={handleBack}
             className="p-2 hover:bg-zinc-100 rounded-full transition-colors"
@@ -197,8 +197,8 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
               {items.map(item => (
                 <div 
                   key={item.id} 
-                  className="flex items-center gap-4 px-4 py-4 hover:bg-zinc-50 transition-colors"
-                  onClick={() => handleVideoClick(item)}
+                  className="flex items-center gap-4 px-4 py-4 hover:bg-zinc-50 transition-colors cursor-pointer"
+                  onClick={() => handleItemClick(item)}
                 >
                   {/* Photo / Video Thumbnail */}
                   <div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-zinc-100">
@@ -268,13 +268,107 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
       {/* Bottom Bar - Back to Video Menu */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-zinc-100 px-4 py-3 z-30">
         <button
-          onClick={handleBack}
+          onClick={() => { window.location.href = `/r/${restaurant.slug}/menu?from=full-menu`; }}
           className="w-full flex items-center justify-center gap-2 py-3 bg-zinc-900 text-white font-semibold rounded-xl hover:bg-zinc-800 transition-colors"
         >
           <Play size={18} fill="currentColor" />
           Watch Video Menu
         </button>
       </div>
+
+      {/* Item Detail Modal */}
+      {selectedItem && (
+        <div 
+          className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center"
+          onClick={() => setSelectedItem(null)}
+        >
+          <div 
+            className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl overflow-hidden animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button 
+              onClick={() => setSelectedItem(null)}
+              className="absolute top-4 right-4 z-10 p-2 bg-white/80 backdrop-blur-sm rounded-full text-zinc-600 hover:bg-white transition-colors shadow-sm"
+            >
+              <X size={20} />
+            </button>
+
+            {/* Photo */}
+            {(selectedItem.photoUrl || selectedItem.videoUrl) && (
+              <div className="relative w-full aspect-[4/3] bg-zinc-100">
+                {selectedItem.photoUrl ? (
+                  <img 
+                    src={selectedItem.photoUrl} 
+                    alt={selectedItem.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : selectedItem.videoUrl ? (
+                  <VideoThumbnail src={selectedItem.videoUrl} alt={selectedItem.name} />
+                ) : null}
+                {/* Name & Price overlay */}
+                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
+                  <h2 className="text-xl font-bold text-white">{selectedItem.name}</h2>
+                  {selectedItem.price > 0 && (
+                    <p className="text-orange-400 font-bold text-lg">${selectedItem.price.toFixed(2)}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Details */}
+            <div className="p-5 space-y-4">
+              {/* No photo fallback header */}
+              {!selectedItem.photoUrl && !selectedItem.videoUrl && (
+                <div>
+                  <h2 className="text-xl font-bold text-zinc-900">{selectedItem.name}</h2>
+                  {selectedItem.price > 0 && (
+                    <p className="text-orange-500 font-bold text-lg">${selectedItem.price.toFixed(2)}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Description */}
+              {selectedItem.description && (
+                <div>
+                  <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Description</p>
+                  <p className="text-sm text-zinc-700 leading-relaxed">{selectedItem.description}</p>
+                </div>
+              )}
+
+              {/* Category */}
+              <div>
+                <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Category</p>
+                <span className="inline-block px-3 py-1 bg-zinc-100 text-zinc-700 text-sm font-medium rounded-full">{selectedItem.category}</span>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={(e) => { toggleSave(selectedItem.id, e); }}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors ${
+                    savedItems.has(selectedItem.id)
+                      ? 'bg-orange-50 text-orange-600 border border-orange-200'
+                      : 'bg-zinc-100 text-zinc-700 border border-zinc-200'
+                  }`}
+                >
+                  <Bookmark size={16} fill={savedItems.has(selectedItem.id) ? 'currentColor' : 'none'} />
+                  {savedItems.has(selectedItem.id) ? 'Saved' : 'Save'}
+                </button>
+                {selectedItem.videoUrl && (
+                  <button
+                    onClick={() => { window.location.href = `/r/${restaurant.slug}/menu?from=full-menu&dish=${selectedItem.id}`; }}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-900 text-white rounded-xl font-semibold text-sm hover:bg-zinc-800 transition-colors"
+                  >
+                    <Play size={16} fill="currentColor" />
+                    Watch Video
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

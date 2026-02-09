@@ -43,8 +43,11 @@ const RestaurantMenuLoader: React.FC<RestaurantMenuLoaderProps> = ({ slug }) => 
           console.error('Menu error:', menuError);
         }
 
-        // Get unique categories
-        const categories = [...new Set((menuItems || []).map(item => item.category))].filter(Boolean);
+        // Filter to only items with actual videos (exclude photo-only items)
+        const videoItems = (menuItems || []).filter(item => item.video_url && item.video_url !== '');
+
+        // Get unique categories from video items only
+        const categories = [...new Set(videoItems.map(item => item.category))].filter(Boolean);
 
         // Fetch real Google rating for partner restaurant
         let googleRating = partnerData.rating || 4.5;
@@ -76,7 +79,7 @@ const RestaurantMenuLoader: React.FC<RestaurantMenuLoaderProps> = ({ slug }) => 
           coverPhotoUrl: partnerData.cover_photo_url,
           googleMapsUrl: partnerData.google_maps_url,
           website: partnerData.website,
-          menuItems: (menuItems || []).map(item => ({
+          menuItems: videoItems.map(item => ({
             id: item.id,
             name: item.name,
             description: item.description,

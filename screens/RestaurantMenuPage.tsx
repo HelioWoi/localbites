@@ -312,7 +312,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
             )}
           </button>
           <div className="flex-1">
-            <h1 className="text-white font-bold text-lg leading-tight">{restaurant.name}</h1>
+            <h1 className="text-white font-bold text-base leading-tight">{restaurant.name}</h1>
             <div className="flex items-center gap-2 text-white/60 text-xs">
               <span>{restaurant.cuisine}</span>
               <span>•</span>
