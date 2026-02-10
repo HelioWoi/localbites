@@ -93,6 +93,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   
   // Video preview state
   const [previewVideo, setPreviewVideo] = useState<string | null>(null);
+  const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
 
   // Photo upload for menu items
   const [menuPhotoFile, setMenuPhotoFile] = useState<File | null>(null);
@@ -211,14 +212,34 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         const trialEnds = new Date();
         trialEnds.setDate(trialEnds.getDate() + 14);
 
+        // Check for pending signup data (saved during registration)
+        let pendingData: any = null;
+        try {
+          const raw = localStorage.getItem('pending_partner_signup');
+          if (raw) pendingData = JSON.parse(raw);
+        } catch (e) { /* ignore */ }
+
+        const restaurantName = pendingData?.restaurant_name || '';
+        const slug = restaurantName
+          ? restaurantName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+          : '';
+
         const { data: newPartner, error: createError } = await supabase
           .from('partners')
           .insert({
             id: user.id,
             email: user.email,
-            plan: 'trial',
-            trial_ends_at: trialEnds.toISOString(),
+            restaurant_name: restaurantName || null,
+            abn: pendingData?.abn || null,
+            address: pendingData?.address || null,
+            postal_code: pendingData?.postal_code || null,
+            phone: pendingData?.phone || null,
+            website: pendingData?.website || null,
+            slug: slug || null,
+            plan: pendingData?.hasLifetimeAccess ? 'lifetime' : 'trial',
+            trial_ends_at: pendingData?.hasLifetimeAccess ? null : trialEnds.toISOString(),
             subscription_status: 'active',
+            lifetime_access: pendingData?.hasLifetimeAccess || false,
           })
           .select()
           .single();
@@ -228,6 +249,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         } else {
           console.log('Partner created:', newPartner);
           currentPartner = newPartner;
+          // Clear pending signup data
+          localStorage.removeItem('pending_partner_signup');
         }
       }
 
@@ -1017,7 +1040,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                       className="relative aspect-square bg-zinc-100 rounded-lg overflow-hidden cursor-pointer"
                       onClick={() => setPreviewVideo(item.video_url)}
                     >
-                      <video src={item.video_url} className="w-full h-full object-cover" muted />
+                      <video src={`${item.video_url}#t=0.5`} className="w-full h-full object-cover" muted preload="metadata" />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-2">
                         <p className="text-white text-xs font-medium truncate">{item.name}</p>
                       </div>
@@ -1161,10 +1184,10 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                         <div key={item.id} className="relative group">
                           <div 
                             className="aspect-square bg-zinc-100 rounded-xl overflow-hidden cursor-pointer"
-                            onClick={() => hasVideo ? setPreviewVideo(item.video_url) : null}
+                            onClick={() => hasVideo ? setPreviewVideo(item.video_url) : hasPhoto ? setPreviewPhoto(item.photo_url!) : null}
                           >
                             {hasVideo ? (
-                              <video src={item.video_url} className="w-full h-full object-cover" muted />
+                              <video src={`${item.video_url}#t=0.5`} className="w-full h-full object-cover" muted preload="metadata" />
                             ) : hasPhoto ? (
                               <img src={item.photo_url} className="w-full h-full object-cover" alt={item.name} />
                             ) : (
@@ -1295,7 +1318,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                         <div key={item.id} className="flex items-center gap-3">
                           <span className="text-lg font-bold text-zinc-400 w-6">#{idx + 1}</span>
                           <div className="w-12 h-12 bg-zinc-100 rounded-lg overflow-hidden">
-                            <video src={item.video_url} className="w-full h-full object-cover" />
+                            <video src={`${item.video_url}#t=0.5`} className="w-full h-full object-cover" preload="metadata" />
                           </div>
                           <div className="flex-1">
                             <p className="font-medium text-sm text-zinc-900">{item.name}</p>
@@ -1895,6 +1918,27 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             className="max-w-full max-h-[80vh] rounded-xl" 
             controls 
             autoPlay
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+
+      {/* Photo Preview Modal */}
+      {previewPhoto && (
+        <div 
+          className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"
+          onClick={() => setPreviewPhoto(null)}
+        >
+          <button 
+            onClick={() => setPreviewPhoto(null)}
+            className="absolute top-4 right-4 p-2 text-white hover:bg-white/20 rounded-full z-10"
+          >
+            <X size={24} />
+          </button>
+          <img 
+            src={previewPhoto} 
+            className="max-w-full max-h-[80vh] rounded-xl object-contain" 
+            alt="Menu item"
             onClick={(e) => e.stopPropagation()}
           />
         </div>

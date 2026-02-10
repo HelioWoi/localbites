@@ -18,6 +18,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
   // ABN verification fields (only for signup)
   const [restaurantName, setRestaurantName] = useState('');
   const [abn, setAbn] = useState('');
+  const [businessIdType, setBusinessIdType] = useState<'ABN' | 'ACN'>('ABN');
   const [address, setAddress] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [phone, setPhone] = useState('');
@@ -27,6 +28,49 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
   const [verificationResult, setVerificationResult] = useState<any>(null);
   const [isValidatingPromo, setIsValidatingPromo] = useState(false);
   const [promoValidation, setPromoValidation] = useState<{ valid: boolean; type?: string; error?: string } | null>(null);
+
+  const handleVerifyABN = async () => {
+    const cleanValue = abn.replace(/\s/g, '').replace(/[^0-9]/g, '');
+    const expectedLength = businessIdType === 'ABN' ? 11 : 9;
+    if (cleanValue.length !== expectedLength) return;
+    if (!restaurantName.trim()) {
+      setError(`Please enter your restaurant name first to verify ${businessIdType}`);
+      return;
+    }
+    
+    setIsVerifying(true);
+    setVerificationResult(null);
+    setError('');
+    
+    try {
+      const result = await verifyABN(abn, restaurantName, businessIdType);
+      setVerificationResult(result);
+    } catch (err) {
+      setVerificationResult({ isValid: false, message: 'Error verifying ABN' });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleABNChange = (value: string) => {
+    if (businessIdType === 'ABN') {
+      const formatted = formatABN(value);
+      setAbn(formatted);
+    } else {
+      // ACN: 9 digits, format as XXX XXX XXX
+      const clean = value.replace(/\s/g, '').replace(/[^0-9]/g, '').slice(0, 9);
+      const parts = [clean.slice(0, 3), clean.slice(3, 6), clean.slice(6, 9)].filter(Boolean);
+      setAbn(parts.join(' '));
+    }
+    setVerificationResult(null);
+  };
+
+  const handleToggleBusinessIdType = () => {
+    const newType = businessIdType === 'ABN' ? 'ACN' : 'ABN';
+    setBusinessIdType(newType);
+    setAbn('');
+    setVerificationResult(null);
+  };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,6 +117,18 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
           hasLifetimeAccess = true;
         }
       }
+
+      // Save signup data to localStorage in case email confirmation is required
+      localStorage.setItem('pending_partner_signup', JSON.stringify({
+        restaurant_name: restaurantName.trim(),
+        abn: abn.trim() || null,
+        address: address.trim(),
+        postal_code: postalCode.trim(),
+        phone: phone.trim(),
+        website: website.trim() || null,
+        hasLifetimeAccess,
+        promoCode: promoCode.trim() || null,
+      }));
 
       // Create Supabase auth account
       const { data, error } = await supabase.auth.signUp({
@@ -238,18 +294,68 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
 
                     <div>
                       <label className="block text-xs font-medium text-zinc-500 mb-2">
-                        ABN <span className="text-zinc-400">(optional)</span>
+                        {businessIdType}
                       </label>
-                      <div className="relative">
-                        <Hash size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
-                        <input
-                          type="text"
-                          value={abn}
-                          onChange={(e) => setAbn(e.target.value)}
-                          placeholder="12 345 678 901"
-                          className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                        />
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Hash size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                          <input
+                            type="text"
+                            value={abn}
+                            onChange={(e) => handleABNChange(e.target.value)}
+                            placeholder={businessIdType === 'ABN' ? '12 345 678 901' : '123 456 789'}
+                            maxLength={businessIdType === 'ABN' ? 14 : 11}
+                            className={`w-full pl-12 pr-4 py-3 bg-zinc-50 border rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all ${
+                              verificationResult?.isValid ? 'border-emerald-400 bg-emerald-50/50' : 
+                              verificationResult && !verificationResult.isValid ? 'border-red-300 bg-red-50/50' : 
+                              'border-zinc-200'
+                            }`}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleVerifyABN}
+                          disabled={(() => { const clean = abn.replace(/\s/g, '').replace(/[^0-9]/g, ''); return clean.length !== (businessIdType === 'ABN' ? 11 : 9); })() || isVerifying || !restaurantName.trim()}
+                          className="px-4 py-3 bg-zinc-900 text-white text-sm font-semibold rounded-xl hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 whitespace-nowrap"
+                        >
+                          {isVerifying ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                          Verify
+                        </button>
                       </div>
+                      <button
+                        type="button"
+                        onClick={handleToggleBusinessIdType}
+                        className="mt-1.5 text-xs text-orange-600 hover:text-orange-700 font-medium transition-colors"
+                      >
+                        {businessIdType === 'ABN' ? 'Have an ACN instead? Click here' : 'Have an ABN instead? Click here'}
+                      </button>
+                      {/* Verification Result */}
+                      {verificationResult && (
+                        <div className={`mt-2 p-3 rounded-lg text-sm ${
+                          verificationResult.isValid 
+                            ? 'bg-emerald-50 border border-emerald-200' 
+                            : 'bg-red-50 border border-red-200'
+                        }`}>
+                          {verificationResult.isValid ? (
+                            <div className="flex items-start gap-2">
+                              <CheckCircle size={16} className="text-emerald-600 mt-0.5 flex-shrink-0" />
+                              <div>
+                                <p className="font-semibold text-emerald-800">{businessIdType} Verified</p>
+                                <p className="text-emerald-700 text-xs mt-0.5">{verificationResult.businessName}</p>
+                                <p className="text-emerald-600 text-xs">{verificationResult.entityType} • {verificationResult.isActive ? 'Active' : 'Inactive'}{verificationResult.gst ? ' • GST Registered' : ''}</p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-start gap-2">
+                              <AlertCircle size={16} className="text-red-600 mt-0.5 flex-shrink-0" />
+                              <div>
+                                <p className="font-semibold text-red-800">Verification Failed</p>
+                                <p className="text-red-700 text-xs mt-0.5">{verificationResult.message}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div>

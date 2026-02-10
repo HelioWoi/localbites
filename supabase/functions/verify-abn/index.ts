@@ -13,6 +13,7 @@ const corsHeaders = {
 interface ABNVerificationRequest {
   abn: string;
   businessName: string;
+  type?: 'ABN' | 'ACN';
 }
 
 interface ABNVerificationResponse {
@@ -32,13 +33,13 @@ serve(async (req) => {
   }
 
   try {
-    const { abn, businessName }: ABNVerificationRequest = await req.json();
+    const { abn, businessName, type = 'ABN' }: ABNVerificationRequest = await req.json();
 
     if (!abn || !businessName) {
       return new Response(
         JSON.stringify({ 
           isValid: false, 
-          message: 'ABN and business name are required' 
+          message: `${type} and business name are required` 
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -47,15 +48,16 @@ serve(async (req) => {
       );
     }
 
-    // Clean ABN (remove spaces and special characters)
+    // Clean number (remove spaces and special characters)
     const cleanABN = abn.replace(/\s/g, '').replace(/[^0-9]/g, '');
 
-    // Validate ABN format (11 digits)
-    if (cleanABN.length !== 11) {
+    // Validate format: ABN = 11 digits, ACN = 9 digits
+    const expectedLength = type === 'ACN' ? 9 : 11;
+    if (cleanABN.length !== expectedLength) {
       return new Response(
         JSON.stringify({ 
           isValid: false, 
-          message: 'ABN must be 11 digits' 
+          message: `${type} must be ${expectedLength} digits` 
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -81,13 +83,27 @@ serve(async (req) => {
       );
     }
 
-    // Call ABN Lookup API
-    const abnLookupUrl = `https://abr.business.gov.au/json/AbnDetails.aspx?abn=${cleanABN}&guid=${ABN_GUID}`;
+    // Call ABN Lookup API (different endpoint for ACN)
+    const abnLookupUrl = type === 'ACN'
+      ? `https://abr.business.gov.au/json/AcnDetails.aspx?acn=${cleanABN}&guid=${ABN_GUID}`
+      : `https://abr.business.gov.au/json/AbnDetails.aspx?abn=${cleanABN}&guid=${ABN_GUID}`;
     
-    console.log('Calling ABN Lookup API for ABN:', cleanABN);
+    console.log(`Calling ABN Lookup API for ${type}:`, cleanABN);
     
     const abnResponse = await fetch(abnLookupUrl);
-    const abnData = await abnResponse.json();
+    const abnText = await abnResponse.text();
+    
+    // ABN Lookup API returns JSONP: callback({...})
+    // Strip the callback wrapper to get pure JSON
+    const jsonMatch = abnText.match(/callback\(([\s\S]*)\)/);
+    if (!jsonMatch) {
+      console.error('Unexpected ABN API response format:', abnText.substring(0, 200));
+      return new Response(
+        JSON.stringify({ isValid: false, message: 'Unexpected response from ABN service' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+    const abnData = JSON.parse(jsonMatch[1]);
 
     console.log('ABN Lookup Response:', JSON.stringify(abnData, null, 2));
 

@@ -23,11 +23,12 @@ export interface ABNVerificationResult {
  */
 export const verifyABN = async (
   abn: string,
-  businessName: string
+  businessName: string,
+  type: 'ABN' | 'ACN' = 'ABN'
 ): Promise<ABNVerificationResult> => {
   try {
     const { data, error } = await supabase.functions.invoke('verify-abn', {
-      body: { abn, businessName },
+      body: { abn, businessName, type },
     });
 
     if (error) {
