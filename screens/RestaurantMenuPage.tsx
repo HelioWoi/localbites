@@ -185,12 +185,23 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   };
 
   // Play/pause and load management based on active index
+  // Only keep videos within ±1 of active index loaded to save memory on mobile
   useEffect(() => {
     videoRefs.current.forEach((video, index) => {
       if (!video) return;
+      const distance = Math.abs(index - activeVideoIndex);
       
-      if (index === activeVideoIndex) {
+      if (distance > 1) {
+        // FAR AWAY: unload to free memory
+        video.pause();
+        video.removeAttribute('src');
+        video.load(); // triggers unload of buffered data
+      } else if (index === activeVideoIndex) {
         // ACTIVE VIDEO: force load and play
+        if (!video.src || video.src === '') {
+          video.src = filteredItems[index]?.videoUrl || '';
+          video.load();
+        }
         video.muted = isMuted;
         if (video.readyState < 3) {
           video.load();
@@ -199,7 +210,12 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
           video.play().catch(() => {});
         }
       } else {
-        // INACTIVE: pause to free bandwidth
+        // ADJACENT (±1): preload but pause
+        if (!video.src || video.src === '') {
+          video.src = filteredItems[index]?.videoUrl || '';
+          video.preload = 'metadata';
+          video.load();
+        }
         video.pause();
       }
     });
@@ -256,6 +272,20 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     currentVideo.addEventListener('ended', handleVideoEnd);
     return () => currentVideo.removeEventListener('ended', handleVideoEnd);
   }, [activeVideoIndex, filteredItems.length, activeCategory, restaurant.categories]);
+
+  // Cleanup: unload all videos when component unmounts to free memory
+  useEffect(() => {
+    return () => {
+      videoRefs.current.forEach((video) => {
+        if (video) {
+          video.pause();
+          video.removeAttribute('src');
+          video.load();
+        }
+      });
+      videoRefs.current = [];
+    };
+  }, []);
 
   // Reset video index when category changes
   useEffect(() => {
@@ -390,7 +420,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
             )}
             <video
               ref={el => videoRefs.current[index] = el}
-              src={item.videoUrl}
+              src={Math.abs(index - activeVideoIndex) <= 1 ? item.videoUrl : undefined}
               className="absolute inset-0 w-full h-full object-cover"
               loop
               muted
@@ -410,9 +440,12 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                 if (!videoErrors.has(index)) {
                   setVideoErrors(prev => new Set(prev).add(index));
                   setTimeout(() => {
-                    video.load();
-                    if (index === activeVideoIndex) {
-                      video.play().catch(() => {});
+                    if (Math.abs(index - activeVideoIndex) <= 1) {
+                      video.src = item.videoUrl;
+                      video.load();
+                      if (index === activeVideoIndex) {
+                        video.play().catch(() => {});
+                      }
                     }
                   }, 2000);
                 }

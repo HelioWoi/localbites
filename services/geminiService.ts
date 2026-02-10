@@ -5,6 +5,14 @@ import { searchNearbyRestaurants as searchGooglePlaces, getPlaceDetails, textSea
 import { enrichRestaurantWithFilters, applyFilters } from "../utils/filterHelpers";
 import { getCachedRestaurants, setCachedRestaurants } from "../utils/cacheHelpers";
 
+// Helper: parse distance string ("30 m", "1.5 km") to meters
+function _parseDistanceToMeters(distance: string): number {
+  if (!distance) return 999999;
+  const num = parseFloat(distance.replace(/[^\d.]/g, '')) || 0;
+  if (distance.toLowerCase().includes('km')) return num * 1000;
+  return num; // already in meters
+}
+
 // HYBRID COST OPTIMIZATION: Partners first, limited Google API usage
 const GOOGLE_API_LIMIT = 50; // Fetch up to 50 Google restaurants (increased for testing)
 const RATE_LIMIT_KEY = 'google_api_searches';
@@ -122,6 +130,7 @@ export async function getNearbyRestaurants(
           cuisine: place.cuisine,
           priceLevel: place.priceLevel,
           distance: place.distance,
+          distanceMeters: (place as any).distanceMeters,
           isOpen: place.isOpen ?? true,
           rating: place.rating,
           totalReviews: place.totalReviews,
@@ -164,13 +173,10 @@ export async function getNearbyRestaurants(
     if (a.isSubscribed && !b.isSubscribed) return -1;
     if (!a.isSubscribed && b.isSubscribed) return 1;
     
-    // Priority 2: Within same group (both partners or both non-partners), sort by distance
-    const distA = parseFloat(a.distance.replace(/[^\d.]/g, '')) || 0;
-    const distB = parseFloat(b.distance.replace(/[^\d.]/g, '')) || 0;
-    // Convert km to m if needed for comparison
-    const distAMeters = a.distance.includes('km') ? distA * 1000 : distA;
-    const distBMeters = b.distance.includes('km') ? distB * 1000 : distB;
-    return distAMeters - distBMeters;
+    // Priority 2: Within same group, sort by distanceMeters (numeric, reliable)
+    const distA = a.distanceMeters ?? _parseDistanceToMeters(a.distance);
+    const distB = b.distanceMeters ?? _parseDistanceToMeters(b.distance);
+    return distA - distB;
   });
   console.log('[LocalBites] After sort:', results.length, 'restaurants');
   console.log('[LocalBites] First restaurant after sort:', results[0]?.name, 'isSubscribed:', results[0]?.isSubscribed);

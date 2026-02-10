@@ -17,12 +17,37 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper: Offset a lat/lng by meters in a given direction
+function offsetLatLng(lat: number, lng: number, offsetMeters: number, direction: 'N' | 'S' | 'E' | 'W'): { lat: number; lng: number } {
+  const earthRadius = 6371000;
+  const dLat = offsetMeters / earthRadius * (180 / Math.PI);
+  const dLng = offsetMeters / (earthRadius * Math.cos(lat * Math.PI / 180)) * (180 / Math.PI);
+  switch (direction) {
+    case 'N': return { lat: lat + dLat, lng };
+    case 'S': return { lat: lat - dLat, lng };
+    case 'E': return { lat, lng: lng + dLng };
+    case 'W': return { lat, lng: lng - dLng };
+  }
+}
+
 // Helper: Round coordinates to create cache keys (groups nearby locations)
 function getCacheKey(lat: number, lng: number, radius: number): string {
-  // Round to 2 decimal places (~1km precision)
-  const roundedLat = Math.round(lat * 100) / 100;
-  const roundedLng = Math.round(lng * 100) / 100;
+  // Round to 3 decimal places (~110m precision) for more accurate results
+  const roundedLat = Math.round(lat * 1000) / 1000;
+  const roundedLng = Math.round(lng * 1000) / 1000;
   return `places_${roundedLat}_${roundedLng}_${radius}`;
+}
+
+// Calculate distance between two points in meters (Haversine formula)
+function calculateDistanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000; // Earth's radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
 function getLocalityCacheKey(lat: number, lng: number): string {
@@ -161,7 +186,13 @@ serve(async (req) => {
 });
 
 async function searchNearbyRestaurants(lat: number, lng: number, radius: number, category: string = 'all') {
-  const cacheKey = `${getCacheKey(lat, lng, radius)}_${category}`;
+  // Determine search radii based on requested radius
+  // Default: 2km, 5km, 8km. Expanded: adds 10km, 15km
+  const isExpanded = radius > 8000;
+  const searchRadii = isExpanded ? [2000, 5000, 8000, 10000, 15000] : [2000, 5000, 8000];
+  const maxRadius = searchRadii[searchRadii.length - 1];
+  
+  const cacheKey = `${getCacheKey(lat, lng, maxRadius)}_${category}_v2`;
   
   // OPTIMIZATION #2: Check cache first
   try {
@@ -188,7 +219,6 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number,
   const seenIds = new Set<string>();
 
   // Determine which type groups to search based on category
-  // For 'all', we make separate requests per type to get more results (up to 20 per type)
   let typeGroups: string[][];
   switch (category) {
     case 'restaurants':
@@ -202,7 +232,6 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number,
       break;
     case 'all':
     default:
-      // Split into separate requests to get more results (up to 20 each = 60 total)
       typeGroups = [["restaurant"], ["cafe", "bakery"], ["bar"]];
       break;
   }
@@ -214,53 +243,85 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number,
     'school', 'university', 'bank', 'atm', 'car_wash', 'car_repair'
   ];
 
-  for (const includedTypes of typeGroups) {
-    try {
-      const response = await fetch(
-        "https://places.googleapis.com/v1/places:searchNearby",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Goog-Api-Key": GOOGLE_API_KEY!,
-            "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.photos,places.location,places.types,places.googleMapsUri",
-          },
-          body: JSON.stringify({
-            includedTypes: includedTypes,
-            maxResultCount: 20,
-            locationRestriction: {
-              circle: {
-                center: { latitude: lat, longitude: lng },
-                radius: radius,
-              },
-            },
-            rankPreference: "DISTANCE",
-          }),
-        }
-      );
+  // Build search points: center + offset points for expanded search
+  // Each point searches with its own radius to cover more area
+  const searchPoints: { lat: number; lng: number; radius: number; label: string }[] = [];
+  
+  // Standard radii from center
+  for (const r of searchRadii) {
+    searchPoints.push({ lat, lng, radius: r, label: `center@${r}m` });
+  }
+  
+  // For expanded search: add 4 offset points (N/S/E/W at 7km) with 5km radius each
+  // This creates a grid that covers ~15km total area with minimal overlap
+  if (isExpanded) {
+    const offsetDist = 7000; // 7km offset
+    const gridRadius = 5000; // 5km search radius at each point
+    const directions: ('N' | 'S' | 'E' | 'W')[] = ['N', 'S', 'E', 'W'];
+    for (const dir of directions) {
+      const pt = offsetLatLng(lat, lng, offsetDist, dir);
+      searchPoints.push({ lat: pt.lat, lng: pt.lng, radius: gridRadius, label: `${dir}@${offsetDist}m` });
+    }
+    console.log(`[Nearby] Expanded grid search: ${searchPoints.length} search points (center + 4 offset)`);
+  }
+  
+  console.log(`[Nearby] Searching ${searchPoints.length} points, ${typeGroups.length} type groups (expanded: ${isExpanded})`);
 
-      if (response.ok) {
-        const data = await response.json();
-        for (const place of (data.places || [])) {
-          const placeTypes = place.types || [];
-          const isExcluded = placeTypes.some((t: string) => excludedTypes.includes(t));
-          
-          if (!seenIds.has(place.id) && !isExcluded) {
-            seenIds.add(place.id);
-            allPlaces.push(place);
+  for (const includedTypes of typeGroups) {
+    for (const point of searchPoints) {
+      try {
+        const response = await fetch(
+          "https://places.googleapis.com/v1/places:searchNearby",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Goog-Api-Key": GOOGLE_API_KEY!,
+              "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.photos,places.location,places.types,places.googleMapsUri",
+            },
+            body: JSON.stringify({
+              includedTypes: includedTypes,
+              maxResultCount: 20,
+              locationRestriction: {
+                circle: {
+                  center: { latitude: point.lat, longitude: point.lng },
+                  radius: point.radius,
+                },
+              },
+              rankPreference: "DISTANCE",
+            }),
           }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          let newCount = 0;
+          for (const place of (data.places || [])) {
+            const placeTypes = place.types || [];
+            const isExcluded = placeTypes.some((t: string) => excludedTypes.includes(t));
+            
+            if (!seenIds.has(place.id) && !isExcluded) {
+              seenIds.add(place.id);
+              allPlaces.push(place);
+              newCount++;
+            }
+          }
+          console.log(`[Nearby] ${point.label}, types ${includedTypes.join(',')}: ${data.places?.length || 0} results, ${newCount} new`);
         }
+      } catch (error) {
+        console.error("Search error for types", includedTypes, "point", point.label, ":", error);
       }
-    } catch (error) {
-      console.error("Search error for types", includedTypes, ":", error);
     }
   }
   
-  console.log(`[Nearby] Found ${allPlaces.length} total places for category "${category}"`);
+  console.log(`[Nearby] Found ${allPlaces.length} total unique places for category "${category}"`);
 
-  // Transform places to response format
+  // Transform places to response format with distance from user
   const result = (allPlaces || []).map((place: any) => {
     const openingHours = place.currentOpeningHours?.weekdayDescriptions || [];
+    const placeLat = place.location?.latitude;
+    const placeLng = place.location?.longitude;
+    const distMeters = (placeLat && placeLng) ? calculateDistanceMeters(lat, lng, placeLat, placeLng) : 999999;
     return {
       id: place.id,
       name: place.displayName?.text || "Unknown",
@@ -278,12 +339,17 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number,
       googleMapsUrl: place.googleMapsUri || `https://www.google.com/maps/place/?q=place_id:${place.id}`,
       cuisine: extractCuisine(place.types),
       location: {
-        lat: place.location?.latitude,
-        lng: place.location?.longitude,
+        lat: placeLat,
+        lng: placeLng,
       },
+      distanceMeters: Math.round(distMeters),
       reviews: [], // Reviews now fetched on demand via getPlaceDetails to save costs
     };
   });
+
+  // Sort by distance from user (closest first)
+  result.sort((a: any, b: any) => a.distanceMeters - b.distanceMeters);
+  console.log(`[Nearby] Sorted ${result.length} places by distance. Closest: ${result[0]?.name} (${result[0]?.distanceMeters}m), Farthest: ${result[result.length-1]?.name} (${result[result.length-1]?.distanceMeters}m)`);
 
   // OPTIMIZATION #2: Save to cache for future requests
   if (result.length > 0) {
@@ -310,7 +376,7 @@ async function textSearchRestaurants(lat: number, lng: number, radius: number, q
     return [];
   }
 
-  const cacheKey = `text_search_${query.toLowerCase().replace(/\s+/g, '_')}_${Math.round(lat * 100) / 100}_${Math.round(lng * 100) / 100}`;
+  const cacheKey = `text_search_${query.toLowerCase().replace(/\s+/g, '_')}_${Math.round(lat * 1000) / 1000}_${Math.round(lng * 1000) / 1000}_v2`;
   
   // Check cache first
   try {
@@ -367,6 +433,9 @@ async function textSearchRestaurants(lat: number, lng: number, radius: number, q
 
     const result = places.map((place: any) => {
       const openingHours = place.currentOpeningHours?.weekdayDescriptions || [];
+      const placeLat = place.location?.latitude;
+      const placeLng = place.location?.longitude;
+      const distMeters = (placeLat && placeLng) ? calculateDistanceMeters(lat, lng, placeLat, placeLng) : 999999;
       return {
         id: place.id,
         name: place.displayName?.text || "Unknown",
@@ -382,12 +451,16 @@ async function textSearchRestaurants(lat: number, lng: number, radius: number, q
         googleMapsUrl: place.googleMapsUri || `https://www.google.com/maps/place/?q=place_id:${place.id}`,
         cuisine: extractCuisine(place.types),
         location: {
-          lat: place.location?.latitude,
-          lng: place.location?.longitude,
+          lat: placeLat,
+          lng: placeLng,
         },
+        distanceMeters: Math.round(distMeters),
         reviews: [],
       };
     });
+
+    // Sort by distance from user (closest first)
+    result.sort((a: any, b: any) => a.distanceMeters - b.distanceMeters);
 
     // Save to cache
     if (result.length > 0) {

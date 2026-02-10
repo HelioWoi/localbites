@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Mic, Sparkles, Send } from 'lucide-react';
+import { X, Mic, Sparkles, Send, MapPin, Loader2 } from 'lucide-react';
 import { chatWithBitesBuddy, getInitialMessage, ChatMessage, TriageData, logBuddyIntent, logBuddyAction } from '../services/aiAssistant';
 import { UserIntent, initializeIntent } from '../types/intent';
 
@@ -14,9 +14,12 @@ interface BitesAIProps {
     radiusKm?: number;
   }) => void;
   mode?: 'voice' | 'chat'; // voice = Start talking screen, chat = Direct chat
+  endOfFeedMode?: boolean; // true = opened from end of feed, show expand option
+  onExpandSearch?: () => Promise<void>; // callback to load more restaurants
+  restaurantCount?: number; // how many restaurants are currently shown
 }
 
-const BitesAI: React.FC<BitesAIProps> = ({ onClose, onSearchTrigger, onApplyIntent, mode = 'voice' }) => {
+const BitesAI: React.FC<BitesAIProps> = ({ onClose, onSearchTrigger, onApplyIntent, mode = 'voice', endOfFeedMode = false, onExpandSearch, restaurantCount = 0 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -24,6 +27,8 @@ const BitesAI: React.FC<BitesAIProps> = ({ onClose, onSearchTrigger, onApplyInte
   const [triageData, setTriageData] = useState<TriageData>({ isComplete: false });
   const [hasStarted, setHasStarted] = useState(mode === 'chat'); // Auto-start if chat mode
   const [isListening, setIsListening] = useState(false);
+  const [isExpanding, setIsExpanding] = useState(false);
+  const [expandDone, setExpandDone] = useState(false);
   const [userIntent, setUserIntent] = useState<UserIntent>(initializeIntent()); // Intent Engine
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -41,17 +46,29 @@ const BitesAI: React.FC<BitesAIProps> = ({ onClose, onSearchTrigger, onApplyInte
   // Auto-start conversation if chat mode
   useEffect(() => {
     if (mode === 'chat' && messages.length === 0) {
-      const initial = getInitialMessage();
-      setMessages([
-        {
-          role: 'assistant',
-          content: initial.message,
-          timestamp: new Date(),
-        },
-      ]);
-      setQuickReplies(initial.quickReplies || []);
+      if (endOfFeedMode) {
+        // Contextual message for end of feed
+        setMessages([
+          {
+            role: 'assistant',
+            content: `You've seen ${restaurantCount} places so far!\nWant me to find more nearby, or are you looking for something specific?`,
+            timestamp: new Date(),
+          },
+        ]);
+        setQuickReplies(['Quick & casual', 'Sit-down meal', 'Bars & drinks', 'Surprise me']);
+      } else {
+        const initial = getInitialMessage();
+        setMessages([
+          {
+            role: 'assistant',
+            content: initial.message,
+            timestamp: new Date(),
+          },
+        ]);
+        setQuickReplies(initial.quickReplies || []);
+      }
     }
-  }, [mode]);
+  }, [mode, endOfFeedMode]);
 
   // Initialize Web Speech API
   useEffect(() => {
@@ -292,6 +309,46 @@ const BitesAI: React.FC<BitesAIProps> = ({ onClose, onSearchTrigger, onApplyInte
                   {reply}
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* Show me more nearby button - only in end of feed mode, hidden after used */}
+          {endOfFeedMode && onExpandSearch && !isTyping && !expandDone && (
+            <div className="pt-2">
+              <button
+                onClick={async () => {
+                  if (isExpanding) return;
+                  setIsExpanding(true);
+                  try {
+                    await onExpandSearch();
+                    setExpandDone(true);
+                    setMessages(prev => [...prev, {
+                      role: 'assistant',
+                      content: 'Done! I found more places for you. Scroll down to explore them!',
+                      timestamp: new Date(),
+                    }]);
+                    setQuickReplies([]);
+                    setTimeout(() => onClose(), 1500);
+                  } catch (error) {
+                    setExpandDone(true);
+                    setMessages(prev => [...prev, {
+                      role: 'assistant',
+                      content: 'No new places found nearby. Try searching for something specific below!',
+                      timestamp: new Date(),
+                    }]);
+                  } finally {
+                    setIsExpanding(false);
+                  }
+                }}
+                disabled={isExpanding}
+                className="w-full px-5 py-3 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-semibold rounded-full text-sm transition-all flex items-center justify-center gap-2"
+              >
+                {isExpanding ? (
+                  <><Loader2 size={16} className="animate-spin" /> Searching further...</>
+                ) : (
+                  <><MapPin size={16} /> Show me more nearby</>
+                )}
+              </button>
             </div>
           )}
 

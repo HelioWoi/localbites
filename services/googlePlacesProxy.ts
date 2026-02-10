@@ -69,13 +69,21 @@ export async function searchNearbyRestaurants(
       return [];
     }
 
-    // Add distance calculation
+    // Use server-calculated distance when available, fallback to client calculation
     const results = (data || []).map((place: any) => ({
       ...place,
-      distance: formatDistance(calculateDistance(lat, lng, place.location?.lat, place.location?.lng)),
+      distance: place.distanceMeters 
+        ? formatDistance(place.distanceMeters / 1000)
+        : formatDistance(calculateDistance(lat, lng, place.location?.lat, place.location?.lng)),
     }));
 
-    console.log('[GooglePlaces] Found', results.length, 'restaurants');
+    // Debug: verify expanding radius is working
+    const hasDistance = results.filter((r: any) => r.distanceMeters).length;
+    console.log('[GooglePlaces] Found', results.length, 'restaurants.', hasDistance, 'have server-calculated distance');
+    if (results.length > 0) {
+      console.log('[GooglePlaces] Closest:', results[0]?.name, results[0]?.distanceMeters ? `${results[0].distanceMeters}m` : 'no dist');
+      console.log('[GooglePlaces] Farthest:', results[results.length-1]?.name, results[results.length-1]?.distanceMeters ? `${results[results.length-1].distanceMeters}m` : 'no dist');
+    }
     return results;
   } catch (error) {
     console.error('[GooglePlaces] Error:', error);
@@ -107,10 +115,12 @@ export async function textSearchRestaurants(
       return [];
     }
 
-    // Add distance calculation
+    // Use server-calculated distance when available, fallback to client calculation
     const results = (Array.isArray(data) ? data : []).map((place: any) => ({
       ...place,
-      distance: formatDistance(calculateDistance(lat, lng, place.location?.lat, place.location?.lng)),
+      distance: place.distanceMeters 
+        ? formatDistance(place.distanceMeters / 1000)
+        : formatDistance(calculateDistance(lat, lng, place.location?.lat, place.location?.lng)),
     }));
 
     console.log('[GooglePlaces] Text search found', results.length, 'restaurants for:', query);

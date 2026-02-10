@@ -16,6 +16,7 @@ export interface Restaurant {
   cuisine: string;
   priceLevel: string; // $, $$, $$$
   distance: string;
+  distanceMeters?: number;
   isOpen: boolean;
   rating?: number;
   totalReviews?: number;

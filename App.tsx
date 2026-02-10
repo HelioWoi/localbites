@@ -134,6 +134,11 @@ const App: React.FC = () => {
   const [showSearch, setShowSearch] = useState(false);
   const [showReviewsFeed, setShowReviewsFeed] = useState(false);
   const [showBitesAI, setShowBitesAI] = useState(false);
+  const [hasExpandedSearch, setHasExpandedSearch] = useState(false);
+  const [isExpandingSearch, setIsExpandingSearch] = useState(false);
+  const [endOfFeedBuddy, setEndOfFeedBuddy] = useState(false);
+  const [searchExpansionCount, setSearchExpansionCount] = useState(0);
+  const endOfFeedTriggeredRef = useRef(false);
   const [showRestaurantReviews, setShowRestaurantReviews] = useState<Restaurant | null>(null);
   const [modalReviews, setModalReviews] = useState<any[]>([]);
   const [loadingModalReviews, setLoadingModalReviews] = useState(false);
@@ -294,6 +299,9 @@ const App: React.FC = () => {
     console.log('[App] 🔄 fetchRestaurants called - page:', page, 'location:', loc.name, 'category:', selectedCategory);
     setIsLoading(true);
     setError(null);
+    setHasExpandedSearch(false);
+    setSearchExpansionCount(0);
+    endOfFeedTriggeredRef.current = false;
     try {
       const data = await getNearbyRestaurants(loc, f, selectedCategory);
       console.log('[App] ✅ Total restaurants from getNearbyRestaurants:', data.length);
@@ -543,12 +551,13 @@ const App: React.FC = () => {
     const itemHeight = window.innerHeight;
     const index = Math.round(scrollPos / itemHeight);
     
-    // Check if user reached the end of feed
-    if (index >= restaurants.length - 1 && restaurants.length > 0 && !showBitesAI) {
-      // Open AI Assistant when reaching the last restaurant
+    // Auto-open Bites Buddy chat when reaching end of feed
+    if (index >= restaurants.length - 1 && restaurants.length > 0 && !showBitesAI && !endOfFeedTriggeredRef.current) {
+      endOfFeedTriggeredRef.current = true;
       setTimeout(() => {
+        setEndOfFeedBuddy(true);
         setShowBitesAI(true);
-      }, 500);
+      }, 600);
     }
     
     if (index !== activeRestaurantIndex && index >= 0 && index < restaurants.length) {
@@ -1355,27 +1364,7 @@ const App: React.FC = () => {
           </div>
         )}
         
-        {/* End of results indicator */}
-        {!isLoading && !isLoadingMore && restaurants.length > 0 && !hasMorePages && (
-          <div className="snap-item">
-            <div className="video-card shadow-none rounded-none border-none bg-gradient-to-br from-zinc-900 to-black flex items-center justify-center">
-              <div className="text-center p-8">
-                <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Star size={32} className="text-orange-500" />
-                </div>
-                <h3 className="text-xl font-bold text-white mb-2">
-                  That's all for now!
-                </h3>
-                <p className="text-white/60 text-sm max-w-xs mx-auto">
-                  You've seen all {restaurants.length} restaurants in your area
-                </p>
-                <p className="text-white/40 text-xs mt-4">
-                  Try adjusting your filters to see more options
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* End of feed is handled by auto-opening Bites Buddy chat via scroll handler */}
         
         {!isLoading && error ? (
           <div className="h-full w-full flex flex-col items-center justify-center p-12 text-center bg-white">
@@ -2082,7 +2071,41 @@ const App: React.FC = () => {
       {showBitesAI && (
         <BitesAI
           mode="chat"
-          onClose={() => setShowBitesAI(false)}
+          endOfFeedMode={endOfFeedBuddy}
+          restaurantCount={restaurants.length}
+          onExpandSearch={async () => {
+            if (!location) throw new Error('No location');
+            
+            // Clear browser cache to force fresh API call
+            const cacheKeys = Object.keys(localStorage).filter(k => k.startsWith('restaurants_cache_'));
+            cacheKeys.forEach(k => localStorage.removeItem(k));
+            
+            // Increase radius with each expansion: 15km, 25km, 40km
+            const expansionRadii = [15000, 25000, 40000];
+            const expandRadius = expansionRadii[Math.min(searchExpansionCount, expansionRadii.length - 1)];
+            
+            const expandedLocation = { ...location, radius: expandRadius };
+            const data = await getNearbyRestaurants(expandedLocation, filters, selectedCategory);
+            
+            // Find new restaurants not already in the feed
+            const existingIds = new Set(allRestaurants.map(r => r.id));
+            const newResults = data.filter(r => !existingIds.has(r.id));
+            
+            if (newResults.length > 0) {
+              const merged = [...allRestaurants, ...newResults];
+              setAllRestaurants(merged);
+              setRestaurants(merged);
+              setTotalAvailable(merged.length);
+              setHasMorePages(false);
+              setSearchExpansionCount(prev => prev + 1);
+              endOfFeedTriggeredRef.current = false; // Allow re-trigger at new end
+              console.log('[ExpandSearch] Found', newResults.length, 'new restaurants at', expandRadius/1000, 'km radius');
+            } else {
+              console.log('[ExpandSearch] No new restaurants found at', expandRadius/1000, 'km radius');
+              throw new Error('No new results');
+            }
+          }}
+          onClose={() => { setShowBitesAI(false); setEndOfFeedBuddy(false); }}
           onSearchTrigger={(triageData: TriageData) => {
             // Map category
             const categoryMap: { [key: string]: CategoryFilter } = {
@@ -2106,6 +2129,8 @@ const App: React.FC = () => {
             
             // Reset cuisine filter to show all results
             setFilters(prev => ({ ...prev, cuisine: '' }));
+            
+            setEndOfFeedBuddy(false);
             
             // Get GPS and go to feed
             if (navigator.geolocation) {
