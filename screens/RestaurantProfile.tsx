@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Restaurant, Dish, Review } from '../types';
-import { ChevronLeft, Globe, MapPin, Navigation, Bookmark, PlayCircle, Camera, X, Crown, Play, Pause, Volume2, VolumeX, Star, ChevronRight, ChevronUp, ExternalLink, Home, Search, MessageSquare, Filter, Clock, Heart, Trash2, Phone, Sparkles, UtensilsCrossed, Video } from 'lucide-react';
+import { ChevronLeft, Globe, MapPin, Navigation, Bookmark, PlayCircle, Camera, X, Crown, Play, Pause, Volume2, VolumeX, Star, ChevronRight, ChevronUp, ExternalLink, Home, Search, MessageSquare, Filter, Clock, Heart, Trash2, Phone, Sparkles, UtensilsCrossed, Video, Share2 } from 'lucide-react';
 import { getPlaceDetails, textSearchRestaurants } from '../services/googlePlacesProxy';
 import DesktopBanner from '../components/DesktopBanner';
 
@@ -630,6 +630,27 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
             </a>
           )}
         </div>
+
+        {/* Share button */}
+        <button
+          onClick={async () => {
+            const shareUrl = window.location.href;
+            const shareData = {
+              title: restaurant.name,
+              text: `Check out ${restaurant.name} on LocalBites!`,
+              url: shareUrl,
+            };
+            if (navigator.share) {
+              try { await navigator.share(shareData); } catch (e) { /* user cancelled */ }
+            } else {
+              await navigator.clipboard.writeText(shareUrl);
+              alert('Link copied to clipboard!');
+            }
+          }}
+          className="w-full flex items-center justify-center gap-2 bg-zinc-100 text-zinc-700 font-semibold py-3 rounded-xl text-sm active:scale-95 transition-all"
+        >
+          <Share2 size={14} /> Share
+        </button>
 
         {/* Non-subscriber menu preview */}
         {!restaurant.isSubscribed && (

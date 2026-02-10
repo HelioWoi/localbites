@@ -114,7 +114,11 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
 
   const handleItemClick = (item: MenuItem) => {
-    setSelectedItem(item);
+    if (item.videoUrl) {
+      window.location.href = `/r/${restaurant.slug}/menu?from=full-menu&dish=${item.id}`;
+    } else {
+      setSelectedItem(item);
+    }
   };
 
   return (

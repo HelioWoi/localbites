@@ -108,8 +108,8 @@ const SavedPicksPage: React.FC<SavedPicksPageProps> = ({ restaurant }) => {
       <DesktopBanner />
       
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-white border-b border-zinc-100">
-        <div className="flex items-center gap-3 px-4 py-3">
+      <div className="sticky top-0 z-30 bg-white border-b border-zinc-100" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 48px)' }}>
+        <div className="flex items-center gap-3 px-4 pt-3 pb-3">
           <button 
             onClick={handleBack}
             className="p-2 hover:bg-zinc-100 rounded-full transition-colors"
