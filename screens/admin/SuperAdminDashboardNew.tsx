@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { 
   Users, Video, DollarSign, TrendingUp, Search, Bell, LogOut,
   Home, FileText, Settings, BarChart3, Crown, Clock, CheckCircle,
-  MoreVertical, TrendingDown, Activity, Menu, X
+  MoreVertical, TrendingDown, Activity, Menu, X, ShieldAlert, Trash2, Check
 } from 'lucide-react';
 
 interface Partner {
@@ -67,11 +67,14 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
   const [activityLog, setActivityLog] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [newPartners, setNewPartners] = useState<Partner[]>([]);
+  const [removalRequests, setRemovalRequests] = useState<any[]>([]);
+  const [pendingRemovals, setPendingRemovals] = useState(0);
 
   useEffect(() => {
     loadDashboardData();
     loadNotifications();
     loadActivityLog();
+    loadRemovalRequests();
   }, []);
 
   // Search functionality
@@ -212,6 +215,52 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
       }
     } catch (error) {
       console.error('Error loading notifications:', error);
+    }
+  };
+
+  // Load removal requests
+  const loadRemovalRequests = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('removal_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (!error && data) {
+        setRemovalRequests(data);
+        setPendingRemovals(data.filter((r: any) => r.status === 'pending').length);
+      }
+    } catch (error) {
+      console.error('Error loading removal requests:', error);
+    }
+  };
+
+  const handleRemovalAction = async (id: string, action: 'approved' | 'rejected') => {
+    try {
+      const request = removalRequests.find(r => r.id === id);
+      
+      const { error } = await supabase
+        .from('removal_requests')
+        .update({ status: action, reviewed_at: new Date().toISOString() })
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      // If approved, add to blocked_places
+      if (action === 'approved' && request?.google_place_id) {
+        await supabase.from('blocked_places').insert({
+          google_place_id: request.google_place_id,
+          business_name: request.business_name,
+          reason: 'Owner requested removal',
+        });
+      }
+      
+      // Reload
+      loadRemovalRequests();
+      alert(`Request ${action} successfully.`);
+    } catch (error) {
+      console.error('Error updating removal request:', error);
+      alert('Error processing request.');
     }
   };
 
@@ -500,11 +549,11 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                   title={`${notifications} new partners in last 7 days`}
                 >
                   <Bell size={20} />
-                  {notifications > 0 && (
+                  {(notifications > 0 || pendingRemovals > 0) && (
                     <>
                       <span className="absolute top-1 right-1 w-2 h-2 bg-orange-500 rounded-full"></span>
                       <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                        {notifications}
+                        {notifications + pendingRemovals}
                       </span>
                     </>
                   )}
@@ -515,8 +564,26 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                   <div className="absolute right-0 mt-2 w-80 bg-white border border-zinc-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
                     <div className="p-4 border-b border-zinc-200">
                       <h3 className="font-bold text-zinc-900">Notifications</h3>
-                      <p className="text-xs text-zinc-500 mt-1">{notifications} new partners in last 7 days</p>
+                      <p className="text-xs text-zinc-500 mt-1">{notifications} new partners · {pendingRemovals} removal requests</p>
                     </div>
+                    {/* Pending Removal Requests */}
+                    {removalRequests.filter(r => r.status === 'pending').length > 0 && (
+                      <div className="border-b border-zinc-200">
+                        <div className="px-4 py-2 bg-red-50">
+                          <p className="text-xs font-bold text-red-600 flex items-center gap-1"><ShieldAlert size={12} /> Removal Requests</p>
+                        </div>
+                        {removalRequests.filter(r => r.status === 'pending').map((req) => (
+                          <div key={req.id} className="p-4 hover:bg-zinc-50 border-b border-zinc-100">
+                            <p className="font-medium text-sm text-zinc-900">{req.business_name}</p>
+                            <p className="text-xs text-zinc-500">ABN: {req.abn} · {req.contact_email}</p>
+                            <div className="flex gap-2 mt-2">
+                              <button onClick={() => handleRemovalAction(req.id, 'approved')} className="px-2 py-1 bg-red-500 text-white text-xs rounded-md flex items-center gap-1"><Check size={10} /> Approve</button>
+                              <button onClick={() => handleRemovalAction(req.id, 'rejected')} className="px-2 py-1 bg-zinc-200 text-zinc-700 text-xs rounded-md">Reject</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {newPartners.length > 0 ? (
                       <div className="divide-y divide-zinc-100">
                         {newPartners.map((partner) => (
@@ -820,6 +887,50 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                   </div>
                 </div>
               </div>
+
+              {/* Removal Requests */}
+              {removalRequests.length > 0 && (
+                <div className="bg-white rounded-xl p-6 border border-zinc-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                      <ShieldAlert size={20} className="text-red-500" />
+                      Removal Requests
+                    </h3>
+                    {pendingRemovals > 0 && (
+                      <span className="px-2 py-1 bg-red-100 text-red-600 text-xs font-bold rounded-full">{pendingRemovals} pending</span>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    {removalRequests.slice(0, 5).map((req) => (
+                      <div key={req.id} className={`flex items-center justify-between p-4 rounded-lg ${req.status === 'pending' ? 'bg-red-50 border border-red-100' : 'bg-zinc-50'}`}>
+                        <div className="flex-1">
+                          <p className="font-medium text-sm text-zinc-900">{req.business_name}</p>
+                          <p className="text-xs text-zinc-500">ABN: {req.abn} · {req.contact_email}</p>
+                          {req.verified_business_name && (
+                            <p className="text-xs text-green-600 mt-0.5">Verified: {req.verified_business_name}</p>
+                          )}
+                          {req.reason && <p className="text-xs text-zinc-400 mt-1 italic">"{req.reason}"</p>}
+                          <p className="text-[10px] text-zinc-400 mt-1">
+                            {new Date(req.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 ml-4">
+                          {req.status === 'pending' ? (
+                            <>
+                              <button onClick={() => handleRemovalAction(req.id, 'approved')} className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg flex items-center gap-1"><Trash2 size={12} /> Remove</button>
+                              <button onClick={() => handleRemovalAction(req.id, 'rejected')} className="px-3 py-1.5 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 text-xs font-medium rounded-lg">Reject</button>
+                            </>
+                          ) : (
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                              req.status === 'approved' ? 'bg-red-100 text-red-600' : 'bg-zinc-100 text-zinc-500'
+                            }`}>{req.status}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Atividade Recente */}
               <div className="bg-white rounded-xl p-6 border border-zinc-200">

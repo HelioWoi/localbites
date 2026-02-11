@@ -15,6 +15,7 @@ import SavedPicksLoader from './components/SavedPicksLoader';
 import MediaContainer from './components/MediaContainer';
 import FloatingFilters from './components/FloatingFilters';
 import BitesAI from './components/BitesAI';
+import RemovalRequestPage from './screens/RemovalRequestPage';
 import { getNearbyRestaurants, getRestaurantDetails, getRemainingSearches, searchRestaurantsByQuery } from './services/geminiService';
 import { TriageData } from './services/aiAssistant';
 import { likeRestaurant, unlikeRestaurant, saveRestaurant, unsaveRestaurant, getUserLikes, getUserSaves, getAllLikesCounts } from './services/interactionService';
@@ -149,6 +150,7 @@ const App: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [openProfileReviews, setOpenProfileReviews] = useState(false);
+  const [showRemovalRequest, setShowRemovalRequest] = useState<{ name: string; id: string } | null>(null);
   const [likesCounts, setLikesCounts] = useState<Map<string, number>>(new Map());
   const lastTapRef = useRef<{ id: string; time: number } | null>(null);
   
@@ -289,6 +291,14 @@ const App: React.FC = () => {
     
     return () => clearTimeout(timeout);
   }, [state, isLoading, restaurants.length, activeRestaurantIndex, showDishInfo, isOverlayOpen]);
+
+  // Global callback for opening removal request from RestaurantProfile
+  useEffect(() => {
+    (window as any).__openRemovalRequest = (name: string, id: string) => {
+      setShowRemovalRequest({ name, id });
+    };
+    return () => { delete (window as any).__openRemovalRequest; };
+  }, []);
 
   // Reset swipe count when changing restaurants
   useEffect(() => {
@@ -861,6 +871,7 @@ const App: React.FC = () => {
           onOpenSearch={() => setShowSearch(true)}
           onOpenFilter={() => setShowFilterModal('cuisine')}
           isStandalone={false}
+          onRequestRemoval={(name, id) => setShowRemovalRequest({ name, id })}
         />
         
         {/* Search Modal */}
@@ -934,6 +945,15 @@ const App: React.FC = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Removal Request Page */}
+        {showRemovalRequest && (
+          <RemovalRequestPage
+            onBack={() => setShowRemovalRequest(null)}
+            prefillRestaurantName={showRemovalRequest.name}
+            prefillGooglePlaceId={showRemovalRequest.id}
+          />
         )}
       </>
     );
@@ -2151,6 +2171,15 @@ const App: React.FC = () => {
               );
             }
           }}
+        />
+      )}
+
+      {/* Removal Request Page */}
+      {showRemovalRequest && (
+        <RemovalRequestPage
+          onBack={() => setShowRemovalRequest(null)}
+          prefillRestaurantName={showRemovalRequest.name}
+          prefillGooglePlaceId={showRemovalRequest.id}
         />
       )}
     </div>

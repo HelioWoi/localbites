@@ -351,6 +351,23 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number,
   result.sort((a: any, b: any) => a.distanceMeters - b.distanceMeters);
   console.log(`[Nearby] Sorted ${result.length} places by distance. Closest: ${result[0]?.name} (${result[0]?.distanceMeters}m), Farthest: ${result[result.length-1]?.name} (${result[result.length-1]?.distanceMeters}m)`);
 
+  // Filter out blocked places (owner requested removal)
+  try {
+    const { data: blockedData } = await supabase.from('blocked_places').select('google_place_id');
+    if (blockedData && blockedData.length > 0) {
+      const blockedIds = new Set(blockedData.map((b: any) => b.google_place_id));
+      const beforeCount = result.length;
+      const filtered = result.filter((r: any) => !blockedIds.has(r.id));
+      if (filtered.length < beforeCount) {
+        console.log(`[Nearby] Filtered out ${beforeCount - filtered.length} blocked places`);
+      }
+      result.length = 0;
+      result.push(...filtered);
+    }
+  } catch (e) {
+    console.error("[Nearby] Error checking blocked places:", e);
+  }
+
   // OPTIMIZATION #2: Save to cache for future requests
   if (result.length > 0) {
     try {

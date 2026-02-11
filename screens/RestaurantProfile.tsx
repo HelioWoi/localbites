@@ -13,6 +13,7 @@ interface RestaurantProfileProps {
   openReviews?: boolean;
   onNavigateToPartner?: () => void;
   onOpenAI?: () => void;
+  onRequestRemoval?: (name: string, id: string) => void;
 }
 
 // Helper to get/set saved dishes from localStorage
@@ -29,7 +30,7 @@ const saveDishesToStorage = (restaurantId: string, dishIds: Set<string>) => {
   localStorage.setItem(`saved_dishes_${restaurantId}`, JSON.stringify([...dishIds]));
 };
 
-const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBack, isSaved, onToggleSave, openReviews = false, onNavigateToPartner, onOpenAI, onOpenSearch, onOpenFilter, isStandalone = false }) => {
+const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBack, isSaved, onToggleSave, openReviews = false, onNavigateToPartner, onOpenAI, onOpenSearch, onOpenFilter, isStandalone = false, onRequestRemoval }) => {
   const [showVideoReels, setShowVideoReels] = useState(false);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [swipeHintCounts, setSwipeHintCounts] = useState<number[]>([]);
@@ -695,11 +696,31 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
           </section>
         )}
 
-        {/* Disclaimer */}
-        <div className="py-4 px-2">
+        {/* Disclaimer & Google Attribution */}
+        <div className="py-4 px-2 space-y-3">
           <p className="text-[10px] text-zinc-400 text-center leading-relaxed">
-            LocalBites is an independent discovery platform. We do not represent, endorse, or guarantee any restaurant. All information is provided for convenience only. Please verify details directly with the establishment.
+            The information displayed is publicly available data provided by Google Maps. LocalBites is an independent discovery platform. We do not represent, endorse, or guarantee any establishment. Please verify details directly with the business.
           </p>
+          <p className="text-[10px] text-zinc-400 text-center leading-relaxed">
+            If you are the owner of this business and wish to update or remove your listing from our platform,{' '}
+            <span 
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onRequestRemoval) {
+                  onRequestRemoval(restaurant.name, restaurant.id);
+                }
+              }}
+              className="text-orange-500 underline font-medium cursor-pointer"
+              role="button"
+              tabIndex={0}
+            >
+              click here to request removal
+            </span>.
+          </p>
+          <div className="flex items-center justify-center gap-1 pt-1">
+            <span className="text-[9px] text-zinc-300">Powered by</span>
+            <span className="text-[9px] text-zinc-400 font-semibold">Google</span>
+          </div>
         </div>
 
       </div>
