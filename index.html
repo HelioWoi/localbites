@@ -172,6 +172,26 @@
         .leaflet-popup-content {
             margin: 8px;
         }
+
+        /* Desktop splash: hidden on mobile, shown on desktop */
+        #desktop-splash {
+            display: none;
+        }
+        @media (min-width: 768px) {
+            #desktop-splash {
+                display: flex;
+                position: fixed;
+                inset: 0;
+                z-index: 99999;
+                background: white;
+                align-items: center;
+                justify-content: center;
+                font-family: 'Inter', sans-serif;
+            }
+            #root {
+                display: none !important;
+            }
+        }
     </style>
 <script type="importmap">
 {
@@ -187,7 +207,57 @@
 <link rel="stylesheet" href="/index.css">
 </head>
 <body>
+    <!-- Desktop-only splash (hidden on mobile) -->
+    <div id="desktop-splash">
+      <div style="display:flex;align-items:center;justify-content:center;gap:80px;max-width:960px;padding:0 40px;">
+        <!-- Left: Phone mockup -->
+        <div style="flex-shrink:0;">
+          <img src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/mockup%20mobile.png" alt="Local Bites on mobile" style="width:300px;height:auto;display:block;" />
+        </div>
+        <!-- Right: Text + QR -->
+        <div style="text-align:left;max-width:380px;">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:32px;">
+            <img src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/logo%20icon.png" alt="Local Bites" style="width:52px;height:52px;border-radius:14px;box-shadow:0 4px 16px rgba(249,115,22,0.2);" />
+            <span style="font-size:22px;font-weight:800;color:#18181b;letter-spacing:-0.5px;">Local Bites</span>
+          </div>
+          <h1 style="font-size:44px;font-weight:800;color:#18181b;margin:0 0 4px;letter-spacing:-1px;line-height:1.1;">Find your<br/>next bite</h1>
+          <p style="font-size:15px;color:#a1a1aa;margin:0 0 36px;font-weight:500;">Discover restaurants near you with video menus.</p>
+          <div style="background:linear-gradient(135deg,#fff7ed,#f4f4f5);border-radius:20px;padding:28px;margin-bottom:28px;border:1px solid #f5f5f5;">
+            <p style="font-size:13px;font-weight:700;color:#18181b;margin:0 0 4px;letter-spacing:-0.2px;">Desktop version coming soon</p>
+            <p style="font-size:12px;color:#71717a;margin:0 0 20px;line-height:1.5;">Scan the QR code to open Local Bites on your phone.</p>
+            <div style="display:flex;align-items:center;gap:20px;">
+              <div style="background:white;padding:10px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=https://localbites.com.au&color=f97316&bgcolor=ffffff" alt="QR Code" style="width:120px;height:120px;display:block;" />
+              </div>
+              <div>
+                <p style="font-size:12px;font-weight:800;color:#f97316;margin:0 0 2px;">localbites.com.au</p>
+                <p style="font-size:11px;color:#a1a1aa;margin:0;">Best on mobile</p>
+              </div>
+            </div>
+          </div>
+          <p style="font-size:11px;color:#d4d4d8;margin:0;">&copy; 2026 Local Bites Australia</p>
+        </div>
+      </div>
+    </div>
+
     <div id="root"></div>
 <script type="module" src="/index.tsx"></script>
+<script>
+  // Bypass desktop splash for admin, partner, restaurant profiles, legal, contact
+  (function() {
+    var path = window.location.pathname;
+    var bypass = path.startsWith('/admin') || path.startsWith('/partner') || path.startsWith('/r/') || path.startsWith('/legal') || path.startsWith('/contact');
+    if (bypass) {
+      var splash = document.getElementById('desktop-splash');
+      if (splash) splash.style.display = 'none';
+      var root = document.getElementById('root');
+      if (root) root.style.display = 'block';
+      // Override the CSS media query
+      var style = document.createElement('style');
+      style.textContent = '@media (min-width:768px){#root{display:block!important}#desktop-splash{display:none!important}}';
+      document.head.appendChild(style);
+    }
+  })();
+</script>
 </body>
 </html>
