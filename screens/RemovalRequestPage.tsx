@@ -104,7 +104,7 @@ const RemovalRequestPage: React.FC<RemovalRequestPageProps> = ({ onBack, prefill
   return (
     <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
       {/* Header */}
-      <div className="sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-zinc-100">
+      <div className="sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-zinc-100" style={{ paddingTop: 'env(safe-area-inset-top, 12px)' }}>
         <div className="flex items-center gap-3 px-4 py-3 max-w-lg mx-auto">
           <button onClick={onBack} className="w-9 h-9 bg-zinc-100 rounded-full flex items-center justify-center">
             <ChevronLeft size={20} className="text-zinc-700" />

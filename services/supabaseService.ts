@@ -281,9 +281,38 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
     };
   });
 
+  // Filter partners by distance from user
+  // <5km = premium position (top of feed)
+  // 5-15km = included but mixed with other results (no priority boost)
+  // >15km = excluded from feed
+  const PREMIUM_RADIUS_KM = 5;
+  const MAX_RADIUS_KM = 15;
+
+  const distanceFiltered = restaurantsWithDistance.filter(r => {
+    // If no user coords or no partner coords, include by default (can't calculate)
+    if (!userLat || !userLng || !r.partner.latitude || !r.partner.longitude) {
+      return true;
+    }
+    if (r.distanceKm > MAX_RADIUS_KM) {
+      console.log(`[PartnerRadius] ${r.name} EXCLUDED - ${r.distanceKm.toFixed(1)}km > ${MAX_RADIUS_KM}km limit`);
+      return false;
+    }
+    return true;
+  });
+
+  // Adjust priority: partners beyond PREMIUM_RADIUS_KM lose the premium boost
+  distanceFiltered.forEach(r => {
+    if (userLat && userLng && r.partner.latitude && r.partner.longitude && r.distanceKm > PREMIUM_RADIUS_KM) {
+      // Remove premium boost — will be mixed with Google results instead of pinned to top
+      r.priorityScore = (MAX_RADIUS_KM - Math.min(r.distanceKm, MAX_RADIUS_KM)) * 10;
+      r.isSubscribed = false; // Treat as regular so geminiService sort doesn't pin to top
+      console.log(`[PartnerRadius] ${r.name} DEMOTED - ${r.distanceKm.toFixed(1)}km > ${PREMIUM_RADIUS_KM}km, mixed with results`);
+    }
+  });
+
   // Sort by priority score (premium + distance)
   // Higher score = appears first in feed
-  const sorted = restaurantsWithDistance.sort((a, b) => b.priorityScore - a.priorityScore);
+  const sorted = distanceFiltered.sort((a, b) => b.priorityScore - a.priorityScore);
   
   console.log('[PartnerRestaurants] Sorted by priority:');
   sorted.slice(0, 5).forEach((r, idx) => {
