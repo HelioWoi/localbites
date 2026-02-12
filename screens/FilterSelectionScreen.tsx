@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Utensils, Coffee, Wine, Sparkles, Search, MapPin } from 'lucide-react';
+import { Utensils, Coffee, Wine, IceCreamCone, Pizza, Sparkles, Search, MapPin } from 'lucide-react';
 import DesktopBanner from '../components/DesktopBanner';
 
 interface FilterSelectionScreenProps {
-  onSelect: (category: 'restaurants' | 'cafes' | 'bars' | 'all') => void;
+  onSelect: (category: 'restaurants' | 'cafes' | 'bars' | 'desserts' | 'pizza' | 'all') => void;
   onSkip: () => void;
   onManualSearch?: (address: string) => void;
   onOpenAI?: () => void;
@@ -54,12 +54,12 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
   
   const categories = [
     {
-      id: 'restaurants' as const,
-      icon: Utensils,
-      title: 'Restaurants',
-      subtitle: 'Pizza, Sushi, Italian...',
-      gradient: 'from-orange-500 to-red-500',
-      iconBg: 'bg-orange-500/10',
+      id: 'bars' as const,
+      icon: Wine,
+      title: 'Bars & Drinks',
+      subtitle: 'Cocktails, Pubs, Nightlife',
+      gradient: 'from-purple-500 to-pink-500',
+      iconBg: 'bg-purple-500/10',
     },
     {
       id: 'cafes' as const,
@@ -70,12 +70,28 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
       iconBg: 'bg-amber-500/10',
     },
     {
-      id: 'bars' as const,
-      icon: Wine,
-      title: 'Bars & Drinks',
-      subtitle: 'Cocktails, Pubs, Nightlife',
-      gradient: 'from-purple-500 to-pink-500',
-      iconBg: 'bg-purple-500/10',
+      id: 'desserts' as const,
+      icon: IceCreamCone,
+      title: 'Desserts',
+      subtitle: 'Ice Cream, Cakes, Sweets',
+      gradient: 'from-pink-400 to-rose-500',
+      iconBg: 'bg-pink-500/10',
+    },
+    {
+      id: 'pizza' as const,
+      icon: Pizza,
+      title: 'Pizza',
+      subtitle: 'Pizzerias, Italian, Slices',
+      gradient: 'from-red-500 to-orange-500',
+      iconBg: 'bg-red-500/10',
+    },
+    {
+      id: 'restaurants' as const,
+      icon: Utensils,
+      title: 'Restaurants',
+      subtitle: 'Sushi, Thai, Mexican...',
+      gradient: 'from-orange-500 to-red-500',
+      iconBg: 'bg-orange-500/10',
     },
     {
       id: 'ai' as const,
@@ -169,7 +185,7 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
                       onOpenAI();
                     } else if (category.id !== 'ai') {
                       console.log('[FilterSelection] Selecting category:', category.id);
-                      onSelect(category.id as 'restaurants' | 'cafes' | 'bars' | 'all');
+                      onSelect(category.id as 'restaurants' | 'cafes' | 'bars' | 'desserts' | 'pizza' | 'all');
                     }
                   }}
                   className="aspect-square bg-zinc-50 rounded-3xl p-6 flex flex-col items-center justify-center gap-3 hover:bg-zinc-100 active:scale-95 transition-all duration-200 group border border-zinc-100"

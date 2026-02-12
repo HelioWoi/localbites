@@ -226,7 +226,7 @@ export async function searchRestaurantsByQuery(
   }
 
   try {
-    const MAX_SEARCH_RADIUS = 15000; // 15km max for text search
+    const MAX_SEARCH_RADIUS = 10000; // 10km max for text search
     const radius = Math.min(location.radius || 5000, MAX_SEARCH_RADIUS);
     const googlePlaces = await textSearchRestaurants(location.lat, location.lng, radius, query);
     

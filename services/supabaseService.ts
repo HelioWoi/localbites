@@ -283,10 +283,10 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
 
   // Filter partners by distance from user
   // <5km = premium position (top of feed)
-  // 5-15km = included but mixed with other results (no priority boost)
-  // >15km = excluded from feed
+  // 5-10km = included but mixed with other results (no priority boost)
+  // >10km = excluded from feed
   const PREMIUM_RADIUS_KM = 5;
-  const MAX_RADIUS_KM = 15;
+  const MAX_RADIUS_KM = 10;
 
   const distanceFiltered = restaurantsWithDistance.filter(r => {
     // If no user coords or no partner coords, include by default (can't calculate)

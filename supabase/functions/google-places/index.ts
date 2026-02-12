@@ -194,7 +194,14 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number,
   
   const cacheKey = `${getCacheKey(lat, lng, maxRadius)}_${category}_v2`;
   
-  // OPTIMIZATION #2: Check cache first
+  // SMART CACHE: Check cache first with fallback logic
+  // - Fresh cache (< 7 days) with enough results → return immediately
+  // - Stale cache (7-30 days) with enough results → return but mark for refresh next time
+  // - Cache with too few results (< 10) → skip cache, call Google
+  // - Expired cache (> 30 days) or no cache → call Google
+  const STALE_THRESHOLD_HOURS = 168; // 7 days - after this, cache is "stale" but still usable
+  const MIN_CACHE_RESULTS = 10; // Minimum results to consider cache sufficient
+  
   try {
     const { data: cached } = await supabase
       .from('api_cache')
@@ -203,10 +210,20 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number,
       .single();
     
     if (cached) {
-      const cacheAge = (Date.now() - new Date(cached.created_at).getTime()) / (1000 * 60 * 60);
-      if (cacheAge < PLACES_CACHE_HOURS) {
-        console.log(`[Cache HIT] Returning cached places for ${cacheKey}`);
+      const cacheAgeHours = (Date.now() - new Date(cached.created_at).getTime()) / (1000 * 60 * 60);
+      const cacheResults = Array.isArray(cached.data) ? cached.data.length : 0;
+      
+      if (cacheAgeHours < PLACES_CACHE_HOURS && cacheResults >= MIN_CACHE_RESULTS) {
+        // Cache is valid and has enough results → return it
+        const freshness = cacheAgeHours < STALE_THRESHOLD_HOURS ? 'FRESH' : 'STALE (will refresh next miss)';
+        console.log(`[Cache HIT] ${freshness} - ${cacheResults} places, age: ${Math.round(cacheAgeHours)}h, key: ${cacheKey}`);
         return cached.data;
+      } else if (cacheResults < MIN_CACHE_RESULTS) {
+        console.log(`[Cache SKIP] Only ${cacheResults} results (need ${MIN_CACHE_RESULTS}+) - calling Google for more`);
+        // Fall through to Google API
+      } else {
+        console.log(`[Cache EXPIRED] Age: ${Math.round(cacheAgeHours)}h > ${PLACES_CACHE_HOURS}h - refreshing`);
+        // Fall through to Google API
       }
     }
   } catch (e) {
@@ -395,7 +412,10 @@ async function textSearchRestaurants(lat: number, lng: number, radius: number, q
 
   const cacheKey = `text_search_${query.toLowerCase().replace(/\s+/g, '_')}_${Math.round(lat * 1000) / 1000}_${Math.round(lng * 1000) / 1000}_v2`;
   
-  // Check cache first
+  // Smart cache: check cache with fallback logic
+  const STALE_HOURS = 168; // 7 days
+  const MIN_RESULTS = 5; // Minimum for text search (more specific queries)
+  
   try {
     const { data: cached } = await supabase
       .from('api_cache')
@@ -404,10 +424,15 @@ async function textSearchRestaurants(lat: number, lng: number, radius: number, q
       .single();
     
     if (cached) {
-      const cacheAge = (Date.now() - new Date(cached.created_at).getTime()) / (1000 * 60 * 60);
-      if (cacheAge < PLACES_CACHE_HOURS) {
-        console.log(`[Text Search Cache HIT] Returning cached results for "${query}"`);
+      const ageHours = (Date.now() - new Date(cached.created_at).getTime()) / (1000 * 60 * 60);
+      const count = Array.isArray(cached.data) ? cached.data.length : 0;
+      
+      if (ageHours < PLACES_CACHE_HOURS && count >= MIN_RESULTS) {
+        const freshness = ageHours < STALE_HOURS ? 'FRESH' : 'STALE';
+        console.log(`[Text Search Cache HIT] ${freshness} - ${count} results, age: ${Math.round(ageHours)}h for "${query}"`);
         return cached.data;
+      } else if (count < MIN_RESULTS) {
+        console.log(`[Text Search Cache SKIP] Only ${count} results for "${query}" - calling Google`);
       }
     }
   } catch (e) {
@@ -478,6 +503,15 @@ async function textSearchRestaurants(lat: number, lng: number, radius: number, q
 
     // Sort by distance from user (closest first)
     result.sort((a: any, b: any) => a.distanceMeters - b.distanceMeters);
+
+    // Filter out places beyond the requested radius
+    const beforeFilter = result.length;
+    const filtered = result.filter((r: any) => r.distanceMeters <= radius);
+    if (filtered.length < beforeFilter) {
+      console.log(`[Text Search] Filtered ${beforeFilter - filtered.length} places beyond ${radius}m radius`);
+    }
+    result.length = 0;
+    result.push(...filtered);
 
     // Save to cache
     if (result.length > 0) {

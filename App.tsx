@@ -313,8 +313,12 @@ const App: React.FC = () => {
     setSearchExpansionCount(0);
     endOfFeedTriggeredRef.current = false;
     try {
-      const data = await getNearbyRestaurants(loc, f, selectedCategory);
-      console.log('[App] ✅ Total restaurants from getNearbyRestaurants:', data.length);
+      // Desserts and Pizza use text search instead of category-based nearby search
+      const textSearchCategories: Record<string, string> = { desserts: 'ice cream acai dessert', pizza: 'pizza' };
+      const data = textSearchCategories[selectedCategory]
+        ? await searchRestaurantsByQuery(loc, textSearchCategories[selectedCategory])
+        : await getNearbyRestaurants(loc, f, selectedCategory);
+      console.log('[App] ✅ Total restaurants from', textSearchCategories[selectedCategory] ? 'textSearch' : 'getNearbyRestaurants', ':', data.length);
       
       if (data.length === 0) {
         console.error('[App] ❌ NO RESTAURANTS RETURNED');

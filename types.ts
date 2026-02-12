@@ -53,6 +53,6 @@ export interface UserLocation {
   radius?: number; // Search radius in meters (default 5000)
 }
 
-export type CategoryFilter = 'restaurants' | 'cafes' | 'bars' | 'all';
+export type CategoryFilter = 'restaurants' | 'cafes' | 'bars' | 'desserts' | 'pizza' | 'all';
 
 export type AppState = 'SPLASH' | 'FILTER_SELECTION' | 'LOCATION_SELECTOR' | 'FEED' | 'PROFILE' | 'ADMIN' | 'PARTNER' | 'LOADING';
