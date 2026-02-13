@@ -135,6 +135,7 @@ const App: React.FC = () => {
   const [showSearch, setShowSearch] = useState(false);
   const [showReviewsFeed, setShowReviewsFeed] = useState(false);
   const [showBitesAI, setShowBitesAI] = useState(false);
+  const [showLocationError, setShowLocationError] = useState(false);
   const [hasExpandedSearch, setHasExpandedSearch] = useState(false);
   const [isExpandingSearch, setIsExpandingSearch] = useState(false);
   const [endOfFeedBuddy, setEndOfFeedBuddy] = useState(false);
@@ -314,7 +315,7 @@ const App: React.FC = () => {
     endOfFeedTriggeredRef.current = false;
     try {
       // Desserts and Pizza use text search instead of category-based nearby search
-      const textSearchCategories: Record<string, string> = { desserts: 'ice cream acai dessert', pizza: 'pizza' };
+      const textSearchCategories: Record<string, string> = { desserts: 'ice cream acai dessert cookies', pizza: 'pizza' };
       const data = textSearchCategories[selectedCategory]
         ? await searchRestaurantsByQuery(loc, textSearchCategories[selectedCategory])
         : await getNearbyRestaurants(loc, f, selectedCategory);
@@ -642,7 +643,7 @@ const App: React.FC = () => {
                 // PRODUCTION: Show friendly message, stay on selection screen
                 // User can try again or contact support
                 console.error('[Geolocation] Production error:', error);
-                alert('Unable to detect your location. Please check your device location settings and try again.');
+                setShowLocationError(true);
               }
             },
             {
@@ -653,7 +654,7 @@ const App: React.FC = () => {
           );
         } else {
           // Browser doesn't support geolocation at all
-          alert('Your browser does not support location services.');
+          setShowLocationError(true);
         }
       }}
       onSkip={() => {
@@ -754,7 +755,7 @@ const App: React.FC = () => {
                 doTextSearch(devLoc);
               } else {
                 setIsLoading(false);
-                alert('Unable to detect your location. Please check your device location settings.');
+                setShowLocationError(true);
               }
             },
             {
@@ -765,7 +766,7 @@ const App: React.FC = () => {
           );
         } else {
           setIsLoading(false);
-          alert('Your browser does not support location services.');
+          setShowLocationError(true);
         }
       }}
     />
@@ -833,7 +834,7 @@ const App: React.FC = () => {
                   setState('FEED');
                   console.log('[Geolocation] ⚠️ Using dev fallback (AI search):', devLoc);
                 } else {
-                  alert('Unable to detect your location. Please check your device location settings.');
+                  setShowLocationError(true);
                 }
               },
               {
@@ -845,6 +846,70 @@ const App: React.FC = () => {
           }
         }}
       />
+    )}
+
+    {/* Location Error Overlay */}
+    {showLocationError && (
+      <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6">
+        <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center">
+          {/* Icon */}
+          <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-5">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+          </div>
+
+          {/* Title */}
+          <h2 className="text-xl font-black text-zinc-900 mb-2">Location access needed</h2>
+
+          {/* Description */}
+          <p className="text-sm text-zinc-500 mb-6 leading-relaxed">
+            To find restaurants near you, please allow location access when prompted.
+          </p>
+
+          {/* Try Again Button */}
+          <button
+            onClick={() => {
+              setShowLocationError(false);
+              if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                  (position) => {
+                    const loc: UserLocation = {
+                      lat: position.coords.latitude,
+                      lng: position.coords.longitude,
+                      name: 'Current Location'
+                    };
+                    setLocation(loc);
+                    setState('FEED');
+                  },
+                  () => setShowLocationError(true),
+                  { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+              }
+            }}
+            className="w-full py-3.5 bg-orange-500 text-white font-bold rounded-full hover:bg-orange-600 active:scale-95 transition-all mb-4"
+          >
+            Try Again
+          </button>
+
+          {/* Dismiss */}
+          <button
+            onClick={() => setShowLocationError(false)}
+            className="text-sm text-zinc-400 font-medium hover:text-zinc-600 transition-colors"
+          >
+            Close
+          </button>
+
+          {/* Instructions */}
+          <div className="mt-5 pt-5 border-t border-zinc-100">
+            <p className="text-[11px] text-zinc-400 leading-relaxed">
+              If you denied access, go to<br/>
+              <span className="font-semibold text-zinc-500">Settings → Safari → Location → Allow</span>
+            </p>
+          </div>
+        </div>
+      </div>
     )}
     </>
   );

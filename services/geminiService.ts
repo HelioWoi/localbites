@@ -3,7 +3,8 @@ import { Restaurant, UserLocation, Review } from "../types";
 import { getPartnerRestaurants, hasSupabaseData } from "./supabaseService";
 import { searchNearbyRestaurants as searchGooglePlaces, getPlaceDetails, textSearchRestaurants } from "./googlePlacesProxy";
 import { enrichRestaurantWithFilters, applyFilters } from "../utils/filterHelpers";
-import { getCachedRestaurants, setCachedRestaurants } from "../utils/cacheHelpers";
+// Browser cache disabled — server-side api_cache handles caching
+// import { getCachedRestaurants, setCachedRestaurants } from "../utils/cacheHelpers";
 
 // Helper: parse distance string ("30 m", "1.5 km") to meters
 function _parseDistanceToMeters(distance: string): number {
@@ -93,17 +94,11 @@ export async function getNearbyRestaurants(
     console.error('[LocalBites] Supabase error:', error);
   }
 
-  // 2. CHECK CACHE for Google restaurants (saves API calls!)
+  // 2. FETCH Google restaurants (server-side cache in Supabase handles cost reduction)
+  // Browser cache disabled — server api_cache (30-day TTL) prevents redundant Google API calls
   let googleRestaurants: Restaurant[] = [];
-  const cachedRestaurants = getCachedRestaurants(location, category);
-  
-  if (cachedRestaurants && cachedRestaurants.length > 0) {
-    console.log('[LocalBites] 🎯 Using cached Google restaurants - NO API COST!');
-    // Extract only non-partner (Google) restaurants from cache
-    googleRestaurants = cachedRestaurants.filter(r => !r.isSubscribed);
-    console.log('[LocalBites] Cached Google restaurants:', googleRestaurants.length);
-  } else {
-    console.log('[LocalBites] No valid cache, fetching fresh Google data...');
+  {
+    console.log('[LocalBites] Fetching Google data (server cache handles cost)...');
     
     // CONDITIONALLY get Google Places restaurants (WITH COST CONTROLS)
     const canUseAPI = canUseGoogleAPI();
@@ -181,9 +176,8 @@ export async function getNearbyRestaurants(
   console.log('[LocalBites] After sort:', results.length, 'restaurants');
   console.log('[LocalBites] First restaurant after sort:', results[0]?.name, 'isSubscribed:', results[0]?.isSubscribed);
 
-  // 6. SAVE TO CACHE (before applying filters, so cache has all restaurants)
-  setCachedRestaurants(results, location, category);
-  console.log('[LocalBites] ✅ Saved to cache for 1 hour');
+  // 6. Browser cache disabled — server-side api_cache handles caching
+  console.log('[LocalBites] ✅ Results ready (server cache active, browser cache disabled)');
 
   // 7. Apply filters (cuisine, price, dietary, ambiance, amenities)
   // NOTE: openNow filter is applied ONLY at display time (App.tsx) because:
