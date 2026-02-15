@@ -289,9 +289,14 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
   const MAX_RADIUS_KM = 10;
 
   const distanceFiltered = restaurantsWithDistance.filter(r => {
-    // If no user coords or no partner coords, include by default (can't calculate)
-    if (!userLat || !userLng || !r.partner.latitude || !r.partner.longitude) {
+    // If user has no GPS, include all partners (can't calculate distance)
+    if (!userLat || !userLng) {
       return true;
+    }
+    // If partner has no coordinates, EXCLUDE — prevents showing globally
+    if (!r.partner.latitude || !r.partner.longitude) {
+      console.log(`[PartnerRadius] ${r.name} EXCLUDED - no coordinates set`);
+      return false;
     }
     if (r.distanceKm > MAX_RADIUS_KM) {
       console.log(`[PartnerRadius] ${r.name} EXCLUDED - ${r.distanceKm.toFixed(1)}km > ${MAX_RADIUS_KM}km limit`);
@@ -320,6 +325,69 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
   });
 
   return sorted;
+}
+
+// Check if a restaurant name matches an active partner and return full partner data
+export async function getPartnerByName(name: string): Promise<Restaurant | null> {
+  try {
+    const { data: partners, error } = await supabase
+      .from('partners')
+      .select(`*, menu_items (*)`)
+      .ilike('restaurant_name', `%${name}%`)
+      .limit(1);
+
+    if (error || !partners || partners.length === 0) return null;
+
+    const p = partners[0];
+
+    // Check if partner is active
+    const now = new Date();
+    const isActive = p.lifetime_access === true ||
+      (p.subscription_status === 'active' && p.subscription_end_date && new Date(p.subscription_end_date) > now) ||
+      (p.trial_ends_at && new Date(p.trial_ends_at) > now);
+
+    if (!isActive) return null;
+    if (!p.menu_items || p.menu_items.length === 0) return null;
+
+    return {
+      id: p.id,
+      name: p.restaurant_name,
+      cuisine: p.cuisine || 'Various',
+      priceLevel: '$$',
+      rating: p.rating || 4.5,
+      totalReviews: p.total_reviews || 0,
+      address: p.address || '',
+      phone: p.phone || '',
+      distance: '',
+      mainPhotoUrl: p.photo_url || p.menu_items[0]?.video_url || '',
+      googleMapsUrl: p.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address)}` : '',
+      website: p.website || '',
+      isSubscribed: true,
+      isOpen: true,
+      isPartner: true,
+      slug: p.slug,
+      dishes: (p.menu_items || [])
+        .sort((a: any, b: any) => {
+          if (a.is_featured && !b.is_featured) return -1;
+          if (!a.is_featured && b.is_featured) return 1;
+          return (a.sort_order || 0) - (b.sort_order || 0);
+        })
+        .map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          description: item.description || '',
+          thumbnailUrl: item.video_url,
+          videoUrl: item.video_url,
+          price: item.price,
+          category: item.category,
+          isFeatured: item.is_featured || false,
+        })),
+      reviews: [],
+    };
+  } catch (err) {
+    console.error('[getPartnerByName] Error:', err);
+    return null;
+  }
 }
 
 // Get all restaurants (both regular and partner)

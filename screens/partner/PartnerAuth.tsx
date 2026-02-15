@@ -140,6 +140,21 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
       
       // If email confirmation is disabled, user is automatically logged in
       if (data.user && data.session) {
+        // Auto-geocode address to get lat/lng via Google Geocoding API
+        let latitude: number | null = null;
+        let longitude: number | null = null;
+        try {
+          const { data: geoData } = await supabase.functions.invoke('google-places', {
+            body: { action: 'geocode', query: `${address.trim()}, ${postalCode.trim()}, Australia` }
+          });
+          if (geoData?.lat && geoData?.lng) {
+            latitude = geoData.lat;
+            longitude = geoData.lng;
+          }
+        } catch (geoErr) {
+          console.warn('[Geocode] Failed, continuing without coordinates:', geoErr);
+        }
+
         // Create partner record with all business info
         await supabase.from('partners').insert({
           id: data.user.id,
@@ -150,6 +165,8 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
           postal_code: postalCode.trim(),
           phone: phone.trim(),
           website: website.trim() || null,
+          latitude,
+          longitude,
           plan: hasLifetimeAccess ? 'lifetime' : 'trial',
           trial_ends_at: hasLifetimeAccess ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
           subscription_status: 'active',

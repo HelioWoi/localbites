@@ -1,38 +1,65 @@
-import React, { useState } from 'react';
-import { Utensils, Coffee, Wine, IceCreamCone, Pizza, Sparkles, Search, MapPin } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Utensils, Coffee, Wine, IceCreamCone, Pizza, Fish, Search, MapPin, Loader2 } from 'lucide-react';
 import DesktopBanner from '../components/DesktopBanner';
+import { supabase } from '../lib/supabase';
 
 interface FilterSelectionScreenProps {
-  onSelect: (category: 'restaurants' | 'cafes' | 'bars' | 'desserts' | 'pizza' | 'all') => void;
+  onSelect: (category: 'restaurants' | 'cafes' | 'bars' | 'desserts' | 'pizza' | 'seafood' | 'all') => void;
   onSkip: () => void;
   onManualSearch?: (address: string) => void;
+  onSelectPlace?: (placeId: string, name: string) => void;
   onOpenAI?: () => void;
 }
 
-const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect, onSkip, onManualSearch, onOpenAI }) => {
+const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect, onSkip, onManualSearch, onSelectPlace, onOpenAI }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  
-  // Popular cuisines and restaurant types for suggestions
-  const popularSearches = [
-    'Pizza', 'Sushi', 'Italian', 'Chinese', 'Thai', 'Mexican', 'Indian', 'Japanese',
-    'Burger', 'Cafe', 'Coffee', 'Breakfast', 'Brunch', 'Seafood', 'Steak', 'BBQ',
-    'Vegetarian', 'Vegan', 'Dessert', 'Bakery', 'Bar', 'Pub', 'Wine Bar', 'Cocktails'
-  ];
+  const [suggestions, setSuggestions] = useState<{ placeId?: string; name: string; address?: string }[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const autocompleteRef = useRef<NodeJS.Timeout | null>(null);
   
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
     
-    if (value.trim().length > 0) {
-      const filtered = popularSearches.filter(item => 
-        item.toLowerCase().includes(value.toLowerCase())
-      ).slice(0, 5);
-      setSuggestions(filtered);
-      setShowSuggestions(filtered.length > 0);
+    if (autocompleteRef.current) clearTimeout(autocompleteRef.current);
+    
+    if (value.trim().length >= 2) {
+      setIsLoadingSuggestions(true);
+      setShowSuggestions(true);
+      autocompleteRef.current = setTimeout(async () => {
+        try {
+          // Get user location for biased results
+          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation?.getCurrentPosition(resolve, reject, { timeout: 3000, maximumAge: 60000 });
+          }).catch(() => null);
+          
+          const { data, error } = await supabase.functions.invoke('google-places', {
+            body: {
+              action: 'autocomplete',
+              query: value.trim(),
+              lat: pos?.coords.latitude,
+              lng: pos?.coords.longitude,
+            }
+          });
+          
+          console.log('[Autocomplete] Response:', { data, error, query: value.trim() });
+          
+          if (Array.isArray(data) && data.length > 0) {
+            setSuggestions(data);
+          } else {
+            setSuggestions([]);
+          }
+        } catch (err) {
+          console.error('[Autocomplete] Error:', err);
+          setSuggestions([]);
+        } finally {
+          setIsLoadingSuggestions(false);
+        }
+      }, 300);
     } else {
       setShowSuggestions(false);
       setSuggestions([]);
+      setIsLoadingSuggestions(false);
     }
   };
   
@@ -44,11 +71,13 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
     }
   };
   
-  const handleSuggestionClick = (suggestion: string) => {
-    setSearchQuery(suggestion);
+  const handleSuggestionClick = (suggestion: { placeId?: string; name: string; address?: string }) => {
+    setSearchQuery(suggestion.name);
     setShowSuggestions(false);
-    if (onManualSearch) {
-      onManualSearch(suggestion);
+    if (suggestion.placeId && onSelectPlace) {
+      onSelectPlace(suggestion.placeId, suggestion.name);
+    } else if (onManualSearch) {
+      onManualSearch(suggestion.name);
     }
   };
   
@@ -94,12 +123,12 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
       iconBg: 'bg-orange-500/10',
     },
     {
-      id: 'ai' as const,
-      icon: Sparkles,
-      title: 'Ask Bites',
-      subtitle: 'AI will help you choose',
-      gradient: 'from-green-500 to-emerald-500',
-      iconBg: 'bg-green-500/10',
+      id: 'seafood' as const,
+      icon: Fish,
+      title: 'Sea Food',
+      subtitle: 'Fish, Prawns, Oysters',
+      gradient: 'from-cyan-500 to-blue-500',
+      iconBg: 'bg-cyan-500/10',
     },
   ];
 
@@ -135,7 +164,7 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
                 type="text"
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
-                onFocus={() => searchQuery.trim() && setSuggestions(popularSearches.filter(item => item.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 5))}
+                onFocus={() => { if (searchQuery.trim().length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                 placeholder="Search restaurants, cuisines..."
                 className="w-full pl-12 pr-24 py-4 bg-zinc-50 border border-zinc-200 rounded-full text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
@@ -149,19 +178,33 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
               </button>
               
               {/* Suggestions Dropdown */}
-              {showSuggestions && suggestions.length > 0 && (
+              {showSuggestions && (
                 <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-lg border border-zinc-200 overflow-hidden z-20">
-                  {suggestions.map((suggestion, index) => (
-                    <button
-                      key={index}
-                      type="button"
-                      onClick={() => handleSuggestionClick(suggestion)}
-                      className="w-full px-4 py-3 text-left text-sm text-zinc-900 hover:bg-orange-50 transition-colors flex items-center gap-3 border-b border-zinc-100 last:border-0"
-                    >
-                      <Search size={16} className="text-zinc-400" />
-                      <span className="font-medium">{suggestion}</span>
-                    </button>
-                  ))}
+                  {isLoadingSuggestions && suggestions.length === 0 ? (
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <Loader2 size={16} className="text-orange-500 animate-spin" />
+                      <span className="text-sm text-zinc-400">Searching...</span>
+                    </div>
+                  ) : suggestions.length > 0 ? (
+                    suggestions.map((suggestion, index) => (
+                      <button
+                        key={suggestion.placeId || index}
+                        type="button"
+                        onClick={() => handleSuggestionClick(suggestion)}
+                        className="w-full px-4 py-3 text-left hover:bg-orange-50 transition-colors flex items-center gap-3 border-b border-zinc-100 last:border-0"
+                      >
+                        <MapPin size={16} className="text-orange-400 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-sm font-semibold text-zinc-900 block truncate">{suggestion.name}</span>
+                          {suggestion.address && (
+                            <span className="text-xs text-zinc-400 block truncate">{suggestion.address}</span>
+                          )}
+                        </div>
+                      </button>
+                    ))
+                  ) : !isLoadingSuggestions && searchQuery.trim().length >= 2 ? (
+                    <div className="px-4 py-3 text-sm text-zinc-400">No restaurants found</div>
+                  ) : null}
                 </div>
               )}
             </div>
@@ -180,13 +223,8 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
                   key={category.id}
                   onClick={() => {
                     console.log('[FilterSelection] Button clicked:', category.id, 'onOpenAI exists:', !!onOpenAI);
-                    if (category.id === 'ai' && onOpenAI) {
-                      console.log('[FilterSelection] Opening AI modal');
-                      onOpenAI();
-                    } else if (category.id !== 'ai') {
-                      console.log('[FilterSelection] Selecting category:', category.id);
-                      onSelect(category.id as 'restaurants' | 'cafes' | 'bars' | 'desserts' | 'pizza' | 'all');
-                    }
+                    console.log('[FilterSelection] Selecting category:', category.id);
+                    onSelect(category.id as 'restaurants' | 'cafes' | 'bars' | 'desserts' | 'pizza' | 'seafood' | 'all');
                   }}
                   className="aspect-square bg-zinc-50 rounded-3xl p-6 flex flex-col items-center justify-center gap-3 hover:bg-zinc-100 active:scale-95 transition-all duration-200 group border border-zinc-100"
                 >

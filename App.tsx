@@ -150,6 +150,9 @@ const App: React.FC = () => {
   const [searchResults, setSearchResults] = useState<Restaurant[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const skipNextFetchRef = useRef(false);
+  const isManualSearchRef = useRef(false);
+  const profileOpenedFromRef = useRef<'FEED' | 'FILTER_SELECTION'>('FEED');
   const [openProfileReviews, setOpenProfileReviews] = useState(false);
   const [showRemovalRequest, setShowRemovalRequest] = useState<{ name: string; id: string } | null>(null);
   const [likesCounts, setLikesCounts] = useState<Map<string, number>>(new Map());
@@ -315,7 +318,7 @@ const App: React.FC = () => {
     endOfFeedTriggeredRef.current = false;
     try {
       // Desserts and Pizza use text search instead of category-based nearby search
-      const textSearchCategories: Record<string, string> = { desserts: 'ice cream acai dessert cookies', pizza: 'pizza' };
+      const textSearchCategories: Record<string, string> = { desserts: 'ice cream acai dessert cookies', pizza: 'pizza', seafood: 'seafood fish prawns oysters' };
       const data = textSearchCategories[selectedCategory]
         ? await searchRestaurantsByQuery(loc, textSearchCategories[selectedCategory])
         : await getNearbyRestaurants(loc, f, selectedCategory);
@@ -413,6 +416,11 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
+    if (skipNextFetchRef.current) {
+      skipNextFetchRef.current = false;
+      console.log('[App] ⏭️ Skipping fetchRestaurants - manual search already loaded');
+      return;
+    }
     if (location) fetchRestaurants(location);
   }, [location]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -594,6 +602,7 @@ const App: React.FC = () => {
           setShowBitesAI(true);
         }}
         onSelect={(category) => {
+        isManualSearchRef.current = false;
         setSelectedCategory(category);
         
         // GEOLOCATION STRATEGY:
@@ -697,10 +706,32 @@ const App: React.FC = () => {
           setState('FEED');
         }
       }}
+      onSelectPlace={async (placeId, name) => {
+        console.log('[SelectPlace] Opening place directly:', name, placeId);
+        profileOpenedFromRef.current = 'FILTER_SELECTION';
+        setIsLoading(true);
+        setState('FEED');
+        try {
+          const restaurant = await getRestaurantDetails(placeId);
+          if (restaurant) {
+            setSelectedRestaurant(restaurant);
+            setState('PROFILE');
+          } else {
+            console.log('[SelectPlace] Details failed for:', name);
+            setError(`Could not load details for "${name}"`);
+            setState('FILTER_SELECTION');
+          }
+        } catch (err) {
+          console.error('[SelectPlace] Error:', err);
+        } finally {
+          setIsLoading(false);
+        }
+      }}
       onManualSearch={async (searchQuery) => {
         // Use Text Search API to search by query (pizza, sushi, etc.)
         console.log('[ManualSearch] Text search for:', searchQuery);
-        setFilters(prev => ({ ...prev, cuisine: 'All' }));
+        isManualSearchRef.current = true;
+        setFilters(prev => ({ ...prev, cuisine: 'All', openNow: false }));
         setSelectedCategory('all');
         setIsLoading(true);
         setState('FEED');
@@ -738,6 +769,7 @@ const App: React.FC = () => {
                 lng: position.coords.longitude,
                 name: 'Current Location'
               };
+              skipNextFetchRef.current = true;
               setLocation(loc);
               doTextSearch(loc);
             },
@@ -751,6 +783,7 @@ const App: React.FC = () => {
                   lng: 153.12,
                   name: 'Sunshine Coast (Dev Mode)'
                 };
+                skipNextFetchRef.current = true;
                 setLocation(devLoc);
                 doTextSearch(devLoc);
               } else {
@@ -924,7 +957,9 @@ const App: React.FC = () => {
         <RestaurantProfile 
           restaurant={selectedRestaurant} 
           onBack={() => {
-            setState('FEED');
+            const returnTo = profileOpenedFromRef.current;
+            profileOpenedFromRef.current = 'FEED';
+            setState(returnTo);
             setOpenProfileReviews(false);
           }} 
           isSaved={savedIds.has(selectedRestaurant.id)}
@@ -945,16 +980,88 @@ const App: React.FC = () => {
         
         {/* Search Modal */}
         {showSearch && (
-          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end justify-center" onClick={() => setShowSearch(false)}>
-            <div className="bg-white w-full max-w-md rounded-t-[40px] p-8 pb-12" onClick={e => e.stopPropagation()}>
-              <h3 className="text-2xl font-black mb-6">Search</h3>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search restaurants..."
-                className="w-full px-4 py-3 border-2 border-zinc-200 rounded-2xl focus:border-orange-500 focus:outline-none"
-              />
+          <div className="fixed inset-0 z-[70] bg-black/90 backdrop-blur-lg flex flex-col animate-in fade-in duration-300">
+            <div className="p-6 pt-12">
+              <div className="flex items-center gap-4 mb-6">
+                <button onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults([]); }} className="p-2 text-white">
+                  <X size={24} />
+                </button>
+                <div className="flex-1 relative">
+                  <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" />
+                  <input
+                    type="text"
+                    placeholder="Search restaurants, cuisines, dishes..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSearchQuery(value);
+                      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+                      if (value.trim().length >= 2 && location) {
+                        setIsSearching(true);
+                        searchTimeoutRef.current = setTimeout(async () => {
+                          try {
+                            const results = await searchRestaurantsByQuery(location, value.trim());
+                            setSearchResults(results);
+                          } catch (err) {
+                            console.error('[Search] Error:', err);
+                            setSearchResults([]);
+                          } finally {
+                            setIsSearching(false);
+                          }
+                        }, 500);
+                      } else {
+                        setSearchResults([]);
+                        setIsSearching(false);
+                      }
+                    }}
+                    className="w-full bg-white/10 border border-white/20 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-white/40 focus:outline-none focus:border-orange-500"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              {/* Search results */}
+              {searchQuery.trim().length >= 2 && (
+                <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+                  {isSearching ? (
+                    <div className="text-center py-8">
+                      <Loader2 size={24} className="text-orange-500 animate-spin mx-auto mb-2" />
+                      <p className="text-white/60 text-sm">Searching for "{searchQuery}"...</p>
+                    </div>
+                  ) : searchResults.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-white/60 text-sm">No restaurants found for "{searchQuery}"</p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-white/50 text-xs font-medium mb-2">
+                        Found {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+                      </p>
+                      {searchResults.map(restaurant => (
+                        <button
+                          key={restaurant.id}
+                          onClick={() => {
+                            const target = restaurant;
+                            setShowSearch(false);
+                            setSearchQuery('');
+                            setSearchResults([]);
+                            requestAnimationFrame(() => {
+                              setSelectedRestaurant(target);
+                              setState('PROFILE');
+                            });
+                          }}
+                          className="w-full flex items-center gap-4 p-4 bg-white/10 rounded-2xl text-left hover:bg-white/20 transition-colors"
+                        >
+                          <img src={restaurant.mainPhotoUrl} className="w-16 h-16 rounded-xl object-cover" alt={restaurant.name} />
+                          <div>
+                            <h4 className="text-white font-bold">{restaurant.name}</h4>
+                            <p className="text-white/60 text-sm">{restaurant.cuisine} • {restaurant.distance}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1106,7 +1213,7 @@ const App: React.FC = () => {
           <button 
             onClick={async () => {
               const newOpenNowValue = !filters.openNow;
-              console.log('[OPEN Button] Clicked! Refreshing feed with openNow:', newOpenNowValue);
+              console.log('[OPEN Button] Clicked! openNow:', newOpenNowValue, 'isManualSearch:', isManualSearchRef.current);
               
               // Create new filters object with updated openNow value
               const newFilters = { ...filters, openNow: newOpenNowValue };
@@ -1114,19 +1221,22 @@ const App: React.FC = () => {
               // Update filter state
               setFilters(newFilters);
               
-              // Clear current restaurants and reload with new filter
-              setRestaurants([]);
-              setActiveRestaurantIndex(0);
-              setCurrentPage(1);
-              setHasMorePages(true);
-              
-              // Reload restaurants with NEW filters (pass directly to avoid race condition)
-              if (location) {
-                await fetchRestaurants(location, newFilters);
+              if (isManualSearchRef.current) {
+                // Manual search mode: just toggle filter, don't reload
+                // The display filter at render time handles openNow filtering
+                setActiveRestaurantIndex(0);
+                feedRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+              } else {
+                // Normal mode: reload with new filters
+                setRestaurants([]);
+                setActiveRestaurantIndex(0);
+                setCurrentPage(1);
+                setHasMorePages(true);
+                if (location) {
+                  await fetchRestaurants(location, newFilters);
+                }
+                feedRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
               }
-              
-              // Scroll to top
-              feedRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             className={`px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all ${filters.openNow ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}
           >

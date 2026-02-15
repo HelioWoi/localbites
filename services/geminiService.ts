@@ -1,6 +1,6 @@
 
 import { Restaurant, UserLocation, Review } from "../types";
-import { getPartnerRestaurants, hasSupabaseData } from "./supabaseService";
+import { getPartnerRestaurants, hasSupabaseData, getPartnerByName } from "./supabaseService";
 import { searchNearbyRestaurants as searchGooglePlaces, getPlaceDetails, textSearchRestaurants } from "./googlePlacesProxy";
 import { enrichRestaurantWithFilters, applyFilters } from "../utils/filterHelpers";
 // Browser cache disabled — server-side api_cache handles caching
@@ -262,6 +262,30 @@ export async function getRestaurantDetails(placeId: string): Promise<Restaurant 
     const details = await getPlaceDetails(placeId);
     if (!details) return null;
 
+    // Check if this restaurant is a partner — if so, return full partner data with videos
+    const partnerMatch = await getPartnerByName(details.place.name);
+    if (partnerMatch) {
+      console.log('[getRestaurantDetails] Partner match found:', partnerMatch.name);
+      // Enrich partner with Google data (rating, reviews, opening hours)
+      partnerMatch.rating = details.place.rating || partnerMatch.rating;
+      partnerMatch.totalReviews = details.place.totalReviews || partnerMatch.totalReviews;
+      partnerMatch.openingHours = details.place.openingHours || [];
+      partnerMatch.phone = details.place.phone || partnerMatch.phone;
+      partnerMatch.website = details.place.website || partnerMatch.website;
+      partnerMatch.googleMapsUrl = details.place.googleMapsUrl || partnerMatch.googleMapsUrl;
+      partnerMatch.reviews = (details.reviews || []).map((r: any, i: number) => ({
+        id: `review-${i}`,
+        authorName: r.authorName,
+        authorPhotoUrl: r.authorPhotoUrl,
+        rating: r.rating,
+        text: r.text,
+        relativeTimeDescription: r.relativeTimeDescription,
+        time: r.time,
+        photoUrl: undefined,
+      }));
+      return partnerMatch;
+    }
+
     return {
       id: details.place.id,
       name: details.place.name,
@@ -277,11 +301,8 @@ export async function getRestaurantDetails(placeId: string): Promise<Restaurant 
       googleMapsUrl: details.place.googleMapsUrl,
       mainPhotoUrl: details.place.photoUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800',
       isSubscribed: false,
-      dishes: details.photos.map((url, i) => ({
-        id: `photo-${i}`,
-        name: `Photo ${i + 1}`,
-        thumbnailUrl: url,
-      })),
+      dishes: [],
+      openingHours: details.place.openingHours || [],
       reviews: details.reviews.map((r, i) => ({
         id: `review-${i}`,
         authorName: r.authorName,

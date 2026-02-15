@@ -165,6 +165,16 @@ serve(async (req) => {
       case "getNearbyLocalities":
         result = await getNearbyLocalities(lat, lng, points);
         break;
+      case "autocomplete":
+        // Autocomplete restaurant names using Google Places Autocomplete API
+        if (!query) throw new Error("Query is required for autocomplete");
+        result = await autocompleteRestaurants(query, lat, lng);
+        break;
+      case "geocode":
+        // Geocode an address to lat/lng using Google Geocoding API
+        if (!query) throw new Error("Address query is required for geocoding");
+        result = await geocodeAddress(query);
+        break;
       case "getPhoto":
         // Proxy photo requests to avoid exposing API key
         const { photoName } = await req.json();
@@ -574,6 +584,7 @@ async function getPlaceDetails(placeId: string) {
       totalReviews: place.userRatingCount,
       priceLevel: priceLevelToString(place.priceLevel),
       isOpen: place.currentOpeningHours?.openNow,
+      openingHours: place.currentOpeningHours?.weekdayDescriptions || [],
       photoUrl: place.photos?.[0]?.name
         ? `https://places.googleapis.com/v1/${place.photos[0].name}/media?maxHeightPx=800&maxWidthPx=800&key=${GOOGLE_API_KEY}`
         : undefined,
@@ -794,4 +805,68 @@ async function reverseGeocode(lat: number, lng: number): Promise<{ name: string;
     }
   }
   return null;
+}
+
+// Geocode an address string to lat/lng using Google Geocoding API
+async function geocodeAddress(address: string) {
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_API_KEY}`;
+  const response = await fetch(url);
+  const data = await response.json();
+
+  if (data.status === 'OK' && data.results.length > 0) {
+    const location = data.results[0].geometry.location;
+    return {
+      lat: location.lat,
+      lng: location.lng,
+      formatted_address: data.results[0].formatted_address,
+    };
+  }
+
+  return { lat: null, lng: null, formatted_address: null };
+}
+
+// Autocomplete restaurant names using lightweight Text Search (same API already enabled)
+async function autocompleteRestaurants(query: string, lat?: number, lng?: number) {
+  const body: any = {
+    textQuery: `${query} restaurant`,
+    maxResultCount: 5,
+    languageCode: "en",
+  };
+
+  // Bias results to user's location if available
+  if (lat && lng) {
+    body.locationBias = {
+      circle: {
+        center: { latitude: lat, longitude: lng },
+        radius: 10000, // 10km
+      },
+    };
+  }
+
+  const response = await fetch(
+    "https://places.googleapis.com/v1/places:searchText",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_API_KEY!,
+        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.primaryTypeDisplayName",
+      },
+      body: JSON.stringify(body),
+    }
+  );
+
+  if (!response.ok) {
+    console.error("[Autocomplete] Error:", await response.text());
+    return [];
+  }
+
+  const data = await response.json();
+  const places = data.places || [];
+
+  return places.slice(0, 5).map((p: any) => ({
+    placeId: p.id,
+    name: p.displayName?.text || "",
+    address: p.formattedAddress || "",
+  }));
 }
