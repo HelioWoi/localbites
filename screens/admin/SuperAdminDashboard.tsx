@@ -234,7 +234,7 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ user, onLogou
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `localbites-partners-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `menulove-partners-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
   };
 
@@ -261,7 +261,7 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ user, onLogou
               </div>
               <div>
                 <h1 className="text-xl font-black text-zinc-900">Super Admin</h1>
-                <p className="text-xs text-zinc-500">Local Bites Control Panel</p>
+                <p className="text-xs text-zinc-500">MenuLove Control Panel</p>
               </div>
             </div>
             <div className="flex items-center gap-3">

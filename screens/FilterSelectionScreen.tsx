@@ -141,15 +141,15 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
         <div className="w-full max-w-md lg:max-w-4xl">
           {/* Logo */}
           <div className="flex items-center justify-center mb-6">
-            <h2 className="text-2xl font-black text-zinc-900 tracking-tight">Local Bites</h2>
+            <h2 className="text-2xl font-black text-zinc-900 tracking-tight gilroy-bold">MenuLove</h2>
           </div>
 
           {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-4xl font-black text-zinc-900 mb-3 tracking-tight">
-              Find your
+              Find Your
               <br />
-              next bite
+              Next Yum
             </h1>
             <p className="text-zinc-400 text-base">
               Choose a category to explore
@@ -256,11 +256,11 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
         <div className="w-full max-w-md lg:max-w-4xl mx-auto bg-zinc-50 rounded-2xl p-6">
           <div className="text-center space-y-3 opacity-70">
             <p className="text-[10px] text-zinc-500 leading-relaxed">
-              Local Bites helps you discover and support local businesses. All products, services, pricing, and customer experiences are provided by the listed venues. Visit our{' '}
+              MenuLove is currently in Beta. We connect you with local businesses and help you discover what's around you. All products, services, pricing, and customer experiences are provided directly by each listed venue. Please visit our{' '}
               <a href="/policy" className="text-orange-500 hover:text-orange-600 transition-colors font-medium">
-                policy
+                Policy
               </a>{' '}
-              page to learn more.
+              page for more details.
             </p>
             <p className="text-[10px] text-zinc-500 leading-relaxed">
               Contact us for any questions -{' '}

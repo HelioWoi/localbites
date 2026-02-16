@@ -1,6 +1,6 @@
 {
-  "name": "LocalBites",
-  "short_name": "LocalBites",
+  "name": "MenuLove",
+  "short_name": "MenuLove",
   "description": "Discover local restaurants through video reels",
   "start_url": "/",
   "display": "standalone",
@@ -9,25 +9,25 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/icons/icon-192.png",
+      "src": "https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-maskable.png",
+      "src": "https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/icons/icon.svg",
+      "src": "https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"

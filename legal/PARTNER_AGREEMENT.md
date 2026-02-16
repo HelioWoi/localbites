@@ -2,16 +2,16 @@
 
 **Last Updated:** February 5, 2026
 
-**LocalBites Pty Ltd**  
+**MenuLove**  
 ABN: 33 234 268 637  
-Email: contact@localbites.com.au  
+Email: contact@menulove.com.au  
 Address: 16 Smith Street, Mooloolaba, Sunshine Coast, Queensland, Australia
 
 ---
 
 ## 1. Agreement Overview
 
-This Partner Agreement ("Agreement") is entered into between LocalBites Pty Ltd ("LocalBites", "we", "us") and the restaurant or business ("Partner", "you") subscribing to our services.
+This Partner Agreement ("Agreement") is entered into between MenuLove ("MenuLove", "we", "us") and the restaurant or business ("Partner", "you") subscribing to our services.
 
 This Agreement is governed by Australian law and incorporates our Terms of Service and Privacy Policy.
 
@@ -20,7 +20,7 @@ This Agreement is governed by Australian law and incorporates our Terms of Servi
 ## 2. Services Provided
 
 ### 2.1 Platform Access
-LocalBites provides:
+MenuLove provides:
 - Mobile app listing for your restaurant
 - Video menu hosting and display
 - Customer discovery and engagement tools
@@ -107,10 +107,10 @@ You must:
 - You retain all rights to your content (videos, photos, menus)
 - You are solely responsible for your content
 
-### 5.2 License to LocalBites
+### 5.2 License to MenuLove
 By uploading content, you grant us a:
 - **Non-exclusive, worldwide, royalty-free license** to:
-  - Display content in the LocalBites app
+  - Display content in the MenuLove app
   - Promote your restaurant on our platform
   - Use in marketing materials (with attribution)
   - Store and process on our servers
@@ -148,8 +148,8 @@ Violations may result in:
 
 ## 7. Intellectual Property
 
-### 7.1 LocalBites IP
-- "LocalBites" name, logo, and branding are our property
+### 7.1 MenuLove IP
+- "MenuLove" name, logo, and branding are our property
 - Platform design and functionality are protected
 - You may not copy, modify, or distribute our IP
 - Limited license to use our logo for promotional purposes (with approval)
@@ -171,7 +171,7 @@ We collect:
 - Performance analytics
 
 ### 8.2 Data Ownership
-- Aggregated data belongs to LocalBites
+- Aggregated data belongs to MenuLove
 - Your specific analytics available in Partner Dashboard
 - We may use anonymized data for platform improvements
 
@@ -184,12 +184,12 @@ We collect:
 **IMPORTANT - Partner Responsibilities:**
 
 Partners acknowledge that:
-- LocalBites uses Google Places API for restaurant information
+- MenuLove uses Google Places API for restaurant information
 - Partners MUST keep their Google Business Profile updated
 - Partners MUST update opening hours immediately when changed
 - Partners MUST notify us of temporary or permanent closures
 
-**LocalBites is NOT responsible for:**
+**MenuLove is NOT responsible for:**
 - Outdated information on Google
 - Users visiting your restaurant when closed
 - Incorrect hours or information from Google
@@ -199,8 +199,8 @@ Partners acknowledge that:
 You agree to:
 - Maintain accurate Google Business Profile
 - Update hours, closures, and information promptly
-- Not hold LocalBites liable for Google data inaccuracies
-- Indemnify LocalBites for any claims related to incorrect information
+- Not hold MenuLove liable for Google data inaccuracies
+- Indemnify MenuLove for any claims related to incorrect information
 
 ---
 
@@ -223,7 +223,7 @@ To the extent permitted by Australian Consumer Law:
 - We are not liable for third-party service failures (Stripe, Google, etc.)
 
 ### 9.3 Indemnification
-You agree to indemnify LocalBites from claims arising from:
+You agree to indemnify MenuLove from claims arising from:
 - Your content or business operations
 - Food safety issues or customer complaints
 - Violation of laws or regulations
@@ -375,25 +375,25 @@ We strongly recommend Partners maintain:
 - **Product Liability Insurance**
 - **Business Insurance**
 
-LocalBites does not provide insurance coverage for Partner businesses.
+MenuLove does not provide insurance coverage for Partner businesses.
 
 ---
 
 ## 18. Contact Information
 
-**LocalBites Pty Ltd**  
-Email: contact@localbites.com.au  
+**MenuLove**  
+Email: contact@menulove.com.au  
 ABN: 33 234 268 637  
 Address: 16 Smith Street, Mooloolaba, Sunshine Coast, Queensland, Australia
 
-For support: contact@localbites.com.au  
-For legal matters: contact@localbites.com.au
+For support: contact@menulove.com.au  
+For legal matters: contact@menulove.com.au
 
 ---
 
 ## 19. Acknowledgment
 
-By subscribing to LocalBites, you acknowledge that:
+By subscribing to MenuLove, you acknowledge that:
 - You have read and understood this Agreement
 - You agree to be bound by these terms
 - You have authority to bind your business
@@ -405,8 +405,8 @@ By subscribing to LocalBites, you acknowledge that:
 **This Partner Agreement is governed by Australian law and complies with the Australian Consumer Law under the Competition and Consumer Act 2010.**
 
 **Effective Date:** Date of subscription  
-**Parties:** LocalBites Pty Ltd and subscribing Partner business
+**Parties:** MenuLove and subscribing Partner business
 
-Email: contact@localbites.com.au  
+Email: contact@menulove.com.au  
 Address: 16 Smith Street, Mooloolaba, Sunshine Coast, Queensland, Australia  
 ABN: 33 234 268 637

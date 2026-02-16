@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/logo%20icon.png">
-    <title>Contact Us - LocalBites</title>
+    <title>Contact Us - MenuLove</title>
     <style>
         * {
             margin: 0;
@@ -186,7 +186,7 @@
         </div>
         
         <div class="content">
-            <a href="/" class="back-link">← Back to LocalBites</a>
+            <a href="/" class="back-link">← Back to MenuLove</a>
             
             <div class="info-section">
                 <h3>Get in Touch</h3>
@@ -194,7 +194,7 @@
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                     </svg>
-                    <span><strong>Email:</strong> contact@localbites.com.au</span>
+                    <span><strong>Email:</strong> contact@menulove.com.au</span>
                 </div>
                 <div class="info-item">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -211,7 +211,7 @@
 
             <div id="errorMessage" class="error-message">
                 <strong>✗ Error</strong><br>
-                Something went wrong. Please try again or email us directly at contact@localbites.com.au
+                Something went wrong. Please try again or email us directly at contact@menulove.com.au
             </div>
 
             <form id="contactForm">
@@ -288,7 +288,7 @@
 
             try {
                 // Send to FormSubmit.co (free service, no backend needed)
-                const response = await fetch('https://formsubmit.co/ajax/contact@localbites.com.au', {
+                const response = await fetch('https://formsubmit.co/ajax/contact@menulove.com.au', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -301,7 +301,7 @@
                         subject: data.subject,
                         location: data.location,
                         message: data.message,
-                        _subject: `LocalBites Contact: ${data.subject}`,
+                        _subject: `MenuLove Contact: ${data.subject}`,
                         _template: 'table',
                         _captcha: 'false'
                     })

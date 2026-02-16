@@ -638,7 +638,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
             const shareUrl = window.location.href;
             const shareData = {
               title: restaurant.name,
-              text: `Check out ${restaurant.name} on LocalBites!`,
+              text: `Check out ${restaurant.name} on MenuLove!`,
               url: shareUrl,
             };
             if (navigator.share) {
@@ -683,7 +683,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                   <p className="text-orange-900 font-bold text-sm mb-1">Own this restaurant?</p>
                   <p className="text-orange-700 text-xs mb-3">Add videos and attract more customers.</p>
                   <a 
-                    href="https://www.localbites.com.au/partner"
+                    href="https://www.menulove.com.au/partner"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-block px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-[9px] uppercase tracking-widest rounded-lg active:scale-95 transition-transform"
@@ -699,7 +699,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         {/* Disclaimer & Google Attribution */}
         <div className="py-4 px-2 space-y-3">
           <p className="text-[10px] text-zinc-400 text-center leading-relaxed">
-            The information displayed is publicly available data provided by Google Maps. LocalBites is an independent discovery platform. We do not represent, endorse, or guarantee any establishment. Please verify details directly with the business.
+            The information displayed is publicly available data provided by Google Maps. MenuLove is an independent discovery platform. We do not represent, endorse, or guarantee any establishment. Please verify details directly with the business.
           </p>
           <p className="text-[10px] text-zinc-400 text-center leading-relaxed">
             If you are the owner of this business and wish to update or remove your listing from our platform,{' '}

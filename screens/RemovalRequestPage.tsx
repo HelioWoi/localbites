@@ -119,7 +119,7 @@ const RemovalRequestPage: React.FC<RemovalRequestPageProps> = ({ onBack, prefill
             {/* Info box */}
             <div className="bg-zinc-50 rounded-2xl p-4 mb-6">
               <p className="text-sm text-zinc-600 leading-relaxed">
-                The information displayed on LocalBites is publicly available data provided by Google Maps. 
+                The information displayed on MenuLove is publicly available data provided by Google Maps. 
                 If you wish to update or remove your listing from our platform, please complete this form. 
                 We verify business ownership via ABN to protect against unauthorised requests.
               </p>

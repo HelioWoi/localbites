@@ -190,7 +190,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
     <div className="max-w-4xl mx-auto p-6">
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-zinc-900 mb-2">Subscription</h2>
-        <p className="text-zinc-600">Manage your Local Bites premium subscription</p>
+        <p className="text-zinc-600">Manage your MenuLove premium subscription</p>
       </div>
 
       {isLifetime && (

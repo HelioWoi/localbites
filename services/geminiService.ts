@@ -78,37 +78,37 @@ export async function getNearbyRestaurants(
   filters?: { cuisine?: string; price?: string; openNow?: boolean },
   category: string = 'all'
 ): Promise<Restaurant[]> {
-  console.log('[LocalBites] Fetching restaurants for:', location.name);
-  console.log('[LocalBites] Location coordinates:', { lat: location.lat, lng: location.lng, radius: location.radius });
+  console.log('[MenuLove] Fetching restaurants for:', location.name);
+  console.log('[MenuLove] Location coordinates:', { lat: location.lat, lng: location.lng, radius: location.radius });
   
   // 1. ALWAYS get partner restaurants first (NO API COST - always fresh!)
   let partnerRestaurants: Restaurant[] = [];
   try {
     const hasData = await hasSupabaseData();
     if (hasData) {
-      console.log('[LocalBites] Loading partner restaurants from Supabase (NO API COST)');
+      console.log('[MenuLove] Loading partner restaurants from Supabase (NO API COST)');
       partnerRestaurants = await getPartnerRestaurants(location.lat, location.lng);
-      console.log('[LocalBites] Found', partnerRestaurants.length, 'partner restaurants');
+      console.log('[MenuLove] Found', partnerRestaurants.length, 'partner restaurants');
     }
   } catch (error) {
-    console.error('[LocalBites] Supabase error:', error);
+    console.error('[MenuLove] Supabase error:', error);
   }
 
   // 2. FETCH Google restaurants (server-side cache in Supabase handles cost reduction)
   // Browser cache disabled — server api_cache (30-day TTL) prevents redundant Google API calls
   let googleRestaurants: Restaurant[] = [];
   {
-    console.log('[LocalBites] Fetching Google data (server cache handles cost)...');
+    console.log('[MenuLove] Fetching Google data (server cache handles cost)...');
     
     // CONDITIONALLY get Google Places restaurants (WITH COST CONTROLS)
     const canUseAPI = canUseGoogleAPI();
     
     if (!canUseAPI) {
-      console.log('[LocalBites] ⚠️ Daily Google API search limit reached. Showing partners only.');
+      console.log('[MenuLove] ⚠️ Daily Google API search limit reached. Showing partners only.');
     } else if (location.lat && location.lng) {
       try {
         const radius = location.radius || 5000; // Default 5km
-        console.log('[LocalBites] Searching Google Places (LIMITED TO', GOOGLE_API_LIMIT, 'results)');
+        console.log('[MenuLove] Searching Google Places (LIMITED TO', GOOGLE_API_LIMIT, 'results)');
         
         // Increment search count BEFORE making the API call
         incrementSearchCount();
@@ -140,27 +140,27 @@ export async function getNearbyRestaurants(
           openingHours: place.openingHours || [],
         }));
         
-        console.log('[LocalBites] Found', googleRestaurants.length, 'Google restaurants (limited)');
+        console.log('[MenuLove] Found', googleRestaurants.length, 'Google restaurants (limited)');
       } catch (error) {
-        console.error('[LocalBites] Google Places error:', error);
+        console.error('[MenuLove] Google Places error:', error);
       }
     }
   }
 
   // 3. Merge results: Partners first, then Google (avoiding duplicates)
-  console.log('[LocalBites] Merging results - Partners:', partnerRestaurants.length, 'Google:', googleRestaurants.length);
+  console.log('[MenuLove] Merging results - Partners:', partnerRestaurants.length, 'Google:', googleRestaurants.length);
   const partnerNames = new Set(partnerRestaurants.map(r => r.name.toLowerCase()));
   const filteredGoogleRestaurants = googleRestaurants.filter(
     r => !partnerNames.has(r.name.toLowerCase())
   );
 
   let results = [...partnerRestaurants, ...filteredGoogleRestaurants];
-  console.log('[LocalBites] After merge:', results.length, 'restaurants');
-  console.log('[LocalBites] First restaurant:', results[0]?.name, 'isSubscribed:', results[0]?.isSubscribed);
+  console.log('[MenuLove] After merge:', results.length, 'restaurants');
+  console.log('[MenuLove] First restaurant:', results[0]?.name, 'isSubscribed:', results[0]?.isSubscribed);
 
   // 4. Enrich restaurants with inferred filter data
   results = results.map(r => enrichRestaurantWithFilters(r));
-  console.log('[LocalBites] Enriched restaurants with filter data');
+  console.log('[MenuLove] Enriched restaurants with filter data');
 
   // 5. Sort: Partners FIRST (priority), then by distance within each group
   results.sort((a, b) => {
@@ -173,11 +173,11 @@ export async function getNearbyRestaurants(
     const distB = b.distanceMeters ?? _parseDistanceToMeters(b.distance);
     return distA - distB;
   });
-  console.log('[LocalBites] After sort:', results.length, 'restaurants');
-  console.log('[LocalBites] First restaurant after sort:', results[0]?.name, 'isSubscribed:', results[0]?.isSubscribed);
+  console.log('[MenuLove] After sort:', results.length, 'restaurants');
+  console.log('[MenuLove] First restaurant after sort:', results[0]?.name, 'isSubscribed:', results[0]?.isSubscribed);
 
   // 6. Browser cache disabled — server-side api_cache handles caching
-  console.log('[LocalBites] ✅ Results ready (server cache active, browser cache disabled)');
+  console.log('[MenuLove] ✅ Results ready (server cache active, browser cache disabled)');
 
   // 7. Apply filters (cuisine, price, dietary, ambiance, amenities)
   // NOTE: openNow filter is applied ONLY at display time (App.tsx) because:
@@ -196,15 +196,15 @@ export async function getNearbyRestaurants(
       hasOutdoorSeating: (filters as any).hasOutdoorSeating || false,
     };
     results = applyFilters(results, fullFilters);
-    console.log('[LocalBites] After filters:', results.length, '(was', beforeFilters, ')');
+    console.log('[MenuLove] After filters:', results.length, '(was', beforeFilters, ')');
   }
 
   // 8. No fallback to demo data - only show real results
   if (results.length === 0) {
-    console.log('[LocalBites] No results found');
+    console.log('[MenuLove] No results found');
   }
 
-  console.log('[LocalBites] Returning', results.length, 'total restaurants');
+  console.log('[MenuLove] Returning', results.length, 'total restaurants');
   return results;
 }
 
@@ -213,7 +213,7 @@ export async function searchRestaurantsByQuery(
   location: UserLocation,
   query: string
 ): Promise<Restaurant[]> {
-  console.log('[LocalBites] Text search for:', query);
+  console.log('[MenuLove] Text search for:', query);
   
   if (!query || query.trim().length === 0) {
     return [];
@@ -248,10 +248,10 @@ export async function searchRestaurantsByQuery(
     // Enrich with filter data
     const enriched = restaurants.map(r => enrichRestaurantWithFilters(r));
     
-    console.log('[LocalBites] Text search returned', enriched.length, 'restaurants for:', query);
+    console.log('[MenuLove] Text search returned', enriched.length, 'restaurants for:', query);
     return enriched;
   } catch (error) {
-    console.error('[LocalBites] Text search error:', error);
+    console.error('[MenuLove] Text search error:', error);
     return [];
   }
 }
@@ -315,7 +315,7 @@ export async function getRestaurantDetails(placeId: string): Promise<Restaurant 
       })),
     };
   } catch (error) {
-    console.error('[LocalBites] Error getting restaurant details:', error);
+    console.error('[MenuLove] Error getting restaurant details:', error);
     return null;
   }
 }

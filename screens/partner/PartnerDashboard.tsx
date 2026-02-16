@@ -877,9 +877,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
-                <span className="text-white text-xs font-bold">LB</span>
-              </div>
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png" 
+                alt="MenuLove" 
+                className="w-9 h-9 rounded-lg"
+              />
               <div>
                 <p className="text-sm font-semibold text-zinc-900">
                   Welcome, {user.email?.split('@')[0] || 'Partner'}
@@ -1130,7 +1132,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                         <strong>Click the star button</strong> <span className="inline-flex items-center justify-center w-6 h-6 bg-black/60 rounded-full mx-1"><Star size={12} className="text-white" /></span> on any video below to set it as your <strong>feed cover</strong>.
                       </p>
                       <p className="text-xs text-zinc-600">
-                        💡 This video will appear <strong>first</strong> when users discover your restaurant in the LocalBites feed.
+                        💡 This video will appear <strong>first</strong> when users discover your restaurant in the MenuLove feed.
                       </p>
                     </div>
                   </div>

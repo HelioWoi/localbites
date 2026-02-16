@@ -24,7 +24,7 @@ export interface AssistantResponse {
   shouldSearch: boolean;
 }
 
-const SYSTEM_PROMPT = `You are Bites Buddy, a local food discovery assistant for LocalBites.
+const SYSTEM_PROMPT = `You are Bites Buddy, a local food discovery assistant for MenuLove.
 
 YOUR JOB:
 - Help users decide where to eat nearby

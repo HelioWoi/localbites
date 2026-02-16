@@ -66,7 +66,7 @@
 ### ✅ **Navegação**
 - Sidebar com menu de navegação
 - Tabs superiores (Overview, Partners, Revenue, etc)
-- Responsivo para mobile com sidebar colapsável
+- Responsivo para menulove.com.au sidebar colapsável
 
 ### ✅ **Métricas em Tempo Real**
 - Total Partners
@@ -166,7 +166,7 @@ const handlePartnerAction = (partnerId: string, action: string) => {
 - Background: `bg-zinc-100` (cinza claro)
 - Texto: `text-zinc-900` (quase preto)
 - Bordas: `border-zinc-200` (cinza suave)
-- Accent: `text-orange-500` (laranja LocalBites)
+- Accent: `text-orange-500` (laranja MenuLove)
 
 ### **Badges de Status**
 - **Active**: Verde (`bg-green-100 text-green-700`)

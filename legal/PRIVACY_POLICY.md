@@ -2,20 +2,20 @@
 
 **Last Updated:** February 5, 2026
 
-**LocalBites Pty Ltd**  
+**MenuLove**  
 ABN: 33 234 268 637  
-Email: contact@localbites.com.au  
+Email: contact@menulove.com.au  
 Address: 16 Smith Street, Mooloolaba, Sunshine Coast, Queensland, Australia
 
 ---
 
 ## 1. Introduction
 
-LocalBites ("we", "our", "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application and services.
+MenuLove ("we", "our", "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application and services.
 
 This Privacy Policy complies with the **Australian Privacy Act 1988** (Cth) and the **Australian Privacy Principles (APPs)**.
 
-By using LocalBites, you agree to the collection and use of information in accordance with this policy.
+By using MenuLove, you agree to the collection and use of information in accordance with this policy.
 
 ---
 
@@ -62,7 +62,7 @@ We integrate with:
 We use your information for:
 
 ### 3.1 Service Delivery
-- Provide and maintain the LocalBites app
+- Provide and maintain the MenuLove app
 - Show nearby restaurants based on your location
 - Process payments and subscriptions
 - Authenticate users and partners
@@ -184,7 +184,7 @@ Unsubscribe from marketing emails
 ### 9.5 Complaint
 Lodge a complaint with us or the Office of the Australian Information Commissioner (OAIC)
 
-**To exercise your rights, contact us at:** contact@localbites.com.au
+**To exercise your rights, contact us at:** contact@menulove.com.au
 
 We will respond within 30 days.
 
@@ -192,7 +192,7 @@ We will respond within 30 days.
 
 ## 10. Children's Privacy
 
-LocalBites is not intended for users under 18 years of age. We do not knowingly collect personal information from children. If you believe we have collected information from a child, please contact us immediately.
+MenuLove is not intended for users under 18 years of age. We do not knowingly collect personal information from children. If you believe we have collected information from a child, please contact us immediately.
 
 ---
 
@@ -222,7 +222,7 @@ We may update this Privacy Policy from time to time. We will notify you of signi
 - In-app notification
 - Updated "Last Updated" date
 
-Continued use of LocalBites after changes constitutes acceptance of the updated policy.
+Continued use of MenuLove after changes constitutes acceptance of the updated policy.
 
 ---
 
@@ -230,7 +230,7 @@ Continued use of LocalBites after changes constitutes acceptance of the updated 
 
 If you have questions or concerns about this Privacy Policy:
 
-**Email:** contact@localbites.com.au  
+**Email:** contact@menulove.com.au  
 **Address:** 16 Smith Street, Mooloolaba, Sunshine Coast, Queensland, Australia  
 **ABN:** 33 234 268 637
 
@@ -240,7 +240,7 @@ If you have questions or concerns about this Privacy Policy:
 
 If you believe we have breached the Australian Privacy Principles, you can:
 
-1. **Contact us directly** at contact@localbites.com.au
+1. **Contact us directly** at contact@menulove.com.au
 2. **Lodge a complaint** with the Office of the Australian Information Commissioner (OAIC):
    - Website: www.oaic.gov.au
    - Phone: 1300 363 992
@@ -252,8 +252,8 @@ If you believe we have breached the Australian Privacy Principles, you can:
 
 For privacy-related inquiries, contact:
 
-**Privacy Officer:** LocalBites Team  
-**Email:** contact@localbites.com.au
+**Privacy Officer:** MenuLove Team  
+**Email:** contact@menulove.com.au
 
 ---
 

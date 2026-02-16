@@ -37,16 +37,16 @@ const LegalFooter: React.FC = () => {
 
           {/* Copyright */}
           <div className="text-xs text-zinc-500 text-center">
-            © 2026 LocalBites Pty Ltd. ABN: 33 234 268 637. All rights reserved.
+            © 2026 MenuLove. ABN: 33 234 268 637. All rights reserved.
           </div>
 
           {/* Contact */}
           <div className="text-xs text-zinc-400 text-center">
             <a
-              href="mailto:contact@localbites.com.au"
+              href="mailto:contact@menulove.com.au"
               className="hover:text-orange-500 transition-colors"
             >
-              contact@localbites.com.au
+              contact@menulove.com.au
             </a>
           </div>
         </div>

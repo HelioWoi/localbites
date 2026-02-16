@@ -85,9 +85,9 @@ Privacy Policy | Terms of Service | Partner Agreement
 
 ### Opção 1: Páginas Web Simples
 Crie páginas HTML estáticas:
-- `https://localbites.com/privacy`
-- `https://localbites.com/terms`
-- `https://localbites.com/partner-agreement`
+- `https://menulove.com.au/privacy`
+- `https://menulove.com.au/terms`
+- `https://menulove.com.au/partner-agreement`
 
 ### Opção 2: In-App (Recomendado)
 Crie telas dentro do app que mostram os documentos.
@@ -134,12 +134,12 @@ Please review:
 - Privacy Policy: [link]
 - Terms of Service: [link]
 
-Continued use of LocalBites constitutes acceptance of these updated terms.
+Continued use of MenuLove constitutes acceptance of these updated terms.
 
 Questions? Contact us at heliocwoi@gmail.com
 
 Best regards,
-LocalBites Team
+MenuLove Team
 ```
 
 ---
@@ -206,7 +206,7 @@ Estes documentos são templates genéricos baseados em legislação australiana.
 - **Devem ser revisados por advogado australiano**
 - **Podem precisar de ajustes para seu caso específico**
 
-LocalBites Pty Ltd não se responsabiliza pelo uso destes templates.
+MenuLove não se responsabiliza pelo uso destes templates.
 
 ---
 
@@ -219,4 +219,4 @@ LocalBites Pty Ltd não se responsabiliza pelo uso destes templates.
 
 ---
 
-**Boa sorte com o LocalBites! 🚀**
+**Boa sorte com o MenuLove! 🚀**

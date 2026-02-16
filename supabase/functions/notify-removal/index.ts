@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const NOTIFY_EMAIL = "contact@localbites.com.au";
+const NOTIFY_EMAIL = "contact@menulove.com.au";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,7 +25,7 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: "LocalBites <noreply@localbites.com.au>",
+          from: "MenuLove <noreply@menulove.com.au>",
           to: [NOTIFY_EMAIL],
           subject: `🔴 Removal Request: ${business_name}`,
           html: `
@@ -38,7 +38,7 @@ serve(async (req) => {
               <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #eee;">Reason</td><td style="padding:8px;border-bottom:1px solid #eee;">${reason || 'Not provided'}</td></tr>
             </table>
             <br/>
-            <p>Review this request in the <a href="https://www.localbites.com.au/admin">Admin Dashboard</a>.</p>
+            <p>Review this request in the <a href="https://www.menulove.com.au/admin">Admin Dashboard</a>.</p>
           `,
         }),
       });

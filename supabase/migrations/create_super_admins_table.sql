@@ -36,3 +36,4 @@ CREATE INDEX IF NOT EXISTS idx_super_admins_email ON super_admins(email);
 
 -- Add comment
 COMMENT ON TABLE super_admins IS 'Table to store super admin users who have access to the admin dashboard';
+ 

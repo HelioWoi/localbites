@@ -42,7 +42,7 @@
 ✅ **content-moderation.html**
 
 - Professional HTML pages with responsive design
-- Orange/white LocalBites branding
+- Orange/white MenuLove branding
 - Mobile-friendly
 - Cross-linked for easy navigation
 
@@ -76,7 +76,7 @@
 
 **Content:**
 - Partners responsible for their own content
-- LocalBites not liable for Partner content
+- MenuLove not liable for Partner content
 - Right to remove inappropriate content
 
 **Liability Limitations:**
@@ -107,7 +107,7 @@
 
 - **ABN:** 33 234 268 637
 - **Address:** 16 Smith Street, Mooloolaba, Sunshine Coast, Queensland, Australia
-- **Email:** contact@localbites.com.au
+- **Email:** contact@menulove.com.au
 - **Jurisdiction:** Queensland, Australia
 
 ---
@@ -230,16 +230,16 @@ Hi [Name],
 We've updated our legal documents to better protect your rights and comply with Australian law.
 
 Please review:
-- Privacy Policy: https://localbites.com.au/legal/privacy-policy.html
-- Terms of Service: https://localbites.com.au/legal/terms-of-service.html
-- Content Policy: https://localbites.com.au/legal/content-moderation.html
+- Privacy Policy: https://menulove.com.au/legal/privacy-policy.html
+- Terms of Service: https://menulove.com.au/legal/terms-of-service.html
+- Content Policy: https://menulove.com.au/legal/content-moderation.html
 
-Continued use of LocalBites constitutes acceptance of these terms.
+Continued use of MenuLove constitutes acceptance of these terms.
 
-Questions? Contact us at contact@localbites.com.au
+Questions? Contact us at contact@menulove.com.au
 
 Best regards,
-LocalBites Team
+MenuLove Team
 ```
 
 ---
@@ -285,7 +285,7 @@ LocalBites Team
 ## 📞 **SUPPORT:**
 
 **Questions about implementation?**
-- Email: contact@localbites.com.au
+- Email: contact@menulove.com.au
 
 **Legal questions?**
 - Consult Australian lawyer
@@ -308,4 +308,4 @@ Your legal documents are:
 ---
 
 **Last Updated:** February 5, 2026  
-**LocalBites Pty Ltd** | ABN: 33 234 268 637
+**MenuLove** | ABN: 33 234 268 637

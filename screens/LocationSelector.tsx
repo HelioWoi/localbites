@@ -309,8 +309,8 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
           <Utensils className="text-white" size={24} />
         </div>
         <div>
-          <p className="text-lg font-bold text-zinc-900">Local Bites</p>
-          <p className="text-xs text-zinc-500">Discover local flavors</p>
+          <p className="text-lg font-bold text-zinc-900">MenuLove</p>
+          <p className="text-xs text-zinc-500">Find Your Next Yum</p>
         </div>
       </div>
 
@@ -398,13 +398,13 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
       {/* Footer */}
       <div className="mt-6 pt-4 border-t border-zinc-100 text-center">
         <p className="text-[10px] text-zinc-400">
-          ABN 33 234 268 637 • © 2026 Local Bites Australia. All rights reserved.
+          ABN 33 234 268 637 • © 2026 MenuLove Australia. All rights reserved.
         </p>
         <a 
-          href="mailto:contact@localbites.com.au" 
+          href="mailto:contact@menulove.com.au" 
           className="text-[10px] text-zinc-400/50 hover:text-orange-500 transition-colors mt-1 inline-block"
         >
-          contact@localbites.com.au
+          contact@menulove.com.au
         </a>
       </div>
     </div>

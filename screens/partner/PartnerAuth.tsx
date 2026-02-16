@@ -263,11 +263,13 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
       {/* Header - better spacing */}
       <div className="pt-16 pb-8 flex items-center justify-center">
         <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-            <Utensils size={20} className="text-white" />
-          </div>
+          <img 
+            src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png" 
+            alt="MenuLove" 
+            className="w-12 h-12 rounded-xl"
+          />
           <div>
-            <span className="text-xl font-bold text-zinc-900">Local Bites</span>
+            <span className="text-xl font-bold text-zinc-900">MenuLove</span>
             <span className="text-xl font-light text-zinc-400 ml-1">Partner</span>
           </div>
         </a>
@@ -574,7 +576,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
               <ul className="text-sm text-orange-700 space-y-1">
                 <li>• Upload up to 5 menu videos</li>
                 <li>• Basic analytics dashboard</li>
-                <li>• Appear in Local Bites feed</li>
+                <li>• Appear in MenuLove feed</li>
                 <li>• No credit card required</li>
               </ul>
             </div>

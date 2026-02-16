@@ -2,24 +2,24 @@
 
 **Last Updated:** February 5, 2026
 
-**LocalBites Pty Ltd**  
+**MenuLove**  
 ABN: 33 234 268 637  
-Email: contact@localbites.com.au  
+Email: contact@menulove.com.au  
 Address: 16 Smith Street, Mooloolaba, Sunshine Coast, Queensland, Australia
 
 ---
 
 ## 1. Agreement to Terms
 
-By accessing or using LocalBites ("the App"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the App.
+By accessing or using MenuLove ("the App"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the App.
 
-These Terms constitute a legally binding agreement between you and LocalBites Pty Ltd under Australian law, including the **Australian Consumer Law (ACL)** under the Competition and Consumer Act 2010.
+These Terms constitute a legally binding agreement between you and MenuLove under Australian law, including the **Australian Consumer Law (ACL)** under the Competition and Consumer Act 2010.
 
 ---
 
 ## 2. Definitions
 
-- **"We", "Us", "Our"** - LocalBites Pty Ltd
+- **"We", "Us", "Our"** - MenuLove
 - **"You", "User"** - Any person using the App
 - **"Partner"** - Restaurant or business with a paid subscription
 - **"Content"** - Videos, photos, text, and other materials
@@ -30,7 +30,7 @@ These Terms constitute a legally binding agreement between you and LocalBites Pt
 ## 3. Eligibility
 
 ### 3.1 Age Requirement
-- You must be at least **18 years old** to use LocalBites
+- You must be at least **18 years old** to use MenuLove
 - By using the App, you represent that you are 18 or older
 
 ### 3.2 Business Partners
@@ -105,7 +105,7 @@ You agree NOT to upload content that:
 - We do not pre-screen content but may review complaints
 
 ### 6.4 Our Intellectual Property
-- LocalBites name, logo, and app design are our property
+- MenuLove name, logo, and app design are our property
 - You may not copy, modify, or distribute our intellectual property
 - All rights not expressly granted are reserved
 
@@ -172,7 +172,7 @@ To the maximum extent permitted by law:
 ### 9.5 Third-Party Information Disclaimer
 **IMPORTANT - READ CAREFULLY:**
 
-LocalBites aggregates information from third-party sources, including but not limited to Google Places API. We are NOT responsible for:
+MenuLove aggregates information from third-party sources, including but not limited to Google Places API. We are NOT responsible for:
 
 **Restaurant Information:**
 - Opening hours or closing times
@@ -210,20 +210,20 @@ LocalBites aggregates information from third-party sources, including but not li
 **Partners' Responsibility:**
 - Partners must keep their information current
 - Partners must update hours and closures promptly
-- LocalBites is not liable for Partner's failure to update information
+- MenuLove is not liable for Partner's failure to update information
 
 **Your Acknowledgment:**
-By using LocalBites, you acknowledge and agree that:
+By using MenuLove, you acknowledge and agree that:
 - You will verify all information before visiting any restaurant
 - You understand that information may be outdated or incorrect
-- You will not hold LocalBites liable for any inconvenience
+- You will not hold MenuLove liable for any inconvenience
 - You use the App at your own risk
 
 ---
 
 ## 10. Indemnification
 
-You agree to indemnify and hold harmless LocalBites, its officers, directors, and employees from any claims, damages, or expenses arising from:
+You agree to indemnify and hold harmless MenuLove, its officers, directors, and employees from any claims, damages, or expenses arising from:
 - Your use of the App
 - Your violation of these Terms
 - Your violation of any law or third-party rights
@@ -278,7 +278,7 @@ These Terms are governed by the laws of **Queensland, Australia**.
 Any disputes will be subject to the exclusive jurisdiction of the courts of Queensland, Australia.
 
 ### 14.3 Informal Resolution
-Before filing a claim, you agree to contact us at contact@localbites.com.au to attempt informal resolution.
+Before filing a claim, you agree to contact us at contact@menulove.com.au to attempt informal resolution.
 
 ### 14.4 Arbitration (Optional)
 Parties may agree to arbitration under the Australian Commercial Disputes Centre (ACDC) rules.
@@ -288,7 +288,7 @@ Parties may agree to arbitration under the Australian Commercial Disputes Centre
 ## 15. General Provisions
 
 ### 15.1 Entire Agreement
-These Terms constitute the entire agreement between you and LocalBites.
+These Terms constitute the entire agreement between you and MenuLove.
 
 ### 15.2 Severability
 If any provision is found invalid, the remaining provisions remain in effect.
@@ -329,7 +329,7 @@ We are committed to complying with all Australian Consumer Law requirements and 
 
 ## 18. Acknowledgment
 
-By using LocalBites, you acknowledge that:
+By using MenuLove, you acknowledge that:
 - You have read and understood these Terms
 - You agree to be bound by these Terms
 - You have the authority to enter into this agreement

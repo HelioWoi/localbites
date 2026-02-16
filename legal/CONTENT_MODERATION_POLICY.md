@@ -2,16 +2,16 @@
 
 **Last Updated:** February 5, 2026
 
-**LocalBites Pty Ltd**  
+**MenuLove**  
 ABN: 33 234 268 637  
-Email: contact@localbites.com.au  
+Email: contact@menulove.com.au  
 Address: 16 Smith Street, Mooloolaba, Sunshine Coast, Queensland, Australia
 
 ---
 
 ## 1. Purpose
 
-This Content Moderation Policy outlines the standards for content uploaded to LocalBites and our procedures for handling inappropriate, illegal, or harmful content.
+This Content Moderation Policy outlines the standards for content uploaded to MenuLove and our procedures for handling inappropriate, illegal, or harmful content.
 
 All Partners and users must comply with this policy. Violations may result in content removal, account suspension, or termination.
 
@@ -123,7 +123,7 @@ Content must not show:
 ### 4.1 How to Report
 Users can report inappropriate content via:
 - In-app "Report" button
-- Email: contact@localbites.com.au
+- Email: contact@menulove.com.au
 - Subject: "Content Report - [Video ID]"
 
 ### 4.2 What to Include
@@ -230,7 +230,7 @@ Partners are solely responsible for:
 - Copyright and licensing
 - Accuracy of information
 
-**LocalBites is not responsible for Partner content.**
+**MenuLove is not responsible for Partner content.**
 
 ---
 
@@ -252,7 +252,7 @@ We prioritize user safety by:
 
 ## 10. Changes to This Policy
 
-We may update this policy at any time. Continued use of LocalBites constitutes acceptance of changes.
+We may update this policy at any time. Continued use of MenuLove constitutes acceptance of changes.
 
 ---
 
@@ -260,7 +260,7 @@ We may update this policy at any time. Continued use of LocalBites constitutes a
 
 For questions about content moderation:
 
-**Email:** contact@localbites.com.au  
+**Email:** contact@menulove.com.au  
 **Address:** 16 Smith Street, Mooloolaba, Sunshine Coast, Queensland, Australia  
 **ABN:** 33 234 268 637
 

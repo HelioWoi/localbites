@@ -68,7 +68,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onClose, onCo
                 <Play size={40} className="text-white" fill="white" />
               </div>
               <div>
-                <h2 className="text-3xl font-bold text-zinc-900 mb-3">Welcome to Local Bites</h2>
+                <h2 className="text-3xl font-bold text-zinc-900 mb-3">Welcome to MenuLove</h2>
                 <p className="text-lg text-zinc-600 max-w-md mx-auto">
                   Transform your menu into engaging video content and get discovered by hungry customers
                 </p>

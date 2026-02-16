@@ -67,7 +67,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
               <Check size={40} />
             </div>
             <h2 className="text-2xl font-bold mb-2">Content Published</h2>
-            <p className="text-zinc-500 mb-8 max-w-xs">Your video is now live in the Local Bites feed for users nearby.</p>
+            <p className="text-zinc-500 mb-8 max-w-xs">Your video is now live in the MenuLove feed for users nearby.</p>
             <button 
               onClick={() => setStep(1)}
               className="px-8 py-4 bg-white text-black font-bold rounded-2xl"
