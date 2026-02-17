@@ -442,3 +442,53 @@ export const getRestaurantDailyPerformance = async (restaurantId: string, days: 
     return [];
   }
 };
+
+// Super Admin - Location Analytics
+export interface LocationData {
+  location: string;
+  views: number;
+  percentage: number;
+}
+
+export const getTopLocations = async (days: number = 7): Promise<LocationData[]> => {
+  try {
+    const { data, error } = await supabase.rpc('get_top_locations', { p_days: days });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('[Events] Error fetching top locations:', error);
+    return [];
+  }
+};
+
+// Super Admin - Global Hourly Activity
+export interface HourlyActivity {
+  hour: number;
+  views: number;
+}
+
+export const getGlobalHourlyActivity = async (days: number = 7): Promise<HourlyActivity[]> => {
+  try {
+    const { data, error } = await supabase.rpc('get_global_hourly_activity', { p_days: days });
+    
+    if (error) throw error;
+    
+    // Ensure all 24 hours are represented
+    const hourlyMap = new Map<number, number>();
+    for (let i = 0; i < 24; i++) {
+      hourlyMap.set(i, 0);
+    }
+    
+    data?.forEach((item: HourlyActivity) => {
+      hourlyMap.set(item.hour, item.views);
+    });
+    
+    return Array.from(hourlyMap.entries())
+      .map(([hour, views]) => ({ hour, views }))
+      .sort((a, b) => a.hour - b.hour);
+  } catch (error) {
+    console.error('[Events] Error fetching global hourly activity:', error);
+    return [];
+  }
+};

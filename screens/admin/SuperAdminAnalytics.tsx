@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import {
   TrendingUp, Users, Search, Eye, Video, QrCode, Calendar,
-  Smartphone, Monitor, Tablet, ArrowUp, ArrowDown, Loader2
+  Smartphone, Monitor, Tablet, ArrowUp, ArrowDown, Loader2, MapPin, Clock
 } from 'lucide-react';
 import {
   getDashboardMetrics,
@@ -15,12 +15,16 @@ import {
   getDeviceBreakdown,
   getTopPerformingRestaurants,
   getOnlineVisitors,
+  getTopLocations,
+  getGlobalHourlyActivity,
   DashboardMetrics,
   DailyActivity,
   SearchTerm,
   RestaurantViews,
   DeviceBreakdown,
-  TopRestaurant
+  TopRestaurant,
+  LocationData,
+  HourlyActivity
 } from '../../services/eventsService';
 
 type DateRange = 'today' | '7days' | '30days' | 'custom';
@@ -47,6 +51,8 @@ const SuperAdminAnalytics: React.FC = () => {
   const [topRestaurants, setTopRestaurants] = useState<RestaurantViews[]>([]);
   const [deviceData, setDeviceData] = useState<DeviceBreakdown[]>([]);
   const [topPerformers, setTopPerformers] = useState<TopRestaurant[]>([]);
+  const [topLocations, setTopLocations] = useState<LocationData[]>([]);
+  const [hourlyActivity, setHourlyActivity] = useState<HourlyActivity[]>([]);
 
   useEffect(() => {
     loadAnalytics();
@@ -88,14 +94,18 @@ const SuperAdminAnalytics: React.FC = () => {
         searchesData,
         restaurantsData,
         devicesData,
-        performersData
+        performersData,
+        locationsData,
+        hourlyData
       ] = await Promise.all([
         getDashboardMetrics(days),
         getDailyActivity(days),
         getTopSearchTerms(10),
         getMostViewedRestaurants(10),
         getDeviceBreakdown(),
-        getTopPerformingRestaurants(10)
+        getTopPerformingRestaurants(10),
+        getTopLocations(days),
+        getGlobalHourlyActivity(days)
       ]);
 
       setMetrics(metricsData);
@@ -104,6 +114,8 @@ const SuperAdminAnalytics: React.FC = () => {
       setTopRestaurants(restaurantsData);
       setDeviceData(devicesData);
       setTopPerformers(performersData);
+      setTopLocations(locationsData);
+      setHourlyActivity(hourlyData);
     } catch (error) {
       console.error('Error loading analytics:', error);
     } finally {
@@ -323,6 +335,71 @@ const SuperAdminAnalytics: React.FC = () => {
                 }}
               />
               <Bar dataKey="views" fill="#f97316" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Top Locations & Hourly Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top Locations */}
+        <div className="bg-white rounded-xl border border-zinc-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <MapPin size={20} className="text-orange-600" />
+            <h3 className="text-lg font-bold text-zinc-900">Top Locations</h3>
+          </div>
+          {topLocations.length > 0 ? (
+            <div className="space-y-3">
+              {topLocations.map((location, index) => (
+                <div key={location.location} className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg hover:bg-zinc-100 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <span className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-sm font-bold text-orange-600">
+                      {index + 1}
+                    </span>
+                    <span className="font-medium text-zinc-900">{location.location}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-semibold text-zinc-900">{location.views} views</span>
+                    <span className="text-xs font-medium text-zinc-500 bg-zinc-200 px-2 py-1 rounded">
+                      {location.percentage.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-64 text-zinc-400">
+              <MapPin size={48} className="mb-2" />
+              <p className="text-sm">No location data yet</p>
+            </div>
+          )}
+        </div>
+
+        {/* Global Hourly Activity */}
+        <div className="bg-white rounded-xl border border-zinc-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Clock size={20} className="text-blue-600" />
+            <h3 className="text-lg font-bold text-zinc-900">Peak Hours</h3>
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={hourlyActivity}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" />
+              <XAxis 
+                dataKey="hour" 
+                stroke="#71717a" 
+                fontSize={12}
+                tickFormatter={(hour) => `${hour}h`}
+              />
+              <YAxis stroke="#71717a" fontSize={12} />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: '#fff', 
+                  border: '1px solid #e4e4e7',
+                  borderRadius: '8px'
+                }}
+                labelFormatter={(hour) => `${hour}:00`}
+              />
+              <Bar dataKey="views" fill="#3b82f6" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
