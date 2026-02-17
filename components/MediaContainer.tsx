@@ -81,7 +81,6 @@ const MediaContainer: React.FC<MediaContainerProps> = ({
           src={videoUrl}
           className={`h-full w-full object-cover transition-opacity duration-500 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
           loop
-          muted
           playsInline
           preload="auto"
           onCanPlay={() => setIsLoaded(true)}

@@ -34,7 +34,7 @@ interface RestaurantMenuPageProps {
 const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) => {
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(true); // Start muted - Safari blocks autoplay with sound
+  const [isMuted, setIsMuted] = useState(false); // Start with sound enabled
   const [isPlaying, setIsPlaying] = useState(true);
   const [showSavedOnly, setShowSavedOnly] = useState(false); // Filter for saved videos
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
@@ -423,7 +423,6 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               src={Math.abs(index - activeVideoIndex) <= 1 ? item.videoUrl : undefined}
               className="absolute inset-0 w-full h-full object-cover"
               loop
-              muted
               playsInline
               preload={index === activeVideoIndex ? 'auto' : index === activeVideoIndex + 1 ? 'metadata' : 'none'}
               onCanPlay={() => {
