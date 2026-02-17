@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase';
 import { PartnerUser } from './PartnerPortal';
 import SubscriptionManager from './SubscriptionManager';
 import OnboardingModal from './OnboardingModal';
+import RestaurantAnalytics from './RestaurantAnalytics';
 import { compressVideo, shouldCompressVideo } from '../../utils/videoCompression';
 import { QRCodeSVG } from 'qrcode.react';
 import { sanitizeFileName } from '../../utils/fileUtils';
@@ -1270,75 +1271,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         )}
 
         {/* Analytics Tab */}
-        {activeTab === 'analytics' && (
-          <div className="space-y-6">
-            <h2 className="text-lg font-bold text-zinc-900">Analytics</h2>
-            
-            {!hasActiveSubscription ? (
-              <div className="bg-white rounded-xl border border-zinc-200 p-8 text-center">
-                <Crown size={48} className="text-amber-500 mx-auto mb-4" />
-                <h3 className="text-lg font-bold text-zinc-900 mb-2">Unlock Full Analytics</h3>
-                <p className="text-zinc-500 mb-6 max-w-md mx-auto">
-                  Upgrade to Pro to see which videos are most liked, views per item, directions clicks, and conversion tracking.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 opacity-50">
-                  <div className="bg-zinc-50 rounded-xl p-4 text-center">
-                    <Eye size={24} className="text-zinc-400 mx-auto mb-2" />
-                    <p className="text-xs text-zinc-500">Views per video</p>
-                  </div>
-                  <div className="bg-zinc-50 rounded-xl p-4 text-center">
-                    <Heart size={24} className="text-zinc-400 mx-auto mb-2" />
-                    <p className="text-xs text-zinc-500">Most liked items</p>
-                  </div>
-                  <div className="bg-zinc-50 rounded-xl p-4 text-center">
-                    <MapPin size={24} className="text-zinc-400 mx-auto mb-2" />
-                    <p className="text-xs text-zinc-500">Direction clicks</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setActiveTab('subscription')}
-                  className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl hover:opacity-90 transition-opacity"
-                >
-                  Upgrade to Pro - $29/month
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {/* Pro Analytics - Top performing videos */}
-                <div className="bg-white rounded-xl border border-zinc-200 p-5">
-                  <h3 className="text-sm font-semibold text-zinc-900 mb-4">Top Performing Videos</h3>
-                  {menuItems.length > 0 ? (
-                    <div className="space-y-3">
-                      {menuItems
-                        .map(item => ({
-                          ...item,
-                          viewCount: menuItemsWithViews.get(item.id) || 0
-                        }))
-                        .sort((a, b) => b.viewCount - a.viewCount)
-                        .slice(0, 5)
-                        .map((item, idx) => (
-                        <div key={item.id} className="flex items-center gap-3">
-                          <span className="text-lg font-bold text-zinc-400 w-6">#{idx + 1}</span>
-                          <div className="w-12 h-12 bg-zinc-100 rounded-lg overflow-hidden">
-                            <video src={`${item.video_url}#t=0.5`} className="w-full h-full object-cover" preload="metadata" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-medium text-sm text-zinc-900">{item.name}</p>
-                            <p className="text-xs text-zinc-500">{item.category}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-semibold text-zinc-900">{item.viewCount} views</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-zinc-500 text-sm">Add menu items to see analytics</p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+        {activeTab === 'analytics' && partnerData && (
+          <RestaurantAnalytics restaurantId={partnerData.id} />
         )}
 
         {/* Subscription Tab */}

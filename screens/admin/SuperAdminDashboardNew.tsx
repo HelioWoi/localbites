@@ -3,8 +3,23 @@ import { supabase } from '../../lib/supabase';
 import { 
   Users, Video, DollarSign, TrendingUp, Search, Bell, LogOut,
   Home, FileText, Settings, BarChart3, Crown, Clock, CheckCircle,
-  MoreVertical, TrendingDown, Activity, Menu, X, ShieldAlert, Trash2, Check
+  MoreVertical, TrendingDown, Activity, Menu, X, ShieldAlert, Trash2, Check,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
+import SuperAdminAnalytics from './SuperAdminAnalytics';
+import { getOnlineVisitors } from '../../services/eventsService';
+import { 
+  isNotificationSupported, 
+  getNotificationPermission, 
+  requestNotificationPermission,
+  sendTestNotification 
+} from '../../services/notificationService';
+import { 
+  sendVisitorAlertSMS, 
+  sendTestSMS, 
+  isValidPhoneNumber, 
+  formatPhoneNumber 
+} from '../../services/smsService';
 
 interface Partner {
   id: string;
@@ -35,7 +50,7 @@ interface Metrics {
   restaurantesLocais: number;
 }
 
-type TabType = 'overview' | 'restaurants' | 'videos' | 'menus' | 'partners' | 'revenue' | 'analytics' | 'settings';
+type TabType = 'overview' | 'partners' | 'revenue' | 'content' | 'analytics';
 
 interface SuperAdminDashboardNewProps {
   user: any;
@@ -69,13 +84,130 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
   const [newPartners, setNewPartners] = useState<Partner[]>([]);
   const [removalRequests, setRemovalRequests] = useState<any[]>([]);
   const [pendingRemovals, setPendingRemovals] = useState(0);
+  const [onlineVisitors, setOnlineVisitors] = useState(0);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [previousVisitorCount, setPreviousVisitorCount] = useState(0);
+  const [smsNotificationsEnabled, setSmsNotificationsEnabled] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [showPhoneInput, setShowPhoneInput] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
     loadNotifications();
     loadActivityLog();
     loadRemovalRequests();
+    loadOnlineVisitors();
+    checkNotificationPermission();
   }, []);
+
+  // Auto-refresh online visitors every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(loadOnlineVisitors, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const checkNotificationPermission = () => {
+    if (isNotificationSupported()) {
+      const permission = getNotificationPermission();
+      setNotificationsEnabled(permission.granted);
+    }
+  };
+
+  const handleEnableNotifications = async () => {
+    const granted = await requestNotificationPermission();
+    if (granted) {
+      setNotificationsEnabled(true);
+      await sendTestNotification();
+      alert('Notifications enabled! You will receive alerts when visitors access the site.');
+    } else {
+      alert('Notification permission denied. Please enable it in your browser settings.');
+    }
+  };
+
+  const handleSavePhoneNumber = async () => {
+    const formatted = formatPhoneNumber(phoneNumber);
+    
+    if (!isValidPhoneNumber(formatted)) {
+      alert('Invalid phone number. Use international format: +61412345678');
+      return;
+    }
+
+    try {
+      // Save phone number to database
+      const { error } = await supabase
+        .from('super_admins')
+        .update({ 
+          phone_number: formatted,
+          sms_notifications_enabled: true 
+        })
+        .eq('email', user.email);
+
+      if (error) throw error;
+
+      setSmsNotificationsEnabled(true);
+      setPhoneNumber(formatted);
+      setShowPhoneInput(false);
+
+      // Send test SMS
+      const sent = await sendTestSMS(formatted);
+      if (sent) {
+        alert('✅ Test SMS sent! Check your phone.');
+      } else {
+        alert('⚠️ Number saved, but could not send test SMS. Check your Twilio credentials.');
+      }
+    } catch (error) {
+      console.error('Error saving phone number:', error);
+      alert('Error saving phone number.');
+    }
+  };
+
+  const handleToggleSMS = async () => {
+    if (!smsNotificationsEnabled) {
+      setShowPhoneInput(true);
+    } else {
+      // Disable SMS notifications
+      try {
+        const { error } = await supabase
+          .from('super_admins')
+          .update({ sms_notifications_enabled: false })
+          .eq('email', user.email);
+
+        if (error) throw error;
+        setSmsNotificationsEnabled(false);
+        alert('SMS notifications disabled.');
+      } catch (error) {
+        console.error('Error disabling SMS:', error);
+      }
+    }
+  };
+
+  const loadOnlineVisitors = async () => {
+    try {
+      const count = await getOnlineVisitors();
+      
+      // Send notifications if visitor count increased from 0
+      if (count > 0 && previousVisitorCount === 0) {
+        // Browser notification
+        if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+          new Notification('🟢 Visitante Online!', {
+            body: `${count} ${count === 1 ? 'visitor is' : 'visitors are'} browsing MenuLove right now!`,
+            icon: '/menulove-logo.png',
+            tag: 'visitor-alert'
+          });
+        }
+        
+        // SMS notification
+        if (smsNotificationsEnabled && phoneNumber) {
+          await sendVisitorAlertSMS(phoneNumber, count);
+        }
+      }
+      
+      setPreviousVisitorCount(count);
+      setOnlineVisitors(count);
+    } catch (error) {
+      console.error('Error loading online visitors:', error);
+    }
+  };
 
   // Search functionality
   useEffect(() => {
@@ -336,128 +468,83 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
   return (
     <div className="min-h-screen bg-zinc-50 flex">
       {/* Sidebar */}
-      <div className={`w-64 bg-white border-r border-zinc-200 fixed h-full flex flex-col transition-transform duration-300 z-50 ${
-        isSidebarOpen ? 'translate-x-0' : '-translate-x-64'
-      } lg:translate-x-0`}>
+      <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-white border-r border-zinc-200 flex flex-col transition-all duration-300 ${
+        isSidebarOpen ? 'w-64 translate-x-0' : 'w-20 -translate-x-full lg:translate-x-0'
+      }`}>
         {/* Logo */}
         <div className="p-6 border-b border-zinc-200">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center">
-                <Crown size={20} className="text-white" />
-              </div>
-              <span className="text-lg font-bold text-zinc-900">Super Admin</span>
+            <div className={`flex items-center gap-3 ${!isSidebarOpen && 'justify-center w-full'}`}>
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png" 
+                alt="MenuLove" 
+                className="w-10 h-10 rounded-xl flex-shrink-0 object-cover"
+              />
+              {isSidebarOpen && <span className="text-lg font-bold text-zinc-900 whitespace-nowrap">Super Admin</span>}
             </div>
             {/* Toggle Sidebar Button - Desktop only */}
-            <button
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="hidden lg:block p-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors"
-              title={isSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-            >
-              {isSidebarOpen ? <X size={18} /> : <Menu size={18} />}
-            </button>
+            {isSidebarOpen && (
+              <button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="hidden lg:block p-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors"
+                title="Collapse sidebar"
+              >
+                <ChevronLeft size={18} />
+              </button>
+            )}
           </div>
         </div>
+        
+        {/* Expand Button - Only visible when collapsed */}
+        {!isSidebarOpen && (
+          <div className="hidden lg:flex justify-center p-4 border-b border-zinc-200">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors"
+              title="Expand sidebar"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-1">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'overview'
-                ? 'bg-orange-500 text-white'
-                : 'text-zinc-600 hover:bg-zinc-100'
-            }`}
-          >
-            <Home size={18} />
-            Overview
-          </button>
-
-          <button
-            onClick={() => setActiveTab('restaurants')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'restaurants'
-                ? 'bg-orange-500 text-white'
-                : 'text-zinc-600 hover:bg-zinc-100'
-            }`}
-          >
-            <Users size={18} />
-            Restaurants
-          </button>
-
-          <button
-            onClick={() => setActiveTab('videos')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'videos'
-                ? 'bg-orange-500 text-white'
-                : 'text-zinc-600 hover:bg-zinc-100'
-            }`}
-          >
-            <Video size={18} />
-            Videos
-          </button>
-
-          <button
-            onClick={() => setActiveTab('menus')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'menus'
-                ? 'bg-orange-500 text-white'
-                : 'text-zinc-600 hover:bg-zinc-100'
-            }`}
-          >
-            <FileText size={18} />
-            Menus
-          </button>
-
-          <button
-            onClick={() => setActiveTab('partners')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'partners'
-                ? 'bg-orange-500 text-white'
-                : 'text-zinc-600 hover:bg-zinc-100'
-            }`}
-          >
-            <Crown size={18} />
-            Partners
-          </button>
-
-          <button
-            onClick={() => setActiveTab('revenue')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'revenue'
-                ? 'bg-orange-500 text-white'
-                : 'text-zinc-600 hover:bg-zinc-100'
-            }`}
-          >
-            <DollarSign size={18} />
-            Revenue
-          </button>
-
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'analytics'
-                ? 'bg-orange-500 text-white'
-                : 'text-zinc-600 hover:bg-zinc-100'
-            }`}
-          >
-            <BarChart3 size={18} />
-            Analytics
-          </button>
-
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'settings'
-                ? 'bg-orange-500 text-white'
-                : 'text-zinc-600 hover:bg-zinc-100'
-            }`}
-          >
-            <Settings size={18} />
-            Settings
-          </button>
+          {[
+            { id: 'overview', label: 'Overview', icon: Home },
+            { id: 'partners', label: 'Partners', icon: Crown },
+            { id: 'revenue', label: 'Revenue', icon: DollarSign },
+            { id: 'content', label: 'Content', icon: Video },
+            { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id as TabType)}
+              className={`w-full flex items-center ${isSidebarOpen ? 'gap-3 px-4' : 'justify-center px-2'} py-3 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === item.id
+                  ? 'bg-orange-500 text-white'
+                  : 'text-zinc-600 hover:bg-zinc-100'
+              }`}
+              title={!isSidebarOpen ? item.label : ''}
+            >
+              <item.icon size={18} />
+              {isSidebarOpen && item.label}
+            </button>
+          ))}
         </nav>
-      </div>
+
+        {/* Logout Button */}
+        <div className="p-4 border-t border-zinc-200">
+          <button
+            onClick={onLogout}
+            className={`w-full flex items-center ${isSidebarOpen ? 'gap-3 px-4' : 'justify-center px-2'} py-3 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors`}
+            title={!isSidebarOpen ? 'Logout' : ''}
+          >
+            <LogOut size={18} />
+            {isSidebarOpen && 'Logout'}
+          </button>
+        </div>
+      </aside>
 
       {/* Overlay for mobile */}
       {isSidebarOpen && (
@@ -468,12 +555,10 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
       )}
 
       {/* Main Content */}
-      <div className={`flex-1 transition-all duration-300 ${
-        isSidebarOpen ? 'lg:ml-64' : 'lg:ml-0'
-      }`}>
+      <div className="flex-1">
         {/* Top Bar */}
         <div className="bg-white border-b border-zinc-200 sticky top-0 z-30">
-          <div className="px-4 lg:px-8 py-4 flex items-center justify-between">
+          <div className="px-4 lg:px-6 py-4 flex items-center justify-between">
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -545,10 +630,14 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
               <div className="relative">
                 <button 
                   onClick={() => setShowNotifications(!showNotifications)}
-                  className="relative p-2 text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors"
-                  title={`${notifications} new partners in last 7 days`}
+                  className={`relative p-2 rounded-lg transition-colors ${
+                    notificationsEnabled 
+                      ? 'text-green-600 bg-green-50 hover:bg-green-100' 
+                      : 'text-zinc-600 hover:bg-zinc-100'
+                  }`}
+                  title={notificationsEnabled ? 'Notificações ativadas' : `${notifications} new partners in last 7 days`}
                 >
-                  <Bell size={20} />
+                  <Bell size={20} fill={notificationsEnabled ? 'currentColor' : 'none'} />
                   {(notifications > 0 || pendingRemovals > 0) && (
                     <>
                       <span className="absolute top-1 right-1 w-2 h-2 bg-orange-500 rounded-full"></span>
@@ -565,6 +654,70 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                     <div className="p-4 border-b border-zinc-200">
                       <h3 className="font-bold text-zinc-900">Notifications</h3>
                       <p className="text-xs text-zinc-500 mt-1">{notifications} new partners · {pendingRemovals} removal requests</p>
+                      
+                      {/* Visitor Notifications Toggle */}
+                      {isNotificationSupported() && (
+                        <button
+                          onClick={handleEnableNotifications}
+                          className={`w-full mt-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-between ${
+                            notificationsEnabled
+                              ? 'bg-green-50 text-green-700 hover:bg-green-100'
+                              : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                          }`}
+                        >
+                          <span className="flex items-center gap-2">
+                            <Bell size={14} fill={notificationsEnabled ? 'currentColor' : 'none'} />
+                            Browser Alerts
+                          </span>
+                          <span className="text-xs">
+                            {notificationsEnabled ? 'ON' : 'OFF'}
+                          </span>
+                        </button>
+                      )}
+                      
+                      {/* SMS Notifications Toggle */}
+                      <button
+                        onClick={handleToggleSMS}
+                        className={`w-full mt-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-between ${
+                          smsNotificationsEnabled
+                            ? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                            : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          📱 SMS Alerts
+                        </span>
+                        <span className="text-xs">
+                          {smsNotificationsEnabled ? 'ON' : 'OFF'}
+                        </span>
+                      </button>
+                      
+                      {/* Phone Number Input */}
+                      {showPhoneInput && (
+                        <div className="mt-2 p-3 bg-zinc-50 rounded-lg">
+                          <label className="text-xs font-medium text-zinc-700 block mb-2">
+                            Phone Number (format: +61412345678)
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="tel"
+                              value={phoneNumber}
+                              onChange={(e) => setPhoneNumber(e.target.value)}
+                              placeholder="+61412345678"
+                              className="flex-1 px-3 py-2 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <button
+                              onClick={handleSavePhoneNumber}
+                              className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600"
+                            >
+                              Save
+                            </button>
+                          </div>
+                          <p className="text-xs text-zinc-500 mt-2">
+                            You will receive a test SMS after saving
+                          </p>
+                        </div>
+                      )}
                     </div>
                     {/* Pending Removal Requests */}
                     {removalRequests.filter(r => r.status === 'pending').length > 0 && (
@@ -672,9 +825,52 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
         </div>
 
         {/* Content Area */}
-        <div className="p-4 lg:p-8">
+        <div className="p-4 lg:p-6">
           {activeTab === 'overview' && (
             <div className="space-y-6">
+              {/* Online Visitors - Live Indicator */}
+              <div className={`rounded-xl border-2 p-4 lg:p-6 transition-all duration-500 ${
+                onlineVisitors > 0 
+                  ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200' 
+                  : 'bg-gradient-to-br from-zinc-50 to-zinc-100 border-zinc-200'
+              }`}>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 lg:gap-4">
+                    <div className="relative flex-shrink-0">
+                      <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-full flex items-center justify-center transition-colors duration-500 ${
+                        onlineVisitors > 0 ? 'bg-green-500' : 'bg-zinc-400'
+                      }`}>
+                        <Users size={20} className="text-white lg:w-6 lg:h-6" />
+                      </div>
+                      {onlineVisitors > 0 && (
+                        <div className="absolute inset-0 w-10 h-10 lg:w-12 lg:h-12 bg-green-500 rounded-full animate-ping opacity-75"></div>
+                      )}
+                    </div>
+                    <div>
+                      <p className={`text-2xl lg:text-3xl font-bold transition-colors duration-500 ${
+                        onlineVisitors > 0 ? 'text-green-700' : 'text-zinc-500'
+                      }`}>{onlineVisitors}</p>
+                      <p className={`text-xs lg:text-sm font-medium transition-colors duration-500 ${
+                        onlineVisitors > 0 ? 'text-green-600' : 'text-zinc-400'
+                      }`}>
+                        {onlineVisitors > 0 ? 'Online Now' : 'No visitors'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors duration-500 ${
+                    onlineVisitors > 0 ? 'bg-green-500' : 'bg-zinc-400'
+                  }`}>
+                    <div className={`w-2 h-2 bg-white rounded-full ${onlineVisitors > 0 ? 'animate-pulse' : ''}`}></div>
+                    <span className="text-xs font-bold text-white uppercase">Live</span>
+                  </div>
+                </div>
+                <p className={`text-xs mt-3 transition-colors duration-500 ${
+                  onlineVisitors > 0 ? 'text-green-600' : 'text-zinc-400'
+                }`}>
+                  Active visitors in the last 2 minutes • Updates every 30s
+                </p>
+              </div>
+
               {/* Metrics Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {/* Total Partners */}
@@ -959,6 +1155,437 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Partners Tab */}
+          {activeTab === 'partners' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-zinc-900">Partners</h2>
+                  <p className="text-sm text-zinc-500 mt-1">Manage all registered partners</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-2 text-xs">
+                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full font-medium">
+                      {partners.filter(p => p.subscription_status === 'active').length} Active
+                    </span>
+                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
+                      {partners.filter(p => p.subscription_status === 'trial').length} Trial
+                    </span>
+                    <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full font-medium">
+                      {partners.filter(p => p.subscription_status === 'expired' || p.subscription_status === 'cancelled').length} Inactive
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Partners Table */}
+              <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-zinc-50 border-b border-zinc-200">
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Restaurant</th>
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Email</th>
+                        <th className="text-center py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Status</th>
+                        <th className="text-center py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Videos</th>
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Joined</th>
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Trial Ends</th>
+                        <th className="text-center py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {partners.map((partner) => (
+                        <tr key={partner.id} className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-3">
+                              {partner.main_photo_url ? (
+                                <img src={partner.main_photo_url} alt={partner.restaurant_name} className="w-9 h-9 rounded-lg object-cover" />
+                              ) : (
+                                <div className="w-9 h-9 bg-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                                  <span className="text-white font-bold text-xs">{getInitials(partner.restaurant_name)}</span>
+                                </div>
+                              )}
+                              <span className="font-medium text-sm text-zinc-900">{partner.restaurant_name}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-sm text-zinc-500">{partner.email}</td>
+                          <td className="py-3 px-4 text-center">
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                              partner.subscription_status === 'active' ? 'bg-green-100 text-green-700' :
+                              partner.subscription_status === 'trial' ? 'bg-blue-100 text-blue-700' :
+                              partner.subscription_status === 'expired' ? 'bg-red-100 text-red-700' :
+                              'bg-zinc-100 text-zinc-600'
+                            }`}>
+                              {partner.subscription_status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center text-sm font-medium text-zinc-900">{partner.total_videos}</td>
+                          <td className="py-3 px-4 text-sm text-zinc-500">
+                            {new Date(partner.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </td>
+                          <td className="py-3 px-4 text-sm text-zinc-500">
+                            {partner.trial_end_date 
+                              ? new Date(partner.trial_end_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
+                              : '—'
+                            }
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => handlePartnerAction(partner.id, 'view')}
+                                className="px-2 py-1 text-xs font-medium text-orange-600 hover:bg-orange-50 rounded transition-colors"
+                              >
+                                View
+                              </button>
+                              <button
+                                onClick={() => handlePartnerAction(partner.id, 'stripe')}
+                                className="px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                disabled={!partner.stripe_customer_id}
+                              >
+                                Stripe
+                              </button>
+                              <button
+                                onClick={() => handlePartnerAction(partner.id, 'email')}
+                                className="px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 rounded transition-colors"
+                              >
+                                Email
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {partners.length === 0 && (
+                  <div className="p-12 text-center">
+                    <Users size={40} className="text-zinc-300 mx-auto mb-3" />
+                    <p className="text-zinc-500">No partners registered yet</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Revenue Tab */}
+          {activeTab === 'revenue' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-zinc-900">Revenue</h2>
+                  <p className="text-sm text-zinc-500 mt-1">Track subscription revenue and financial metrics</p>
+                </div>
+              </div>
+
+              {/* Revenue Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white rounded-xl border border-zinc-200 p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                      <DollarSign size={20} className="text-green-600" />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-zinc-900">{formatCurrency(metrics.monthlyRevenue)}</p>
+                  <p className="text-sm text-zinc-500 mt-1">Monthly Recurring Revenue</p>
+                </div>
+
+                <div className="bg-white rounded-xl border border-zinc-200 p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <TrendingUp size={20} className="text-blue-600" />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-zinc-900">{formatCurrency(metrics.monthlyRevenue * 12)}</p>
+                  <p className="text-sm text-zinc-500 mt-1">Annual Run Rate</p>
+                </div>
+
+                <div className="bg-white rounded-xl border border-zinc-200 p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <Users size={20} className="text-purple-600" />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-zinc-900">{metrics.activeSubscriptions}</p>
+                  <p className="text-sm text-zinc-500 mt-1">Paying Subscribers</p>
+                </div>
+
+                <div className="bg-white rounded-xl border border-zinc-200 p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                      <DollarSign size={20} className="text-orange-600" />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-zinc-900">
+                    {metrics.activeSubscriptions > 0 
+                      ? formatCurrency(metrics.monthlyRevenue / metrics.activeSubscriptions)
+                      : formatCurrency(0)
+                    }
+                  </p>
+                  <p className="text-sm text-zinc-500 mt-1">Avg Revenue Per User</p>
+                </div>
+              </div>
+
+              {/* Subscription Breakdown */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white rounded-xl border border-zinc-200 p-6">
+                  <h3 className="text-lg font-bold text-zinc-900 mb-4">Subscription Breakdown</h3>
+                  <div className="space-y-4">
+                    {/* Active */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span className="text-sm text-zinc-700">Active Subscriptions</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-bold text-zinc-900">{metrics.activeSubscriptions}</span>
+                        <div className="w-32 bg-zinc-100 rounded-full h-2">
+                          <div 
+                            className="bg-green-500 h-2 rounded-full transition-all" 
+                            style={{ width: `${metrics.totalPartners > 0 ? (metrics.activeSubscriptions / metrics.totalPartners) * 100 : 0}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Trial */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                        <span className="text-sm text-zinc-700">Trial Users</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-bold text-zinc-900">{metrics.trialUsers}</span>
+                        <div className="w-32 bg-zinc-100 rounded-full h-2">
+                          <div 
+                            className="bg-blue-500 h-2 rounded-full transition-all" 
+                            style={{ width: `${metrics.totalPartners > 0 ? (metrics.trialUsers / metrics.totalPartners) * 100 : 0}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Expired/Cancelled */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                        <span className="text-sm text-zinc-700">Expired / Cancelled</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-bold text-zinc-900">
+                          {partners.filter(p => p.subscription_status === 'expired' || p.subscription_status === 'cancelled').length}
+                        </span>
+                        <div className="w-32 bg-zinc-100 rounded-full h-2">
+                          <div 
+                            className="bg-red-500 h-2 rounded-full transition-all" 
+                            style={{ width: `${metrics.totalPartners > 0 ? (partners.filter(p => p.subscription_status === 'expired' || p.subscription_status === 'cancelled').length / metrics.totalPartners) * 100 : 0}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Key Metrics */}
+                <div className="bg-white rounded-xl border border-zinc-200 p-6">
+                  <h3 className="text-lg font-bold text-zinc-900 mb-4">Key Metrics</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg">
+                      <span className="text-sm text-zinc-600">Conversion Rate</span>
+                      <span className="text-sm font-bold text-zinc-900">{metrics.conversionRate.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg">
+                      <span className="text-sm text-zinc-600">Churn Rate</span>
+                      <span className="text-sm font-bold text-zinc-900">{metrics.churnRate.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg">
+                      <span className="text-sm text-zinc-600">Plan Price</span>
+                      <span className="text-sm font-bold text-zinc-900">$29/month</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg">
+                      <span className="text-sm text-zinc-600">Trial Period</span>
+                      <span className="text-sm font-bold text-zinc-900">14 days</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Revenue by Partner */}
+              <div className="bg-white rounded-xl border border-zinc-200 p-6">
+                <h3 className="text-lg font-bold text-zinc-900 mb-4">Paying Partners</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-zinc-200">
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Restaurant</th>
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Email</th>
+                        <th className="text-center py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Status</th>
+                        <th className="text-right py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Monthly</th>
+                        <th className="text-center py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Stripe</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {partners.filter(p => p.subscription_status === 'active').map((partner) => (
+                        <tr key={partner.id} className="border-b border-zinc-100 hover:bg-zinc-50">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-3">
+                              {partner.main_photo_url ? (
+                                <img src={partner.main_photo_url} alt={partner.restaurant_name} className="w-8 h-8 rounded-lg object-cover" />
+                              ) : (
+                                <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
+                                  <span className="text-white font-bold text-xs">{getInitials(partner.restaurant_name)}</span>
+                                </div>
+                              )}
+                              <span className="font-medium text-sm text-zinc-900">{partner.restaurant_name}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-sm text-zinc-500">{partner.email}</td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">Active</span>
+                          </td>
+                          <td className="py-3 px-4 text-right text-sm font-bold text-zinc-900">$29.00</td>
+                          <td className="py-3 px-4 text-center">
+                            <button
+                              onClick={() => handlePartnerAction(partner.id, 'stripe')}
+                              className="px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            >
+                              Open Stripe
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {partners.filter(p => p.subscription_status === 'active').length === 0 && (
+                  <div className="p-8 text-center">
+                    <DollarSign size={32} className="text-zinc-300 mx-auto mb-2" />
+                    <p className="text-sm text-zinc-500">No paying subscribers yet</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Content Tab */}
+          {activeTab === 'content' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-zinc-900">Content</h2>
+                  <p className="text-sm text-zinc-500 mt-1">Overview of all platform content</p>
+                </div>
+              </div>
+
+              {/* Content Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white rounded-xl border border-zinc-200 p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <Video size={20} className="text-purple-600" />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-zinc-900">{metrics.totalVideos}</p>
+                  <p className="text-sm text-zinc-500 mt-1">Total Videos</p>
+                </div>
+
+                <div className="bg-white rounded-xl border border-zinc-200 p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                      <Users size={20} className="text-orange-600" />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-zinc-900">
+                    {partners.filter(p => p.total_videos > 0).length}
+                  </p>
+                  <p className="text-sm text-zinc-500 mt-1">Partners with Content</p>
+                </div>
+
+                <div className="bg-white rounded-xl border border-zinc-200 p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <BarChart3 size={20} className="text-blue-600" />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-zinc-900">
+                    {partners.length > 0 
+                      ? (metrics.totalVideos / partners.length).toFixed(1)
+                      : '0'
+                    }
+                  </p>
+                  <p className="text-sm text-zinc-500 mt-1">Avg Videos per Partner</p>
+                </div>
+              </div>
+
+              {/* Content by Partner */}
+              <div className="bg-white rounded-xl border border-zinc-200 p-6">
+                <h3 className="text-lg font-bold text-zinc-900 mb-4">Content by Partner</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-zinc-200">
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Restaurant</th>
+                        <th className="text-center py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Videos</th>
+                        <th className="text-center py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Status</th>
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Joined</th>
+                        <th className="text-center py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...partners].sort((a, b) => b.total_videos - a.total_videos).map((partner) => (
+                        <tr key={partner.id} className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-3">
+                              {partner.main_photo_url ? (
+                                <img src={partner.main_photo_url} alt={partner.restaurant_name} className="w-9 h-9 rounded-lg object-cover" />
+                              ) : (
+                                <div className="w-9 h-9 bg-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                                  <span className="text-white font-bold text-xs">{getInitials(partner.restaurant_name)}</span>
+                                </div>
+                              )}
+                              <span className="font-medium text-sm text-zinc-900">{partner.restaurant_name}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className={`text-sm font-bold ${partner.total_videos > 0 ? 'text-zinc-900' : 'text-zinc-400'}`}>
+                              {partner.total_videos}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            {partner.total_videos > 0 ? (
+                              <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">Has Content</span>
+                            ) : (
+                              <span className="px-2 py-1 bg-zinc-100 text-zinc-500 text-xs font-medium rounded-full">No Content</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-sm text-zinc-500">
+                            {new Date(partner.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <button
+                              onClick={() => handlePartnerAction(partner.id, 'view')}
+                              className="px-3 py-1 text-xs font-medium text-orange-600 hover:bg-orange-50 rounded transition-colors"
+                            >
+                              View Profile
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {partners.length === 0 && (
+                  <div className="p-8 text-center">
+                    <Video size={32} className="text-zinc-300 mx-auto mb-2" />
+                    <p className="text-sm text-zinc-500">No content uploaded yet</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Analytics Tab */}
+          {activeTab === 'analytics' && (
+            <SuperAdminAnalytics />
           )}
         </div>
       </div>

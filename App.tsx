@@ -24,6 +24,7 @@ import { calculateIsOpenNow } from './utils/filterHelpers';
 import { Home, Search, MessageSquare, Filter, Bookmark, ExternalLink, Info, Loader2, X, ArrowRight, Globe, MapPin, ChevronUp, Crown, PlayCircle, Heart, Star, Clock, Sparkles, Eye, Car, PersonStanding } from 'lucide-react';
 import { useLazyLoading } from './hooks/useLazyLoading';
 import { supabase } from './services/supabaseClient';
+import { trackEvent } from './services/eventsService';
 
 // Check if we're on the admin route
 const isAdminRoute = window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin');
@@ -170,6 +171,19 @@ const App: React.FC = () => {
 
   const isOverlayOpen = showDishInfo || !!showFilterModal || showSaved;
   const isExternalOverlayOpen = !!showFilterModal || showSaved;
+
+  // Track page views and restaurant profile views
+  useEffect(() => {
+    trackEvent({ eventType: 'page_view' });
+    
+    // Track restaurant profile view
+    if (state === 'PROFILE' && selectedRestaurant) {
+      trackEvent({ 
+        eventType: 'restaurant_profile_view',
+        restaurantId: selectedRestaurant.id 
+      });
+    }
+  }, [state, selectedRestaurant]);
 
   // Load reviews when Reviews Feed opens
   useEffect(() => {
@@ -738,6 +752,12 @@ const App: React.FC = () => {
         
         const doTextSearch = async (loc: UserLocation) => {
           try {
+            // Track search event
+            trackEvent({ 
+              eventType: 'search_performed', 
+              eventValue: searchQuery 
+            });
+            
             const results = await searchRestaurantsByQuery(loc, searchQuery);
             console.log('[ManualSearch] Found', results.length, 'restaurants for:', searchQuery);
             
@@ -1362,6 +1382,7 @@ const App: React.FC = () => {
                   photoUrl={res.mainPhotoUrl}
                   isActive={activeRestaurantIndex === i && state === 'FEED' && !isLoading}
                   isSubscribed={res.isSubscribed}
+                  restaurantId={res.id}
                   onSwipeUp={() => feedRef.current?.scrollBy({ top: window.innerHeight, behavior: 'smooth' })}
                   onPartialSwipeUp={() => {
                     setSelectedRestaurant(res);

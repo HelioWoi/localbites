@@ -1,11 +1,13 @@
 
 import React, { useRef, useEffect, useState } from 'react';
+import { trackEvent } from '../services/eventsService';
 
 interface MediaContainerProps {
   videoUrl?: string;
   photoUrl: string;
   isActive: boolean;
   isSubscribed: boolean;
+  restaurantId?: string;
   onSwipeUp?: () => void;
   onPartialSwipeUp?: () => void;
 }
@@ -15,11 +17,13 @@ const MediaContainer: React.FC<MediaContainerProps> = ({
   photoUrl, 
   isActive, 
   isSubscribed,
+  restaurantId,
   onSwipeUp,
   onPartialSwipeUp
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
   const touchStartY = useRef<number | null>(null);
 
   // Timeout to prevent infinite spinner - show content after 3 seconds even if not loaded
@@ -37,12 +41,22 @@ const MediaContainer: React.FC<MediaContainerProps> = ({
     if (isSubscribed && videoRef.current) {
       if (isActive) {
         videoRef.current.play().catch(() => {});
+        
+        // Track video play event (only once per video)
+        if (!hasTrackedPlay && restaurantId) {
+          trackEvent({ 
+            eventType: 'video_play',
+            restaurantId 
+          });
+          setHasTrackedPlay(true);
+        }
       } else {
         videoRef.current.pause();
         videoRef.current.currentTime = 0;
+        setHasTrackedPlay(false);
       }
     }
-  }, [isActive, isSubscribed]);
+  }, [isActive, isSubscribed, restaurantId, hasTrackedPlay]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;

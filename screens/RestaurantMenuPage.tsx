@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, ChevronUp, Star, MapPin, Globe, Navigation, Heart, Bookmark, X, ChevronLeft, MessageSquare, Home, Search, Sparkles, Filter, Clock, Send, Video, UtensilsCrossed } from 'lucide-react';
 import DesktopBanner from '../components/DesktopBanner';
+import { trackEvent } from '../services/eventsService';
 
 interface MenuItem {
   id: string;
@@ -565,6 +566,12 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                     href={restaurant.googleMapsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => {
+                      trackEvent({ 
+                        eventType: 'directions_click',
+                        restaurantId: restaurant.id 
+                      });
+                    }}
                     className="flex items-center justify-center gap-2 bg-white text-black font-bold py-4 px-6 rounded-2xl"
                   >
                     <Navigation size={18} />

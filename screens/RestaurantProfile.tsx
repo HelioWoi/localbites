@@ -4,6 +4,7 @@ import { Restaurant, Dish, Review } from '../types';
 import { ChevronLeft, Globe, MapPin, Navigation, Bookmark, PlayCircle, Camera, X, Crown, Play, Pause, Volume2, VolumeX, Star, ChevronRight, ChevronUp, ExternalLink, Home, Search, MessageSquare, Filter, Clock, Heart, Trash2, Phone, Sparkles, UtensilsCrossed, Video, Share2 } from 'lucide-react';
 import { getPlaceDetails, textSearchRestaurants } from '../services/googlePlacesProxy';
 import DesktopBanner from '../components/DesktopBanner';
+import { trackEvent } from '../services/eventsService';
 
 interface RestaurantProfileProps {
   restaurant: Restaurant;
@@ -622,7 +623,17 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
 
         {/* Quick action buttons - Compact */}
         <div className="flex gap-2">
-          <a href={restaurant.googleMapsUrl} target="_blank" className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white font-semibold py-3 rounded-xl text-sm active:scale-95 transition-all">
+          <a 
+            href={restaurant.googleMapsUrl} 
+            target="_blank" 
+            onClick={() => {
+              trackEvent({ 
+                eventType: 'directions_click',
+                restaurantId: restaurant.id 
+              });
+            }}
+            className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white font-semibold py-3 rounded-xl text-sm active:scale-95 transition-all"
+          >
             <Navigation size={14} fill="currentColor" /> Directions
           </a>
           {restaurant.website && (
