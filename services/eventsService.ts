@@ -5,17 +5,23 @@ export type EventType =
   | 'page_view'
   | 'search_performed'
   | 'restaurant_profile_view'
+  | 'item_view'
   | 'video_play'
   | 'video_complete'
+  | 'like'
+  | 'save'
+  | 'share'
   | 'qr_scan'
-  | 'directions_click'
-  | 'save_item';
+  | 'directions_click';
 
 interface TrackEventParams {
   eventType: EventType;
   restaurantId?: string;
+  itemId?: string;
+  itemType?: string;
   eventValue?: string;
   sessionId?: string;
+  referrer?: string;
 }
 
 // Generate or retrieve session ID
@@ -55,8 +61,11 @@ const getLocationCity = async (): Promise<string | null> => {
 export const trackEvent = async ({
   eventType,
   restaurantId,
+  itemId,
+  itemType,
   eventValue,
   sessionId,
+  referrer,
 }: TrackEventParams): Promise<void> => {
   try {
     const finalSessionId = sessionId || getSessionId();
@@ -67,9 +76,12 @@ export const trackEvent = async ({
       restaurant_id: restaurantId || null,
       user_session_id: finalSessionId,
       event_type: eventType,
+      item_id: itemId || null,
+      item_type: itemType || null,
       event_value: eventValue || null,
       device,
       location_city: locationCity,
+      referrer: referrer || null,
     });
 
     if (error) {
