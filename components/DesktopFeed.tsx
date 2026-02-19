@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 
 interface DesktopFeedProps {
   restaurants: Restaurant[];
+  allRestaurants?: Restaurant[]; // All restaurants without category filter for search
   isLoading: boolean;
   savedIds: Set<string>;
   likedIds: Set<string>;
@@ -41,6 +42,7 @@ const CATEGORIES = [
 
 const DesktopFeed: React.FC<DesktopFeedProps> = ({
   restaurants,
+  allRestaurants,
   isLoading,
   savedIds,
   likedIds,
@@ -136,8 +138,10 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
     }
   };
 
+  // When searching, use allRestaurants to ignore category filter
+  // When not searching, use filtered restaurants from category
   const filteredRestaurants = searchQuery.trim()
-    ? restaurants.filter(r => {
+    ? (allRestaurants || restaurants).filter(r => {
         const queryWords = searchQuery.toLowerCase().trim().split(/\s+/);
         const combined = `${r.name.toLowerCase()} ${r.cuisine.toLowerCase()}`;
         return queryWords.every(qw => combined.includes(qw));
@@ -218,7 +222,7 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
             <span className="bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent"> Yum</span>
           </h1>
           <p className="text-xl text-white/80 font-medium mb-4 max-w-2xl">
-            Discover restaurants, cafes and bars near you, within a 10km radius.
+            Discover restaurants, cafes and bars near you, within a 5km radius.
           </p>
           
           {/* Partner CTA */}

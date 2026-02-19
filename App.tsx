@@ -1350,6 +1350,7 @@ const App: React.FC = () => {
       <div className="hidden lg:block">
         <DesktopFeed
           restaurants={filters.openNow ? restaurants.filter(r => r.isSubscribed || calculateIsOpenNow(r.openingHours)) : restaurants}
+          allRestaurants={allRestaurants}
           isLoading={isLoading}
           savedIds={savedIds}
           likedIds={likedIds}
@@ -1402,22 +1403,37 @@ const App: React.FC = () => {
           onLocationSearch={async (query) => {
             setIsLoadingLocation(true);
             try {
-              const { data: geoData } = await supabase.functions.invoke('google-places', {
-                body: { action: 'geocode', query: `${query}, Australia` }
-              });
-              if (geoData?.lat && geoData?.lng) {
+              // Check if query is coordinates (lat,lng format)
+              const coordsMatch = query.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
+              
+              if (coordsMatch) {
+                // Direct coordinates - use them directly
+                const lat = parseFloat(coordsMatch[1]);
+                const lng = parseFloat(coordsMatch[2]);
                 const newLoc: UserLocation = {
-                  lat: geoData.lat,
-                  lng: geoData.lng,
-                  name: geoData.formatted_address?.split(',')[0] || query
+                  lat,
+                  lng,
+                  name: 'Current Location'
                 };
                 setLocation(newLoc);
-                // fetchRestaurants will be triggered by the location useEffect
               } else {
-                console.error('[LocationSearch] No coordinates found for:', query);
+                // Address string - geocode it
+                const { data: geoData } = await supabase.functions.invoke('google-places', {
+                  body: { action: 'geocode', query: `${query}, Australia` }
+                });
+                if (geoData?.lat && geoData?.lng) {
+                  const newLoc: UserLocation = {
+                    lat: geoData.lat,
+                    lng: geoData.lng,
+                    name: geoData.formatted_address?.split(',')[0] || query
+                  };
+                  setLocation(newLoc);
+                } else {
+                  console.error('[LocationSearch] No coordinates found for:', query);
+                }
               }
             } catch (err) {
-              console.error('[LocationSearch] Geocode error:', err);
+              console.error('[LocationSearch] Error:', err);
             } finally {
               setIsLoadingLocation(false);
             }

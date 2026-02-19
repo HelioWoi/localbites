@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Utensils, Coffee, Wine, IceCreamCone, Pizza, Fish, Search, MapPin, Loader2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Utensils, Coffee, Wine, IceCreamCone, Pizza, Fish, Search, MapPin, Loader2, Crown, ChevronDown, Video } from 'lucide-react';
 import DesktopBanner from '../components/DesktopBanner';
 import { supabase } from '../lib/supabase';
 
@@ -16,7 +16,17 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<{ placeId?: string; name: string; address?: string }[]>([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
   const autocompleteRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Parallax effect on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
   
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
@@ -86,49 +96,37 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
       id: 'bars' as const,
       icon: Wine,
       title: 'Bars & Drinks',
-      subtitle: 'Cocktails, Pubs, Nightlife',
-      gradient: 'from-purple-500 to-pink-500',
-      iconBg: 'bg-purple-500/10',
+      bgColor: 'bg-purple-500',
     },
     {
       id: 'cafes' as const,
       icon: Coffee,
       title: 'Cafes & Bakery',
-      subtitle: 'Coffee, Breakfast, Pastries',
-      gradient: 'from-amber-500 to-yellow-500',
-      iconBg: 'bg-amber-500/10',
+      bgColor: 'bg-amber-500',
     },
     {
       id: 'desserts' as const,
       icon: IceCreamCone,
       title: 'Desserts',
-      subtitle: 'Ice Cream, Cakes, Sweets',
-      gradient: 'from-pink-400 to-rose-500',
-      iconBg: 'bg-pink-500/10',
+      bgColor: 'bg-pink-500',
     },
     {
       id: 'pizza' as const,
       icon: Pizza,
       title: 'Pizza',
-      subtitle: 'Pizzerias, Italian, Slices',
-      gradient: 'from-red-500 to-orange-500',
-      iconBg: 'bg-red-500/10',
+      bgColor: 'bg-orange-600',
     },
     {
       id: 'restaurants' as const,
       icon: Utensils,
       title: 'Restaurants',
-      subtitle: 'Sushi, Thai, Mexican...',
-      gradient: 'from-orange-500 to-red-500',
-      iconBg: 'bg-orange-500/10',
+      bgColor: 'bg-orange-500',
     },
     {
       id: 'seafood' as const,
       icon: Fish,
       title: 'Sea Food',
-      subtitle: 'Fish, Prawns, Oysters',
-      gradient: 'from-cyan-500 to-blue-500',
-      iconBg: 'bg-cyan-500/10',
+      bgColor: 'bg-cyan-500',
     },
   ];
 
@@ -137,49 +135,88 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
       {/* Desktop Banner - Only visible on desktop */}
       <DesktopBanner />
       
-      <div className="flex-1 flex flex-col items-center justify-start pt-12 px-6 lg:pt-20">
-        <div className="w-full max-w-md lg:max-w-4xl">
+      {/* Video Hero Section - Mobile Only */}
+      <div className="lg:hidden relative min-h-screen overflow-hidden">
+        <video
+          src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/hero_desktop.mp4"
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
+        
+        {/* Hero Content */}
+        <div className="relative h-full flex flex-col px-6 pt-16 pb-8">
           {/* Logo */}
-          <div className="flex items-center justify-center mb-6">
-            <h2 className="text-2xl font-black text-zinc-900 tracking-tight gilroy-bold">MenuLove</h2>
+          <div className="flex flex-col items-center mb-10">
+            <div className="flex items-center gap-3 mb-2">
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/favcon.png"
+                alt="MenuLove"
+                className="w-12 h-12 rounded-2xl"
+              />
+              <h2 className="text-2xl font-black text-white tracking-tight">MenuLove</h2>
+            </div>
           </div>
 
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-black text-zinc-900 mb-3 tracking-tight">
-              Find Your
-              <br />
-              Next Yum
+          {/* Title */}
+          <div className="text-center mb-6">
+            <h1 className="text-4xl font-extrabold text-white mb-3 tracking-tight leading-tight">
+              Find Your Next <span className="text-orange-500">Yum</span>
             </h1>
-            <p className="text-zinc-400 text-base">
-              Choose a category to explore
+            <p className="text-white/80 text-base leading-relaxed">
+              Discover restaurants, cafes and bars near you,<br/>within a 5km radius.
             </p>
           </div>
 
-          {/* Manual Search Box */}
+          {/* Partner CTA */}
+          <div className="text-center mb-7">
+            <a
+              href="/partner"
+              className="inline-flex items-center gap-2 text-white/80 text-sm font-medium hover:text-white transition-colors group"
+            >
+              <Crown size={16} className="text-orange-400" />
+              <span>Own a restaurant? Join as a partner and showcase your menu with video</span>
+              <ChevronDown size={16} className="text-orange-400 rotate-[-90deg]" />
+            </a>
+          </div>
+
+          {/* Search Bar */}
           <form onSubmit={handleSearch} className="mb-6">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 z-10" size={20} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                onFocus={() => { if (searchQuery.trim().length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                placeholder="Search restaurants, cuisines..."
-                className="w-full pl-12 pr-24 py-4 bg-zinc-50 border border-zinc-200 rounded-full text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-              />
-              <button
-                type="submit"
-                disabled={!searchQuery.trim()}
-                className="absolute right-2 top-1/2 -translate-y-1/2 px-5 py-2 bg-orange-500 text-white text-sm font-bold rounded-full hover:bg-orange-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed z-10"
-              >
-                Go
-              </button>
+              <div className="bg-white rounded-2xl overflow-hidden shadow-2xl">
+                <div className="flex items-center gap-3 p-3">
+                  <div className="flex items-center justify-center w-10 h-10 flex-shrink-0">
+                    <MapPin size={22} className="text-orange-500" />
+                  </div>
+                  <div className="h-8 w-px bg-zinc-200" />
+                  <div className="flex items-center gap-2 flex-1">
+                    <Search size={18} className="text-zinc-400 flex-shrink-0" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => handleSearchChange(e.target.value)}
+                      onFocus={() => { if (searchQuery.trim().length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
+                      onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                      placeholder="Search restaurants, cuisines..."
+                      className="flex-1 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none bg-transparent"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={!searchQuery.trim()}
+                    className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center hover:bg-orange-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                  >
+                    <Search size={18} className="text-white" />
+                  </button>
+                </div>
+              </div>
               
               {/* Suggestions Dropdown */}
               {showSuggestions && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-lg border border-zinc-200 overflow-hidden z-20">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl shadow-black/20 overflow-hidden z-20">
                   {isLoadingSuggestions && suggestions.length === 0 ? (
                     <div className="flex items-center gap-3 px-4 py-3">
                       <Loader2 size={16} className="text-orange-500 animate-spin" />
@@ -208,90 +245,111 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
                 </div>
               )}
             </div>
-            <div className="flex items-center justify-center gap-2 mt-3">
-              <MapPin size={14} className="text-zinc-400" />
-              <span className="text-xs text-zinc-400 font-medium">Search radius: 5km</span>
-            </div>
           </form>
 
-          {/* Categories Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
-            {categories.map((category) => {
+          {/* Stats */}
+          <div className="flex items-center justify-center gap-4 mb-7 text-white/70 text-xs">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 bg-green-400 rounded-full" />
+              <span>6 restaurants nearby</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Video size={14} className="text-orange-400" />
+              <span>1 with video menus</span>
+            </div>
+          </div>
+
+          {/* Category Cards Grid - 3x2 on Video */}
+          <div className="grid grid-cols-3 gap-3 mb-8">
+            {categories.map((category, index) => {
               const Icon = category.icon;
               return (
                 <button
                   key={category.id}
                   onClick={() => {
-                    console.log('[FilterSelection] Button clicked:', category.id, 'onOpenAI exists:', !!onOpenAI);
                     console.log('[FilterSelection] Selecting category:', category.id);
                     onSelect(category.id as 'restaurants' | 'cafes' | 'bars' | 'desserts' | 'pizza' | 'seafood' | 'all');
                   }}
-                  className="aspect-square bg-zinc-50 rounded-3xl p-6 flex flex-col items-center justify-center gap-3 hover:bg-zinc-100 active:scale-95 transition-all duration-200 group border border-zinc-100"
+                  className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:bg-white/20 active:scale-95 transition-all duration-200 group animate-fade-in"
+                  style={{ animationDelay: `${index * 80}ms` }}
                 >
-                  <div className={`w-16 h-16 bg-gradient-to-br ${category.gradient} rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
-                    <Icon size={32} className="text-white" strokeWidth={2} />
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <Icon size={24} className="text-white" strokeWidth={2.5} />
                   </div>
-                  <div className="text-center">
-                    <h3 className="text-base font-bold text-zinc-900">
-                      {category.title}
-                    </h3>
-                  </div>
+                  <h3 className="text-[10px] font-bold text-white text-center leading-tight">
+                    {category.title}
+                  </h3>
                 </button>
               );
             })}
           </div>
 
-          {/* See All Button */}
-          <button
-            onClick={onSkip}
-            className="w-full text-orange-500 text-sm font-bold py-4 hover:text-orange-600 transition-colors"
-          >
-            See All Nearby →
-          </button>
-        </div>
-      </div>
+          {/* Explore Button */}
+          <div className="flex justify-center mb-12">
+            <button
+              onClick={onSkip}
+              className="flex flex-col items-center gap-2 text-white/60 hover:text-white transition-colors"
+            >
+              <span className="text-xs font-medium">Explore</span>
+              <div className="w-10 h-10 border-2 border-white/40 rounded-full flex items-center justify-center">
+                <ChevronDown size={18} className="animate-bounce" />
+              </div>
+            </button>
+          </div>
 
-      {/* Footer */}
-      <div className="w-full px-6 pb-8 mt-auto">
-        <div className="w-full max-w-md lg:max-w-4xl mx-auto bg-zinc-50 rounded-2xl p-6">
-          <div className="text-center space-y-3 opacity-70">
-            <p className="text-[10px] text-zinc-500 leading-relaxed">
-              MenuLove is currently in Beta. We connect you with local businesses and help you discover what's around you. All products, services, pricing, and customer experiences are provided directly by each listed venue. Please visit our{' '}
-              <a href="/policy" className="text-orange-500 hover:text-orange-600 transition-colors font-medium">
-                Policy
-              </a>{' '}
-              page for more details.
-            </p>
-            <p className="text-[10px] text-zinc-500 leading-relaxed">
-              Contact us for any questions -{' '}
-              <a href="/contact" className="text-orange-500 hover:text-orange-600 transition-colors font-medium underline">
-                Click here
-              </a>
-            </p>
-            <div className="mt-4 pt-3 border-t border-zinc-200">
-              <a 
-                href="/partner" 
-                className="text-[10px] text-zinc-400 hover:text-orange-500 transition-colors font-medium"
-              >
-                Partner Login
-              </a>
-              <span className="text-zinc-400"> | </span>
-              <a 
-                href="/terms" 
-                className="text-[10px] text-zinc-400 hover:text-orange-500 transition-colors font-medium"
-              >
-                Terms
-              </a>
-              <span className="text-zinc-400"> | </span>
-              <a 
-                href="/content-moderation" 
-                className="text-[10px] text-zinc-400 hover:text-orange-500 transition-colors font-medium"
-              >
-                Content Moderation
-              </a>
+          {/* Footer Disclaimer - On Video */}
+          <div className="flex-1 flex items-end justify-center pb-8">
+            <div className="text-center space-y-3 px-4">
+              <p className="text-[10px] text-white/70 leading-relaxed">
+                MenuLove is currently in Beta. We connect you with local businesses and help you discover what's around you. All products, services, pricing, and customer experiences are provided directly by each listed venue. Please visit our{' '}
+                <a href="/policy" className="text-orange-400 hover:text-orange-300 transition-colors font-medium">
+                  Policy
+                </a>{' '}
+                page for more details.
+              </p>
+              <p className="text-[10px] text-white/70 leading-relaxed">
+                Contact us for any questions -{' '}
+                <a href="/contact" className="text-orange-400 hover:text-orange-300 transition-colors font-medium underline">
+                  Click here
+                </a>
+              </p>
+              <div className="pt-2 border-t border-white/10">
+                <a 
+                  href="/partner" 
+                  className="text-[10px] text-white/50 hover:text-orange-400 transition-colors font-medium"
+                >
+                  Partner Login
+                </a>
+                <span className="text-white/30"> | </span>
+                <a 
+                  href="/terms" 
+                  className="text-[10px] text-white/50 hover:text-orange-400 transition-colors font-medium"
+                >
+                  Terms
+                </a>
+                <span className="text-white/30"> | </span>
+                <a 
+                  href="/content-moderation" 
+                  className="text-[10px] text-white/50 hover:text-orange-400 transition-colors font-medium"
+                >
+                  Content Moderation
+                </a>
+              </div>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Desktop Hero - Only visible on desktop */}
+      <div className="hidden lg:block pt-20 pb-10 text-center">
+        <h2 className="text-3xl font-black text-zinc-900 tracking-tight mb-6">MenuLove</h2>
+        <h1 className="text-5xl font-extrabold text-zinc-900 mb-4 tracking-tight leading-tight">
+          Find Your Next
+          <span className="block bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">Yum</span>
+        </h1>
+        <p className="text-zinc-600 text-lg font-medium">
+          Discover restaurants, cafes and bars near you
+        </p>
       </div>
     </div>
   );
