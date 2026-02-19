@@ -14,6 +14,8 @@ import FullMenuLoader from './components/FullMenuLoader';
 import SavedPicksLoader from './components/SavedPicksLoader';
 import MediaContainer from './components/MediaContainer';
 import FloatingFilters from './components/FloatingFilters';
+import DesktopFeed from './components/DesktopFeed';
+import DesktopRestaurantProfile from './components/DesktopRestaurantProfile';
 import BitesAI from './components/BitesAI';
 import RemovalRequestPage from './screens/RemovalRequestPage';
 import { getNearbyRestaurants, getRestaurantDetails, getRemainingSearches, searchRestaurantsByQuery } from './services/geminiService';
@@ -23,7 +25,7 @@ import { CUISINES, PRICES, DIETARY_OPTIONS, AMBIANCE_OPTIONS } from './constants
 import { calculateIsOpenNow } from './utils/filterHelpers';
 import { Home, Search, MessageSquare, Filter, Bookmark, ExternalLink, Info, Loader2, X, ArrowRight, Globe, MapPin, ChevronUp, Crown, PlayCircle, Heart, Star, Clock, Sparkles, Eye, Car, PersonStanding } from 'lucide-react';
 import { useLazyLoading } from './hooks/useLazyLoading';
-import { supabase } from './services/supabaseClient';
+import { supabase } from './lib/supabase';
 import { trackEvent } from './services/eventsService';
 
 // Check if we're on the admin route
@@ -102,6 +104,15 @@ const App: React.FC = () => {
     return <RestaurantProfileLoader slug={restaurantSlug} />;
   }
 
+  // Desktop detection - prevents mobile feed videos from playing audio on desktop
+  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   const [state, setState] = useState<AppState>('SPLASH');
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('all');
   const [location, setLocation] = useState<UserLocation | null>(null);
@@ -126,6 +137,7 @@ const App: React.FC = () => {
     hasOutdoorSeating: false
   });
   const [showDishInfo, setShowDishInfo] = useState(false);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState<'cuisine' | 'price' | 'dietary' | 'ambiance' | 'amenities' | null>(null);
   const [showSaved, setShowSaved] = useState(false);
   const [showSavedFeed, setShowSavedFeed] = useState(false);
@@ -172,16 +184,71 @@ const App: React.FC = () => {
   const isOverlayOpen = showDishInfo || !!showFilterModal || showSaved;
   const isExternalOverlayOpen = !!showFilterModal || showSaved;
 
+  // Deep linking: Check for restaurant or saved list query parameters on load
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const restaurantId = urlParams.get('restaurant');
+    const savedList = urlParams.get('saved');
+    
+    // Handle saved list deep link
+    if (savedList && restaurants.length > 0) {
+      console.log('[DeepLink] Opening saved list from URL:', savedList);
+      const savedRestaurantIds = savedList.split(',').filter(Boolean);
+      
+      // Add all restaurants from the shared list to savedIds
+      const newSavedIds = new Set(savedIds);
+      savedRestaurantIds.forEach(id => {
+        const restaurant = restaurants.find(r => r.id === id);
+        if (restaurant) {
+          newSavedIds.add(id);
+          saveRestaurant(id);
+        }
+      });
+      
+      setSavedIds(newSavedIds);
+      
+      // Clean URL after processing
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+    
+    // Handle single restaurant deep link
+    if (restaurantId && restaurants.length > 0 && !selectedRestaurant) {
+      console.log('[DeepLink] Opening restaurant from URL:', restaurantId);
+      
+      // Find restaurant by ID
+      const restaurant = restaurants.find(r => r.id === restaurantId);
+      
+      if (restaurant) {
+        setSelectedRestaurant(restaurant);
+        setState('PROFILE');
+        profileOpenedFromRef.current = 'FEED';
+        
+        // Clean URL after opening (optional - removes ?restaurant=xxx from URL bar)
+        window.history.replaceState({}, '', window.location.pathname);
+      } else {
+        console.log('[DeepLink] Restaurant not found in current list, may need to fetch from Supabase');
+      }
+    }
+  }, [restaurants.length]);
+
   // Track page views and restaurant profile views
   useEffect(() => {
     trackEvent({ eventType: 'page_view' });
     
-    // Track restaurant profile view
+    // Track restaurant profile view (only for partner restaurants with valid UUIDs)
     if (state === 'PROFILE' && selectedRestaurant) {
-      trackEvent({ 
-        eventType: 'restaurant_profile_view',
-        restaurantId: selectedRestaurant.id 
-      });
+      // Only track if it's a partner restaurant (has valid UUID, not Google Places ID like "ChIJ...")
+      const isPartnerRestaurant = selectedRestaurant.isSubscribed || 
+                                  (selectedRestaurant.id && !selectedRestaurant.id.startsWith('ChIJ') && 
+                                   !selectedRestaurant.id.startsWith('places/'));
+      
+      if (isPartnerRestaurant) {
+        trackEvent({ 
+          eventType: 'restaurant_profile_view',
+          restaurantId: selectedRestaurant.id 
+        });
+      }
     }
   }, [state, selectedRestaurant]);
 
@@ -331,12 +398,39 @@ const App: React.FC = () => {
     setSearchExpansionCount(0);
     endOfFeedTriggeredRef.current = false;
     try {
-      // Desserts and Pizza use text search instead of category-based nearby search
-      const textSearchCategories: Record<string, string> = { desserts: 'ice cream acai dessert cookies', pizza: 'pizza', seafood: 'seafood fish prawns oysters' };
-      const data = textSearchCategories[selectedCategory]
-        ? await searchRestaurantsByQuery(loc, textSearchCategories[selectedCategory])
-        : await getNearbyRestaurants(loc, f, selectedCategory);
-      console.log('[App] ✅ Total restaurants from', textSearchCategories[selectedCategory] ? 'textSearch' : 'getNearbyRestaurants', ':', data.length);
+      let data: Restaurant[] = [];
+      
+      // When "All" is selected, fetch from ALL categories and combine
+      if (selectedCategory === 'all') {
+        console.log('[App] 🔄 Fetching ALL categories...');
+        const [baseResults, pizzaResults, dessertsResults, seafoodResults] = await Promise.all([
+          getNearbyRestaurants(loc, f, 'all'), // restaurants, cafes, bars
+          searchRestaurantsByQuery(loc, 'pizza'),
+          searchRestaurantsByQuery(loc, 'ice cream acai dessert cookies'),
+          searchRestaurantsByQuery(loc, 'seafood fish prawns oysters'),
+        ]);
+        
+        // Combine and deduplicate by ID
+        const allResults = [...baseResults, ...pizzaResults, ...dessertsResults, ...seafoodResults];
+        const seenIds = new Set<string>();
+        data = allResults.filter(r => {
+          if (seenIds.has(r.id)) return false;
+          seenIds.add(r.id);
+          return true;
+        });
+        console.log('[App] ✅ Combined ALL categories:', data.length, 'unique restaurants');
+      } else {
+        // Single category search
+        const textSearchCategories: Record<string, string> = { 
+          desserts: 'ice cream acai dessert cookies', 
+          pizza: 'pizza', 
+          seafood: 'seafood fish prawns oysters' 
+        };
+        data = textSearchCategories[selectedCategory]
+          ? await searchRestaurantsByQuery(loc, textSearchCategories[selectedCategory])
+          : await getNearbyRestaurants(loc, f, selectedCategory);
+        console.log('[App] ✅ Total restaurants from', textSearchCategories[selectedCategory] ? 'textSearch' : 'getNearbyRestaurants', ':', data.length);
+      }
       
       if (data.length === 0) {
         console.error('[App] ❌ NO RESTAURANTS RETURNED');
@@ -437,6 +531,14 @@ const App: React.FC = () => {
     }
     if (location) fetchRestaurants(location);
   }, [location]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refetch restaurants when category changes (desktop filters)
+  useEffect(() => {
+    if (location && isDesktop && selectedCategory) {
+      console.log('[App] 🔄 Category changed to:', selectedCategory, '- refetching restaurants');
+      fetchRestaurants(location);
+    }
+  }, [selectedCategory]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch reviews when restaurant reviews modal opens
   useEffect(() => {
@@ -604,8 +706,47 @@ const App: React.FC = () => {
   };
 
   if (state === 'SPLASH') return <SplashScreen onFinish={() => {
-    // After splash, show filter selection screen
-    setState('FILTER_SELECTION');
+    if (isDesktop) {
+      // Desktop: skip filter selection, go straight to feed with geolocation
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            // Set location immediately so feed loads fast
+            setLocation({ lat, lng, name: 'Current Location' });
+            setState('FEED');
+            // Reverse-geocode in background to get real suburb name
+            try {
+              const { data } = await supabase.functions.invoke('google-places', {
+                body: { action: 'reverse-geocode', lat, lng }
+              });
+              if (data?.name) {
+                setLocation(prev => prev ? { ...prev, name: data.name } : prev);
+              }
+            } catch (e) {
+              console.log('[ReverseGeocode] Could not resolve location name');
+            }
+          },
+          (error) => {
+            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            if (isLocalhost && error.code === 2) {
+              setLocation({ lat: -26.68, lng: 153.12, name: 'Sunshine Coast (Dev Mode)' });
+              setState('FEED');
+            } else {
+              setShowLocationError(true);
+              setState('FILTER_SELECTION');
+            }
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      } else {
+        setState('FILTER_SELECTION');
+      }
+    } else {
+      // Mobile: show filter selection screen as before
+      setState('FILTER_SELECTION');
+    }
   }} />;
 
   if (state === 'FILTER_SELECTION') return (
@@ -972,31 +1113,79 @@ const App: React.FC = () => {
   if (state === 'PROFILE' && selectedRestaurant) {
     console.log('[Profile] Rendering profile for:', selectedRestaurant.name);
     
+    // Use DesktopRestaurantProfile ONLY for partners with videos
+    const hasVideos = selectedRestaurant.dishes && selectedRestaurant.dishes.length > 0;
+    const useDesktopProfile = isDesktop && selectedRestaurant.isSubscribed && hasVideos;
+    
     return (
       <>
-        <RestaurantProfile 
-          restaurant={selectedRestaurant} 
-          onBack={() => {
-            const returnTo = profileOpenedFromRef.current;
-            profileOpenedFromRef.current = 'FEED';
-            setState(returnTo);
-            setOpenProfileReviews(false);
-          }} 
-          isSaved={savedIds.has(selectedRestaurant.id)}
-          onToggleSave={() => {
-             const next = new Set(savedIds);
-             if (next.has(selectedRestaurant.id)) next.delete(selectedRestaurant.id);
-             else next.add(selectedRestaurant.id);
-             setSavedIds(next);
-          }}
-          openReviews={openProfileReviews}
-          onNavigateToPartner={() => setState('ADMIN')}
-          onOpenAI={() => setShowBitesAI(true)}
-          onOpenSearch={() => setShowSearch(true)}
-          onOpenFilter={() => setShowFilterModal('cuisine')}
-          isStandalone={false}
-          onRequestRemoval={(name, id) => setShowRemovalRequest({ name, id })}
-        />
+        {useDesktopProfile ? (
+          <DesktopRestaurantProfile
+            restaurant={selectedRestaurant}
+            isSaved={savedIds.has(selectedRestaurant.id)}
+            isLiked={likedIds.has(selectedRestaurant.id)}
+            onClose={() => {
+              const returnTo = profileOpenedFromRef.current;
+              profileOpenedFromRef.current = 'FEED';
+              setState(returnTo);
+              setOpenProfileReviews(false);
+            }}
+            onToggleSave={() => {
+              const next = new Set(savedIds);
+              if (next.has(selectedRestaurant.id)) {
+                next.delete(selectedRestaurant.id);
+                unsaveRestaurant(selectedRestaurant.id);
+              } else {
+                next.add(selectedRestaurant.id);
+                saveRestaurant(selectedRestaurant.id);
+              }
+              setSavedIds(next);
+            }}
+            onToggleLike={() => {
+              const next = new Set(likedIds);
+              if (next.has(selectedRestaurant.id)) {
+                next.delete(selectedRestaurant.id);
+                unlikeRestaurant(selectedRestaurant.id);
+              } else {
+                next.add(selectedRestaurant.id);
+                likeRestaurant(selectedRestaurant.id);
+              }
+              setLikedIds(next);
+            }}
+            onOpenFullMenu={() => {
+              // TODO: Open full menu page/modal
+              console.log('Open full menu for:', selectedRestaurant.name);
+            }}
+            onSelectVideo={(videoId) => {
+              // TODO: Open video in fullscreen player
+              console.log('Open video:', videoId);
+            }}
+          />
+        ) : (
+          <RestaurantProfile 
+            restaurant={selectedRestaurant} 
+            onBack={() => {
+              const returnTo = profileOpenedFromRef.current;
+              profileOpenedFromRef.current = 'FEED';
+              setState(returnTo);
+              setOpenProfileReviews(false);
+            }} 
+            isSaved={savedIds.has(selectedRestaurant.id)}
+            onToggleSave={() => {
+               const next = new Set(savedIds);
+               if (next.has(selectedRestaurant.id)) next.delete(selectedRestaurant.id);
+               else next.add(selectedRestaurant.id);
+               setSavedIds(next);
+            }}
+            openReviews={openProfileReviews}
+            onNavigateToPartner={() => setState('ADMIN')}
+            onOpenAI={() => setShowBitesAI(true)}
+            onOpenSearch={() => setShowSearch(true)}
+            onOpenFilter={() => setShowFilterModal('cuisine')}
+            isStandalone={false}
+            onRequestRemoval={(name, id) => setShowRemovalRequest({ name, id })}
+          />
+        )}
         
         {/* Search Modal */}
         {showSearch && (
@@ -1156,7 +1345,91 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="relative h-screen w-screen bg-black overflow-hidden select-none">
+    <div className="relative h-screen w-screen bg-black overflow-hidden select-none lg:h-auto lg:overflow-auto lg:bg-zinc-50">
+      {/* ===== DESKTOP FEED (lg: 1024px+) ===== */}
+      <div className="hidden lg:block">
+        <DesktopFeed
+          restaurants={filters.openNow ? restaurants.filter(r => r.isSubscribed || calculateIsOpenNow(r.openingHours)) : restaurants}
+          isLoading={isLoading}
+          savedIds={savedIds}
+          likedIds={likedIds}
+          likesCounts={likesCounts}
+          userLocation={location}
+          onSelectRestaurant={(res) => {
+            setSelectedRestaurant(res);
+            setState('PROFILE');
+          }}
+          onToggleSave={(id) => {
+            const next = new Set(savedIds);
+            if (next.has(id)) {
+              next.delete(id);
+              unsaveRestaurant(id);
+            } else {
+              next.add(id);
+              saveRestaurant(id);
+            }
+            setSavedIds(next);
+          }}
+          onToggleLike={async (id) => {
+            const next = new Set(likedIds);
+            if (next.has(id)) {
+              next.delete(id);
+              await unlikeRestaurant(id);
+              const currentCount = likesCounts.get(id) || 0;
+              const newCounts = new Map(likesCounts);
+              newCounts.set(id, Math.max(0, currentCount - 1));
+              setLikesCounts(newCounts);
+            } else {
+              next.add(id);
+              await likeRestaurant(id);
+              const currentCount = likesCounts.get(id) || 0;
+              const newCounts = new Map(likesCounts);
+              newCounts.set(id, currentCount + 1);
+              setLikesCounts(newCounts);
+            }
+            setLikedIds(next);
+          }}
+          onClearAllSaves={() => {
+            savedIds.forEach(id => unsaveRestaurant(id));
+            setSavedIds(new Set());
+          }}
+          onSearch={() => setShowSearch(true)}
+          onFilter={() => setShowFilterModal('cuisine')}
+          onBitesAI={() => setShowBitesAI(true)}
+          showOpenOnly={filters.openNow}
+          onToggleOpenNow={() => setFilters(prev => ({ ...prev, openNow: !prev.openNow }))}
+          onCategoryChange={(cat) => setSelectedCategory(cat as any)}
+          onLocationSearch={async (query) => {
+            setIsLoadingLocation(true);
+            try {
+              const { data: geoData } = await supabase.functions.invoke('google-places', {
+                body: { action: 'geocode', query: `${query}, Australia` }
+              });
+              if (geoData?.lat && geoData?.lng) {
+                const newLoc: UserLocation = {
+                  lat: geoData.lat,
+                  lng: geoData.lng,
+                  name: geoData.formatted_address?.split(',')[0] || query
+                };
+                setLocation(newLoc);
+                // fetchRestaurants will be triggered by the location useEffect
+              } else {
+                console.error('[LocationSearch] No coordinates found for:', query);
+              }
+            } catch (err) {
+              console.error('[LocationSearch] Geocode error:', err);
+            } finally {
+              setIsLoadingLocation(false);
+            }
+          }}
+          selectedCategory={selectedCategory}
+          locationName={location?.name}
+          isLoadingLocation={isLoadingLocation}
+        />
+      </div>
+
+      {/* ===== MOBILE FEED (< 1024px) ===== */}
+      <div className="lg:hidden absolute inset-0">
       {isLoading && restaurants.length > 0 && (
         <div className="absolute inset-0 z-[100] bg-white/80 backdrop-blur-lg flex flex-col items-center justify-center p-12 text-center">
           <Loader2 className="w-12 h-12 animate-spin text-orange-500 mb-6" />
@@ -1380,7 +1653,7 @@ const App: React.FC = () => {
                 <MediaContainer 
                   videoUrl={res.dishes[0]?.videoUrl} 
                   photoUrl={res.mainPhotoUrl}
-                  isActive={activeRestaurantIndex === i && state === 'FEED' && !isLoading}
+                  isActive={activeRestaurantIndex === i && state === 'FEED' && !isLoading && !isDesktop}
                   isSubscribed={res.isSubscribed}
                   restaurantId={res.id}
                   onSwipeUp={() => feedRef.current?.scrollBy({ top: window.innerHeight, behavior: 'smooth' })}
@@ -2382,6 +2655,7 @@ const App: React.FC = () => {
           prefillGooglePlaceId={showRemovalRequest.id}
         />
       )}
+      </div>{/* End mobile wrapper lg:hidden */}
     </div>
   );
 };

@@ -175,6 +175,11 @@ serve(async (req) => {
         if (!query) throw new Error("Address query is required for geocoding");
         result = await geocodeAddress(query);
         break;
+      case "reverse-geocode":
+        // Reverse geocode lat/lng to get suburb/locality name
+        if (!lat || !lng) throw new Error("lat and lng are required for reverse geocoding");
+        result = await reverseGeocode(lat, lng);
+        break;
       case "getPhoto":
         // Proxy photo requests to avoid exposing API key
         const { photoName } = await req.json();
@@ -827,18 +832,20 @@ async function geocodeAddress(address: string) {
 
 // Autocomplete restaurant names using lightweight Text Search (same API already enabled)
 async function autocompleteRestaurants(query: string, lat?: number, lng?: number) {
+  console.log('[Autocomplete] Query:', query, 'GPS:', lat, lng);
+  
   const body: any = {
-    textQuery: `${query} restaurant`,
+    textQuery: query,
     maxResultCount: 5,
-    languageCode: "en",
   };
 
-  // Bias results to user's location if available
+  // Only add location bias if GPS available
   if (lat && lng) {
+    console.log('[Autocomplete] Using location bias around', lat, lng);
     body.locationBias = {
       circle: {
         center: { latitude: lat, longitude: lng },
-        radius: 10000, // 10km
+        radius: 10000,
       },
     };
   }
@@ -850,7 +857,7 @@ async function autocompleteRestaurants(query: string, lat?: number, lng?: number
       headers: {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": GOOGLE_API_KEY!,
-        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.primaryTypeDisplayName",
+        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.primaryTypeDisplayName,places.photos",
       },
       body: JSON.stringify(body),
     }
@@ -863,10 +870,22 @@ async function autocompleteRestaurants(query: string, lat?: number, lng?: number
 
   const data = await response.json();
   const places = data.places || [];
+  
+  console.log('[Autocomplete] Found', places.length, 'results');
+  if (places.length > 0) {
+    console.log('[Autocomplete] First result:', places[0].displayName?.text, places[0].formattedAddress);
+  }
 
-  return places.slice(0, 5).map((p: any) => ({
-    placeId: p.id,
-    name: p.displayName?.text || "",
-    address: p.formattedAddress || "",
-  }));
+  return places.slice(0, 5).map((p: any) => {
+    const photoName = p.photos?.[0]?.name;
+    const photoUrl = photoName
+      ? `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=100&key=${GOOGLE_API_KEY}`
+      : null;
+    return {
+      placeId: p.id,
+      name: p.displayName?.text || "",
+      address: p.formattedAddress || "",
+      photoUrl,
+    };
+  });
 }

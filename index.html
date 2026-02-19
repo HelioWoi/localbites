@@ -177,24 +177,9 @@
             margin: 8px;
         }
 
-        /* Desktop splash: hidden on mobile, shown on desktop */
+        /* Desktop splash: completely disabled - app now has desktop layout */
         #desktop-splash {
-            display: none;
-        }
-        @media (min-width: 768px) {
-            #desktop-splash {
-                display: flex;
-                position: fixed;
-                inset: 0;
-                z-index: 99999;
-                background: white;
-                align-items: center;
-                justify-content: center;
-                font-family: 'Inter', sans-serif;
-            }
-            #root {
-                display: none !important;
-            }
+            display: none !important;
         }
     </style>
 <script type="importmap">
@@ -247,21 +232,7 @@
     <div id="root"></div>
 <script type="module" src="/index.tsx"></script>
 <script>
-  // Bypass desktop splash for admin, partner, restaurant profiles, legal, contact
-  (function() {
-    var path = window.location.pathname;
-    var bypass = path.startsWith('/admin') || path.startsWith('/partner') || path.startsWith('/r/') || path.startsWith('/legal') || path.startsWith('/contact');
-    if (bypass) {
-      var splash = document.getElementById('desktop-splash');
-      if (splash) splash.style.display = 'none';
-      var root = document.getElementById('root');
-      if (root) root.style.display = 'block';
-      // Override the CSS media query
-      var style = document.createElement('style');
-      style.textContent = '@media (min-width:768px){#root{display:block!important}#desktop-splash{display:none!important}}';
-      document.head.appendChild(style);
-    }
-  })();
+  // Desktop splash disabled - app has full desktop layout now
 </script>
 </body>
 </html>

@@ -189,22 +189,82 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
 
   console.log('[PartnerRestaurants] After filter:', filtered.length);
 
-  // Fetch Google ratings for partners that don't have them yet
+  // Fetch Google data for partners and save to Supabase (cost optimization)
   for (const p of filtered) {
-    if ((!p.total_reviews || p.total_reviews === 0) && p.restaurant_name) {
+    // Check if Google data is stale (older than 7 days) or missing
+    const needsGoogleData = !p.google_data_updated_at || 
+                           (new Date().getTime() - new Date(p.google_data_updated_at).getTime()) > 7 * 24 * 60 * 60 * 1000;
+    
+    console.log(`[GoogleData] ${p.restaurant_name}: needsGoogleData=${needsGoogleData}, google_data_updated_at=${p.google_data_updated_at}`);
+    
+    if (needsGoogleData && p.restaurant_name) {
       try {
         const query = p.address 
           ? `${p.restaurant_name} ${p.address}` 
           : p.restaurant_name;
-        const results = await textSearchRestaurants(0, 0, 50000, query);
-        if (results.length > 0 && results[0].rating) {
-          p.rating = results[0].rating;
-          p.total_reviews = results[0].totalReviews || 0;
-          console.log(`[PartnerRestaurants] Google rating for ${p.restaurant_name}: ${p.rating} (${p.total_reviews} reviews)`);
+        console.log(`[GoogleData] Searching Google for: "${query}"`);
+        
+        // Use partner coordinates if available, otherwise use Sydney CBD
+        const searchLat = p.latitude || -33.8688;
+        const searchLng = p.longitude || 151.2093;
+        const results = await textSearchRestaurants(searchLat, searchLng, 50000, query);
+        console.log(`[GoogleData] Found ${results.length} results`);
+        
+        if (results.length > 0) {
+          const googlePlace = results[0];
+          console.log(`[GoogleData] Getting details for place ID: ${googlePlace.id}`);
+          
+          // Get detailed info including opening hours
+          const { getPlaceDetails } = await import('./googlePlacesProxy');
+          const details = await getPlaceDetails(googlePlace.id);
+          console.log(`[GoogleData] Details received:`, {
+            hasOpeningHours: !!details?.place?.openingHours,
+            openingHoursLength: details?.place?.openingHours?.length || 0,
+            hasPhone: !!details?.place?.phone,
+            hasWebsite: !!details?.place?.website
+          });
+          
+          if (details) {
+            // Save Google data to Supabase (COST OPTIMIZATION: avoid duplicate API calls)
+            const { error: updateError } = await supabase
+              .from('partners')
+              .update({
+                google_opening_hours: details.place.openingHours || [],
+                google_phone: details.place.phone || null,
+                google_website: details.place.website || null,
+                google_rating: details.place.rating || null,
+                google_total_reviews: details.place.totalReviews || 0,
+                google_maps_url: details.place.googleMapsUrl || null,
+                google_data_updated_at: new Date().toISOString()
+              })
+              .eq('id', p.id);
+            
+            if (updateError) {
+              console.error(`[PartnerRestaurants] Failed to save Google data for ${p.restaurant_name}:`, updateError);
+            } else {
+              console.log(`[PartnerRestaurants] ✅ Saved Google data for ${p.restaurant_name} (opening hours, phone, website, rating)`);
+              
+              // Update local object
+              p.google_opening_hours = details.place.openingHours || [];
+              p.google_phone = details.place.phone || null;
+              p.google_website = details.place.website || null;
+              p.google_rating = details.place.rating || null;
+              p.google_total_reviews = details.place.totalReviews || 0;
+              p.google_maps_url = details.place.googleMapsUrl || null;
+            }
+          }
+          
+          // Update rating for display
+          if (googlePlace.rating) {
+            p.rating = googlePlace.rating;
+            p.total_reviews = googlePlace.totalReviews || 0;
+          }
         }
       } catch (e) {
-        console.error(`[PartnerRestaurants] Failed to fetch Google rating for ${p.restaurant_name}:`, e);
+        console.error(`[PartnerRestaurants] Failed to fetch Google data for ${p.restaurant_name}:`, e);
       }
+    } else if (p.google_data_updated_at) {
+      console.log(`[PartnerRestaurants] Using cached Google data for ${p.restaurant_name} (updated ${new Date(p.google_data_updated_at).toLocaleDateString()})`);
     }
   }
 
@@ -246,14 +306,18 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
       name: p.restaurant_name,
       cuisine: p.cuisine || 'Various',
       priceLevel: '$$',
-      rating: p.rating || 4.5,
-      totalReviews: p.total_reviews || 0,
+      rating: p.google_rating || p.rating || 4.5,
+      totalReviews: p.google_total_reviews || p.total_reviews || 0,
       address: p.address || '',
-      phone: p.phone || '',
+      phone: p.google_phone || p.phone || '',
       distance,
       mainPhotoUrl: p.photo_url || p.menu_items[0]?.video_url || '',
-      googleMapsUrl: p.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address)}` : '',
-      website: p.website || '',
+      googleMapsUrl: p.google_maps_url || (p.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address)}` : ''),
+      website: p.google_website || p.website || '',
+      openingHours: p.google_opening_hours || [],
+      instagramUrl: p.instagram_url || '',
+      facebookUrl: p.facebook_url || '',
+      tiktokUrl: p.tiktok_url || '',
       isSubscribed: true,
       isOpen: true,
       isPartner: true,
@@ -270,8 +334,9 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
           id: item.id,
           name: item.name,
           description: item.description || '',
-          thumbnailUrl: item.video_url,
-          videoUrl: item.video_url,
+          thumbnailUrl: item.photo_url || item.video_url || '',
+          videoUrl: item.video_url || '',
+          photoUrl: item.photo_url || '',
           price: item.price,
           category: item.category,
           isFeatured: item.is_featured || false,
@@ -354,18 +419,20 @@ export async function getPartnerByName(name: string): Promise<Restaurant | null>
       name: p.restaurant_name,
       cuisine: p.cuisine || 'Various',
       priceLevel: '$$',
-      rating: p.rating || 4.5,
-      totalReviews: p.total_reviews || 0,
+      rating: p.google_rating || p.rating || 4.5,
+      totalReviews: p.google_total_reviews || p.total_reviews || 0,
       address: p.address || '',
-      phone: p.phone || '',
+      phone: p.google_phone || p.phone || '',
       distance: '',
       mainPhotoUrl: p.photo_url || p.menu_items[0]?.video_url || '',
-      googleMapsUrl: p.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address)}` : '',
-      website: p.website || '',
+      googleMapsUrl: p.google_maps_url || (p.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address)}` : ''),
+      website: p.google_website || p.website || '',
+      instagramUrl: p.instagram_url || '',
+      facebookUrl: p.facebook_url || '',
+      tiktokUrl: p.tiktok_url || '',
+      openingHours: p.google_opening_hours || [],
       isSubscribed: true,
       isOpen: true,
-      isPartner: true,
-      slug: p.slug,
       dishes: (p.menu_items || [])
         .sort((a: any, b: any) => {
           if (a.is_featured && !b.is_featured) return -1;

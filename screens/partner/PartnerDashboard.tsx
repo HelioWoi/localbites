@@ -52,6 +52,9 @@ interface PartnerData {
   logo_url?: string;
   photo_url?: string;
   website?: string;
+  instagram_url?: string;
+  facebook_url?: string;
+  tiktok_url?: string;
 }
 
 interface Restaurant {
@@ -104,7 +107,16 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
   // Settings state
   const [editingRestaurant, setEditingRestaurant] = useState(false);
-  const [restaurantForm, setRestaurantForm] = useState({ name: '', cuisine: '', address: '', phone: '', website: '' });
+  const [restaurantForm, setRestaurantForm] = useState({ 
+    name: '', 
+    cuisine: '', 
+    address: '', 
+    phone: '', 
+    website: '',
+    instagramUrl: '',
+    facebookUrl: '',
+    tiktokUrl: ''
+  });
   
   // Photo upload state
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
@@ -262,7 +274,10 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           cuisine: currentPartner.cuisine || '', 
           address: currentPartner.address || '',
           phone: currentPartner.phone || '',
-          website: currentPartner.website || ''
+          website: currentPartner.website || '',
+          instagramUrl: currentPartner.instagram_url || '',
+          facebookUrl: currentPartner.facebook_url || '',
+          tiktokUrl: currentPartner.tiktok_url || ''
         });
 
         // Check if this is first time (no restaurant name set) and hasn't seen onboarding
@@ -384,6 +399,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           address: restaurantForm.address,
           phone: restaurantForm.phone,
           website: restaurantForm.website,
+          instagram_url: restaurantForm.instagramUrl,
+          facebook_url: restaurantForm.facebookUrl,
+          tiktok_url: restaurantForm.tiktokUrl,
           slug: slug,
         })
         .eq('id', partnerData.id);
@@ -394,7 +412,18 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         return;
       }
 
-      setPartnerData({ ...partnerData, restaurant_name: restaurantForm.name, cuisine: restaurantForm.cuisine, address: restaurantForm.address, phone: restaurantForm.phone, website: restaurantForm.website, slug });
+      setPartnerData({ 
+        ...partnerData, 
+        restaurant_name: restaurantForm.name, 
+        cuisine: restaurantForm.cuisine, 
+        address: restaurantForm.address, 
+        phone: restaurantForm.phone, 
+        website: restaurantForm.website,
+        instagram_url: restaurantForm.instagramUrl,
+        facebook_url: restaurantForm.facebookUrl,
+        tiktok_url: restaurantForm.tiktokUrl,
+        slug 
+      });
       setEditingRestaurant(false);
     } catch (error) {
       console.error('Save error:', error);
@@ -1405,6 +1434,55 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                   ) : (
                     <p className="text-sm text-zinc-900">{partnerData?.website || '-'}</p>
                   )}
+                </div>
+
+                {/* Social Media Section */}
+                <div className="pt-4 border-t border-zinc-100">
+                  <h4 className="text-xs font-semibold text-zinc-700 mb-3">Social Media</h4>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-500 mb-1">Instagram</label>
+                      {editingRestaurant ? (
+                        <input
+                          type="url"
+                          value={restaurantForm.instagramUrl}
+                          onChange={(e) => setRestaurantForm({ ...restaurantForm, instagramUrl: e.target.value })}
+                          placeholder="https://instagram.com/yourrestaurant"
+                          className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        />
+                      ) : (
+                        <p className="text-sm text-zinc-900">{partnerData?.instagram_url || '-'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-500 mb-1">Facebook</label>
+                      {editingRestaurant ? (
+                        <input
+                          type="url"
+                          value={restaurantForm.facebookUrl}
+                          onChange={(e) => setRestaurantForm({ ...restaurantForm, facebookUrl: e.target.value })}
+                          placeholder="https://facebook.com/yourrestaurant"
+                          className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        />
+                      ) : (
+                        <p className="text-sm text-zinc-900">{partnerData?.facebook_url || '-'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-500 mb-1">TikTok</label>
+                      {editingRestaurant ? (
+                        <input
+                          type="url"
+                          value={restaurantForm.tiktokUrl}
+                          onChange={(e) => setRestaurantForm({ ...restaurantForm, tiktokUrl: e.target.value })}
+                          placeholder="https://tiktok.com/@yourrestaurant"
+                          className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        />
+                      ) : (
+                        <p className="text-sm text-zinc-900">{partnerData?.tiktok_url || '-'}</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 

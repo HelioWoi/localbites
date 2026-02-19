@@ -147,11 +147,12 @@ export async function getNearbyRestaurants(
     }
   }
 
-  // 3. Merge results: Partners first, then Google (avoiding duplicates)
+  // 3. Merge results: Partners first, then Google (avoiding duplicates + blocklist)
+  const BLOCKED_RESTAURANTS = ['my restaurant', 'regent cafe mooloolaba'];
   console.log('[MenuLove] Merging results - Partners:', partnerRestaurants.length, 'Google:', googleRestaurants.length);
   const partnerNames = new Set(partnerRestaurants.map(r => r.name.toLowerCase()));
   const filteredGoogleRestaurants = googleRestaurants.filter(
-    r => !partnerNames.has(r.name.toLowerCase())
+    r => !partnerNames.has(r.name.toLowerCase()) && !BLOCKED_RESTAURANTS.includes(r.name.toLowerCase())
   );
 
   let results = [...partnerRestaurants, ...filteredGoogleRestaurants];

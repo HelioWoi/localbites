@@ -49,7 +49,7 @@ interface PlaceReview {
 export async function searchNearbyRestaurants(
   lat: number,
   lng: number,
-  radius: number = 5000, // Default 5km
+  radius: number = 10000, // Default 10km
   category: string = 'all'
 ): Promise<PlaceResult[]> {
   try {
@@ -95,7 +95,7 @@ export async function searchNearbyRestaurants(
 export async function textSearchRestaurants(
   lat: number,
   lng: number,
-  radius: number = 5000,
+  radius: number = 10000,
   query: string
 ): Promise<PlaceResult[]> {
   try {

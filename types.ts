@@ -24,6 +24,9 @@ export interface Restaurant {
   phone?: string;
   website?: string;
   googleMapsUrl: string;
+  instagramUrl?: string;
+  facebookUrl?: string;
+  tiktokUrl?: string;
   dishes: Dish[];
   isSubscribed: boolean; // true = has video content, false = Google photos only
   mainPhotoUrl: string;
@@ -42,8 +45,12 @@ export interface Dish {
   id: string;
   name: string;
   videoUrl?: string;
+  photoUrl?: string;
   thumbnailUrl: string;
   description?: string;
+  price?: number;
+  category?: string;
+  isFeatured?: boolean;
 }
 
 export interface UserLocation {
