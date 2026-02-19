@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, MapPin, Star, Heart, Bookmark, Share2, ChevronRight, Play, Filter, Sparkles, Video, UtensilsCrossed, Coffee, Wine, IceCream, Pizza, Fish, Loader2, Navigation, Crown } from 'lucide-react';
+import { Search, MapPin, Star, Heart, Bookmark, Share2, ChevronRight, Play, Filter, Sparkles, Video, UtensilsCrossed, Coffee, Wine, IceCream, Pizza, Fish, Loader2, Navigation, Crown, Clock, Phone, Globe, ExternalLink, X, ChevronLeft } from 'lucide-react';
 import { Restaurant } from '../types';
 import { calculateIsOpenNow } from '../utils/filterHelpers';
 import { supabase } from '../lib/supabase';
@@ -69,6 +69,7 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [suggestions, setSuggestions] = useState<{ placeId?: string; name: string; address?: string; photoUrl?: string }[]>([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [selectedNonPartner, setSelectedNonPartner] = useState<Restaurant | null>(null);
   const locationInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<NodeJS.Timeout | null>(null);
@@ -216,9 +217,21 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
             Find Your Next
             <span className="bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent"> Yum</span>
           </h1>
-          <p className="text-xl text-white/80 font-medium mb-10 max-w-2xl">
+          <p className="text-xl text-white/80 font-medium mb-4 max-w-2xl">
             Discover restaurants, cafes and bars near you, within a 10km radius.
           </p>
+          
+          {/* Partner CTA */}
+          <div className="mb-10">
+            <a
+              href="/partner"
+              className="inline-flex items-center gap-2 text-lg text-white/90 font-medium hover:text-white transition-colors group"
+            >
+              <Crown size={20} className="text-orange-400 group-hover:text-orange-300 transition-colors" />
+              <span>Own a restaurant? Join as a partner and showcase your menu with video</span>
+              <ChevronRight size={18} className="text-orange-400 group-hover:text-orange-300 group-hover:translate-x-1 transition-all" />
+            </a>
+          </div>
 
           {/* Search Bar */}
           <div className="w-full max-w-2xl relative z-[9999]">
@@ -359,7 +372,10 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
               return (
                 <button
                   key={cat.id}
-                  onClick={() => onCategoryChange(cat.id)}
+                  onClick={() => {
+                    onCategoryChange(cat.id);
+                    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+                  }}
                   className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-all ${
                     selectedCategory === cat.id
                       ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/25'
@@ -417,7 +433,7 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
                   likesCount={likesCounts.get(res.id) || 0}
                   onHover={() => setHoveredCard(res.id)}
                   onLeave={() => setHoveredCard(null)}
-                  onSelect={() => onSelectRestaurant(res)}
+                  onSelect={() => res.isSubscribed ? onSelectRestaurant(res) : setSelectedNonPartner(res)}
                   onToggleSave={() => onToggleSave(res.id)}
                   onToggleLike={() => onToggleLike(res.id)}
                   onShare={() => {
@@ -479,7 +495,7 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
                   likesCount={likesCounts.get(res.id) || 0}
                   onHover={() => setHoveredCard(res.id)}
                   onLeave={() => setHoveredCard(null)}
-                  onSelect={() => onSelectRestaurant(res)}
+                  onSelect={() => res.isSubscribed ? onSelectRestaurant(res) : setSelectedNonPartner(res)}
                   onToggleSave={() => onToggleSave(res.id)}
                   onToggleLike={() => onToggleLike(res.id)}
                   onShare={() => {
@@ -534,6 +550,179 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
           )}
         </section>
       </main>
+
+      {/* ===== NON-PARTNER RESTAURANT MODAL ===== */}
+      {selectedNonPartner && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-8" onClick={() => setSelectedNonPartner(null)}>
+          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            {/* Header Image */}
+            <div className="relative h-64">
+              {selectedNonPartner.mainPhotoUrl ? (
+                <img src={selectedNonPartner.mainPhotoUrl} className="w-full h-full object-cover" alt={selectedNonPartner.name} />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-900" />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
+              
+              {/* Close button */}
+              <button
+                onClick={() => setSelectedNonPartner(null)}
+                className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 backdrop-blur-md hover:bg-white/20 flex items-center justify-center transition-colors"
+              >
+                <X size={20} className="text-white" />
+              </button>
+
+              {/* Closed badge */}
+              {!calculateIsOpenNow(selectedNonPartner.openingHours) && (
+                <div className="absolute top-4 left-4 flex items-center gap-1.5 bg-red-500 px-3 py-1.5 rounded-full">
+                  <span className="text-sm font-bold text-white">Closed</span>
+                </div>
+              )}
+
+              {/* Restaurant info overlay */}
+              <div className="absolute bottom-6 left-6 right-6">
+                <h2 className="text-3xl font-extrabold text-white mb-2">{selectedNonPartner.name}</h2>
+                <div className="flex items-center gap-3 text-white/90">
+                  <span className="text-sm font-medium">{selectedNonPartner.cuisine}</span>
+                  {selectedNonPartner.rating && (
+                    <>
+                      <span className="text-white/40">•</span>
+                      <div className="flex items-center gap-1">
+                        <Star size={14} className="text-amber-400 fill-amber-400" />
+                        <span className="text-sm font-bold">{selectedNonPartner.rating}</span>
+                      </div>
+                    </>
+                  )}
+                  {selectedNonPartner.totalReviews > 0 && (
+                    <>
+                      <span className="text-white/40">•</span>
+                      <span className="text-sm">{selectedNonPartner.totalReviews} reviews</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-256px)] space-y-4">
+              {/* Rating Section */}
+              {selectedNonPartner.rating && (
+                <div className="bg-white border border-zinc-200 rounded-2xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Star size={20} className="text-amber-400 fill-amber-400" />
+                      <div>
+                        <span className="text-2xl font-bold text-zinc-900">{selectedNonPartner.rating}</span>
+                        <span className="text-zinc-500 text-xs ml-2">({selectedNonPartner.totalReviews} reviews)</span>
+                      </div>
+                    </div>
+                    {selectedNonPartner.googleMapsUrl && (
+                      <a
+                        href={`${selectedNonPartner.googleMapsUrl}&review=true`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-orange-500 font-bold text-sm hover:text-orange-600 transition-colors flex items-center gap-1"
+                      >
+                        See more
+                        <ChevronRight size={14} />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Opening Hours */}
+              <div className="bg-white border border-zinc-200 rounded-2xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock size={18} className="text-orange-500" />
+                  <h3 className="font-bold text-zinc-900">Opening Hours</h3>
+                </div>
+                {selectedNonPartner.openingHours && selectedNonPartner.openingHours.length > 0 ? (
+                  <div className="space-y-1">
+                    {selectedNonPartner.openingHours.map((hourString, index) => {
+                      const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                      const isToday = hourString.startsWith(today);
+                      return (
+                        <div key={index} className={`text-sm ${isToday ? 'text-orange-500 font-bold' : 'text-zinc-600'}`}>
+                          {hourString}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-zinc-500 text-sm">Hours not available</p>
+                )}
+              </div>
+
+              {/* Directions & Share Buttons */}
+              <div className="space-y-2">
+                {selectedNonPartner.googleMapsUrl && (
+                  <a
+                    href={selectedNonPartner.googleMapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white font-bold rounded-2xl transition-colors text-sm"
+                  >
+                    <Navigation size={16} />
+                    Directions
+                  </a>
+                )}
+                <button
+                  onClick={() => {
+                    if (navigator.share) {
+                      navigator.share({
+                        title: selectedNonPartner.name,
+                        text: `Check out ${selectedNonPartner.name} on MenuLove!`,
+                        url: selectedNonPartner.googleMapsUrl || window.location.href,
+                      }).catch(() => {});
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-bold rounded-2xl transition-colors text-sm"
+                >
+                  <Share2 size={16} />
+                  Share
+                </button>
+              </div>
+
+              {/* Partner CTA Banner */}
+              <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-2xl p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Crown size={20} className="text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-zinc-900 mb-1 text-sm">Own this restaurant?</h3>
+                    <p className="text-zinc-600 text-xs mb-3">Add videos and attract more customers.</p>
+                    <a
+                      href="/partner"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl transition-colors text-xs"
+                    >
+                      BECOME A PARTNER
+                      <ChevronRight size={14} />
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* Disclaimer Text */}
+              <div className="space-y-3 text-center text-zinc-400 text-[10px] leading-relaxed">
+                <p>
+                  The information displayed is publicly available data provided by Google Maps. MenuLove is an independent discovery platform. We do not represent, endorse, or guarantee any establishment. Please verify details directly with the business.
+                </p>
+                <p>
+                  If you are the owner of this business and wish to update or remove your listing from our platform,{' '}
+                  <a href="/partner" className="text-orange-500 font-bold hover:text-orange-600 transition-colors">
+                    click here to request removal
+                  </a>.
+                </p>
+                <p className="text-zinc-300">
+                  Powered by <span className="font-bold">Google</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ===== FOOTER ===== */}
       <footer className="bg-zinc-900 text-white mt-16">
