@@ -538,7 +538,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
               ))}
               {/* See Full Menu Card */}
               <a 
-                href={`/r/${restaurant.slug}/full-menu`}
+                href={`/r/${restaurant.slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/full-menu`}
                 className="relative aspect-square rounded-xl overflow-hidden bg-gradient-to-br from-zinc-100 to-zinc-50 border-2 border-dashed border-zinc-300 flex flex-col items-center justify-center gap-2 hover:border-orange-400 hover:from-orange-50 hover:to-white transition-all group"
               >
                 <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center group-hover:bg-orange-200 transition-colors">

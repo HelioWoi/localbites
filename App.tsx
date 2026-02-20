@@ -42,21 +42,21 @@ const isLegalRoute = window.location.pathname === '/policy' ||
 // Check if we're on contact page
 const isContactRoute = window.location.pathname === '/contact';
 
-// Check if we're on a restaurant route
-const isRestaurantRoute = window.location.pathname.startsWith('/r/');
-const isMenuRoute = isRestaurantRoute && window.location.pathname.endsWith('/menu');
-const isFullMenuRoute = isRestaurantRoute && window.location.pathname.endsWith('/full-menu');
-const isSavedRoute = isRestaurantRoute && window.location.pathname.endsWith('/saved');
-const isProfileRoute = isRestaurantRoute && !isMenuRoute && !isFullMenuRoute && !isSavedRoute;
-
-// Extract slug from URL
-let restaurantSlug = null;
-if (isRestaurantRoute) {
-  const pathParts = window.location.pathname.split('/');
-  restaurantSlug = pathParts[2]; // /r/slug or /r/slug/menu
-}
-
 const App: React.FC = () => {
+  // Check if we're on a restaurant route (moved inside component to update on route changes)
+  const isRestaurantRoute = window.location.pathname.startsWith('/r/');
+  const isMenuRoute = isRestaurantRoute && window.location.pathname.endsWith('/menu');
+  const isFullMenuRoute = isRestaurantRoute && window.location.pathname.endsWith('/full-menu');
+  const isSavedRoute = isRestaurantRoute && window.location.pathname.endsWith('/saved');
+  const isProfileRoute = isRestaurantRoute && !isMenuRoute && !isFullMenuRoute && !isSavedRoute;
+
+  // Extract slug from URL
+  let restaurantSlug = null;
+  if (isRestaurantRoute) {
+    const pathParts = window.location.pathname.split('/');
+    restaurantSlug = pathParts[2]; // /r/slug or /r/slug/menu
+  }
+
   // If on contact page route, redirect to static HTML
   if (isContactRoute) {
     window.location.href = '/contact.html';

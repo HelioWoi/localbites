@@ -79,6 +79,7 @@ const RestaurantMenuLoader: React.FC<RestaurantMenuLoaderProps> = ({ slug }) => 
           coverPhotoUrl: partnerData.cover_photo_url,
           googleMapsUrl: partnerData.google_maps_url,
           website: partnerData.website,
+          openingHours: partnerData.google_opening_hours || [],
           menuItems: videoItems.map(item => ({
             id: item.id,
             name: item.name,

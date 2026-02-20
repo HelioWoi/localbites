@@ -106,7 +106,7 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug 
           categories,
           reviews: [],
           reviewSnippets: [],
-          openingHours: [],
+          openingHours: partnerData.google_opening_hours || [],
         });
         setLoading(false);
       } catch (err) {

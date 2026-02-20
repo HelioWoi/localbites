@@ -50,6 +50,7 @@ const FullMenuLoader: React.FC<FullMenuLoaderProps> = ({ slug }) => {
           name: partnerData.restaurant_name || 'Restaurant',
           slug: partnerData.slug,
           cuisine: partnerData.cuisine || 'Restaurant',
+          openingHours: partnerData.google_opening_hours || [],
           categories,
           menuItems: (menuItems || []).map(item => ({
             id: item.id,

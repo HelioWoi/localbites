@@ -135,17 +135,14 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
       {/* Desktop Banner - Only visible on desktop */}
       <DesktopBanner />
       
-      {/* Video Hero Section - Mobile Only */}
+      {/* Image Hero Section - Mobile Only */}
       <div className="lg:hidden relative min-h-screen overflow-hidden">
-        <video
-          src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/hero_desktop.mp4"
-          autoPlay
-          loop
-          muted
-          playsInline
+        <img
+          src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/bkg.jpg"
+          alt="Background"
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/25 to-black/35" />
         
         {/* Hero Content */}
         <div className="relative h-full flex flex-col px-6 pt-16 pb-8">
