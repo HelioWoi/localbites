@@ -456,22 +456,26 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
               <ChevronLeft size={24}/>
             </button>
           )}
-          <div className={`flex gap-3 ${isStandalone ? 'ml-auto' : ''}`}>
-            {restaurant.isSubscribed && (
-              <div className="w-11 h-11 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full flex items-center justify-center">
-                <Crown size={18} fill="currentColor" />
-              </div>
-            )}
-            <button onClick={onToggleSave} className={`p-3 backdrop-blur-md rounded-full transition-all active:scale-90 ${isSaved ? 'bg-orange-500 text-white' : 'bg-black/20 text-white'}`}>
-              <Bookmark size={20} fill={isSaved ? "currentColor" : "none"} />
-            </button>
-          </div>
+          {!isStandalone && (
+            <div className="flex gap-3">
+              {restaurant.isSubscribed && (
+                <div className="w-11 h-11 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full flex items-center justify-center">
+                  <Crown size={18} fill="currentColor" />
+                </div>
+              )}
+              <button onClick={onToggleSave} className={`p-3 backdrop-blur-md rounded-full transition-all active:scale-90 ${isSaved ? 'bg-orange-500 text-white' : 'bg-black/20 text-white'}`}>
+                <Bookmark size={20} fill={isSaved ? "currentColor" : "none"} />
+              </button>
+            </div>
+          )}
         </div>
         
         {/* Restaurant info overlay */}
         <div className="absolute bottom-6 left-6 right-6">
           <h1 className="text-3xl font-black text-white tracking-tight mb-1 drop-shadow-lg">{restaurant.name}</h1>
-          <p className="text-white/70 text-sm font-medium">{restaurant.cuisine} • {restaurant.distance} • {restaurant.priceLevel}</p>
+          {!isStandalone && (
+            <p className="text-white/70 text-sm font-medium">{restaurant.cuisine} • {restaurant.distance} • {restaurant.priceLevel}</p>
+          )}
         </div>
       </div>
 
@@ -624,26 +628,28 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         )}
 
         {/* Quick action buttons - Compact */}
-        <div className="flex gap-2">
-          <a 
-            href={restaurant.googleMapsUrl} 
-            target="_blank" 
-            onClick={() => {
-              trackEvent({ 
-                eventType: 'directions_click',
-                restaurantId: restaurant.id 
-              });
-            }}
-            className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white font-semibold py-3 rounded-xl text-sm active:scale-95 transition-all"
-          >
-            <Navigation size={14} fill="currentColor" /> Directions
-          </a>
-          {restaurant.website && (
-            <a href={restaurant.website} target="_blank" className="flex-1 flex items-center justify-center gap-2 bg-zinc-100 text-zinc-700 font-semibold py-3 rounded-xl text-sm active:scale-95 transition-all">
-              <Globe size={14} /> Website
+        {!isStandalone && (
+          <div className="flex gap-2">
+            <a 
+              href={restaurant.googleMapsUrl} 
+              target="_blank" 
+              onClick={() => {
+                trackEvent({ 
+                  eventType: 'directions_click',
+                  restaurantId: restaurant.id 
+                });
+              }}
+              className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white font-semibold py-3 rounded-xl text-sm active:scale-95 transition-all"
+            >
+              <Navigation size={14} fill="currentColor" /> Directions
             </a>
-          )}
-        </div>
+            {restaurant.website && (
+              <a href={restaurant.website} target="_blank" className="flex-1 flex items-center justify-center gap-2 bg-zinc-100 text-zinc-700 font-semibold py-3 rounded-xl text-sm active:scale-95 transition-all">
+                <Globe size={14} /> Website
+              </a>
+            )}
+          </div>
+        )}
 
         {/* Share button */}
         <button
@@ -712,31 +718,42 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
           </section>
         )}
 
-        {/* Disclaimer & Google Attribution */}
+        {/* Payment info for QR code OR Disclaimer for app */}
         <div className="py-4 px-2 space-y-3">
-          <p className="text-[10px] text-zinc-400 text-center leading-relaxed">
-            The information displayed is publicly available data provided by Google Maps. MenuLove is an independent discovery platform. We do not represent, endorse, or guarantee any establishment. Please verify details directly with the business.
-          </p>
-          <p className="text-[10px] text-zinc-400 text-center leading-relaxed">
-            If you are the owner of this business and wish to update or remove your listing from our platform,{' '}
-            <span 
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onRequestRemoval) {
-                  onRequestRemoval(restaurant.name, restaurant.id);
-                }
-              }}
-              className="text-orange-500 underline font-medium cursor-pointer"
-              role="button"
-              tabIndex={0}
-            >
-              click here to request removal
-            </span>.
-          </p>
-          <div className="flex items-center justify-center gap-1 pt-1">
-            <span className="text-[9px] text-zinc-300">Powered by</span>
-            <span className="text-[9px] text-zinc-400 font-semibold">Google</span>
-          </div>
+          {isStandalone ? (
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-center">
+              <p className="text-sm font-semibold text-orange-900 mb-1">💳 Payment</p>
+              <p className="text-xs text-orange-700 leading-relaxed">
+                Please pay at the counter when placing your order. We accept cash and card.
+              </p>
+            </div>
+          ) : (
+            <>
+              <p className="text-[10px] text-zinc-400 text-center leading-relaxed">
+                The information displayed is publicly available data provided by Google Maps. MenuLove is an independent discovery platform. We do not represent, endorse, or guarantee any establishment. Please verify details directly with the business.
+              </p>
+              <p className="text-[10px] text-zinc-400 text-center leading-relaxed">
+                If you are the owner of this business and wish to update or remove your listing from our platform,{' '}
+                <span 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onRequestRemoval) {
+                      onRequestRemoval(restaurant.name, restaurant.id);
+                    }
+                  }}
+                  className="text-orange-500 underline font-medium cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                >
+                  click here to request removal
+                </span>.
+              </p>
+              <div className="flex items-center justify-center gap-1 pt-1">
+                <span className="text-[9px] text-zinc-300">Powered by</span>
+                <span className="text-[9px] text-zinc-400 font-semibold">Google</span>
+              </div>
+            </>
+          )}
         </div>
 
       </div>

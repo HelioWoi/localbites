@@ -155,6 +155,7 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug 
       onToggleSave={() => {}}
       openReviews={false}
       onNavigateToPartner={() => {}}
+      isStandalone={true}
     />
   );
 };
