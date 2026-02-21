@@ -21,6 +21,13 @@ const PartnerPortal: React.FC = () => {
     checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Don't override if admin is impersonating
+      const isImpersonating = localStorage.getItem('admin_impersonate_partner_id');
+      if (isImpersonating) {
+        console.log('Ignoring auth state change - admin is impersonating');
+        return;
+      }
+      
       if (event === 'SIGNED_IN' && session?.user) {
         await loadUserData(session.user.id, session.user.email || '');
       } else if (event === 'SIGNED_OUT') {

@@ -311,7 +311,7 @@ Neither party is liable for delays or failures due to:
 ## 14. Dispute Resolution
 
 ### 14.1 Informal Resolution
-- Contact contact@localbites.com.au for concerns
+- Contact contact@menulove.com.au for concerns
 - We will attempt to resolve within 14 days
 
 ### 14.2 Mediation

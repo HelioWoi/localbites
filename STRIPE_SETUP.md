@@ -231,7 +231,7 @@ After Stripe is working:
 If you need help:
 - Stripe Docs: https://stripe.com/docs
 - Supabase Docs: https://supabase.com/docs
-- LocalBites Support: your-email@localbites.com.au
+- MenuLove Support: your-email@menulove.com.au
 
 ---
 

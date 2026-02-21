@@ -10,12 +10,12 @@ Agora você pode acessar as páginas legais diretamente através de URLs simples
 
 **URL Curta:**
 ```
-https://www.localbites.com.au/policy
+https://www.menulove.com.au/policy
 ```
 
 **URL Completa:**
 ```
-https://www.localbites.com.au/legal/privacy-policy.html
+https://www.menulove.com.au/legal/privacy-policy.html
 ```
 
 **Localhost:**
@@ -29,12 +29,12 @@ http://localhost:3000/policy
 
 **URL Curta:**
 ```
-https://www.localbites.com.au/terms
+https://www.menulove.com.au/terms
 ```
 
 **URL Completa:**
 ```
-https://www.localbites.com.au/legal/terms-of-service.html
+https://www.menulove.com.au/legal/terms-of-service.html
 ```
 
 **Localhost:**
@@ -48,12 +48,12 @@ http://localhost:3000/terms
 
 **URL Curta:**
 ```
-https://www.localbites.com.au/content-moderation
+https://www.menulove.com.au/content-moderation
 ```
 
 **URL Completa:**
 ```
-https://www.localbites.com.au/legal/content-moderation.html
+https://www.menulove.com.au/legal/content-moderation.html
 ```
 
 **Localhost:**
@@ -89,8 +89,8 @@ and <a href="/policy" target="_blank">Privacy Policy</a>
 
 ### **Em Emails:**
 ```
-Privacy Policy: https://www.localbites.com.au/policy
-Terms of Service: https://www.localbites.com.au/terms
+Privacy Policy: https://www.menulove.com.au/policy
+Terms of Service: https://www.menulove.com.au/terms
 ```
 
 ---

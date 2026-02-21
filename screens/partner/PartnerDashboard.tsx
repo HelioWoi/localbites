@@ -212,9 +212,10 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const maxVideos = hasActiveSubscription ? Infinity : 5;
 
   useEffect(() => {
-    console.log('PartnerDashboard mounted, loading data...');
+    console.log('PartnerDashboard mounted or user changed, loading data...');
+    console.log('Current user:', user);
     loadData();
-  }, []);
+  }, [user]);
 
   const loadData = async () => {
     console.log('loadData started');
@@ -1280,10 +1281,10 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
             {/* Feed Cover Info */}
             {menuItems.length > 0 && (
-              <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-4 sm:p-5 border-2 border-amber-300">
+              <div className="bg-zinc-50 rounded-xl p-4 sm:p-5 border border-zinc-200">
                 <div className="flex items-start gap-3 sm:gap-4">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                    <Star size={20} className="text-white sm:w-6 sm:h-6" fill="white" />
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-zinc-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Star size={20} className="text-zinc-400 sm:w-6 sm:h-6" />
                   </div>
                   <div className="flex-1">
                     <h3 className="text-base font-bold text-zinc-900 mb-2">

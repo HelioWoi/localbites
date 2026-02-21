@@ -451,10 +451,12 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         
         {/* Header buttons */}
         <div className="absolute top-14 left-6 right-6 flex justify-between">
-          <button onClick={onBack} className="p-3 bg-black/20 backdrop-blur-md rounded-full text-white active:scale-90 transition-transform">
-            <ChevronLeft size={24}/>
-          </button>
-          <div className="flex gap-3">
+          {!isStandalone && (
+            <button onClick={onBack} className="p-3 bg-black/20 backdrop-blur-md rounded-full text-white active:scale-90 transition-transform">
+              <ChevronLeft size={24}/>
+            </button>
+          )}
+          <div className={`flex gap-3 ${isStandalone ? 'ml-auto' : ''}`}>
             {restaurant.isSubscribed && (
               <div className="w-11 h-11 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full flex items-center justify-center">
                 <Crown size={18} fill="currentColor" />
@@ -646,7 +648,10 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         {/* Share button */}
         <button
           onClick={async () => {
-            const shareUrl = window.location.href;
+            const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            const shareUrl = restaurant.isSubscribed 
+              ? `${window.location.origin}/r/${slug}`
+              : `${window.location.origin}${window.location.pathname}?restaurant=${encodeURIComponent(restaurant.id)}`;
             const shareData = {
               title: restaurant.name,
               text: `Check out ${restaurant.name} on MenuLove!`,

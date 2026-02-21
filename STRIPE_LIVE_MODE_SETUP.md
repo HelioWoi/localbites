@@ -203,7 +203,7 @@ npm run build
 
 #### **7.1 Teste de Signup**
 
-1. Acesse: https://www.localbites.com.au/partner
+1. Acesse: https://www.menulove.com.au/partner
 2. Crie uma conta real com seus dados
 3. Verifique que trial de 14 dias foi criado
 4. Verifique no Supabase que partner foi criado

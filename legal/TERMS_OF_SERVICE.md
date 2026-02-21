@@ -308,7 +308,7 @@ We are not liable for delays or failures due to circumstances beyond our control
 
 For questions about these Terms:
 
-**Email:** contact@localbites.com.au  
+**Email:** contact@menulove.com.au  
 **Address:** 16 Smith Street, Mooloolaba, Sunshine Coast, Queensland, Australia  
 **ABN:** 33 234 268 637
 

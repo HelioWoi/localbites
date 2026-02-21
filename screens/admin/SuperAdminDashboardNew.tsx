@@ -418,7 +418,14 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
 
     switch(action) {
       case 'view':
-        window.open(`/r/${partner.slug}`, '_blank');
+        // Impersonate partner and open their dashboard
+        if (!confirm(`Edit ${partner.restaurant_name}'s menu?\n\nThis will open their Partner Dashboard in a new tab.`)) return;
+        
+        localStorage.setItem('admin_impersonate_partner_id', partner.id);
+        localStorage.setItem('admin_impersonate_partner_email', partner.email);
+        localStorage.setItem('admin_return_email', user?.email || 'admin');
+        
+        window.open('/partner?impersonate=true', '_blank');
         break;
       case 'stripe':
         if (partner.stripe_customer_id) {
@@ -1565,7 +1572,7 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                               onClick={() => handlePartnerAction(partner.id, 'view')}
                               className="px-3 py-1 text-xs font-medium text-orange-600 hover:bg-orange-50 rounded transition-colors"
                             >
-                              View Profile
+                              Edit Menu
                             </button>
                           </td>
                         </tr>

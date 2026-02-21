@@ -163,7 +163,7 @@ Reports can be submitted anonymously.
 
 ### 5.2 Appeals
 Partners may appeal within 14 days:
-- Email contact@localbites.com.au
+- Email contact@menulove.com.au
 - Include video ID and explanation
 - Review within 7 business days
 - Decision is final
