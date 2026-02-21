@@ -3,6 +3,7 @@
 -- Run this in Supabase SQL Editor
 
 ALTER TABLE partners 
+ADD COLUMN IF NOT EXISTS google_place_id TEXT, -- Google Place ID for API lookups
 ADD COLUMN IF NOT EXISTS google_opening_hours TEXT[], -- Array of opening hours from Google
 ADD COLUMN IF NOT EXISTS google_phone TEXT,
 ADD COLUMN IF NOT EXISTS google_website TEXT,

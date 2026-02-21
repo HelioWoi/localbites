@@ -473,7 +473,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         </div>
       </div>
 
-      <div className="p-6 space-y-5 flex-1 bg-white rounded-t-[32px] -mt-6 relative z-10">
+      <div className="p-6 space-y-3 flex-1 bg-white rounded-t-[32px] -mt-6 relative z-10">
         
         {/* MENU VIDEOS - Clean grid */}
         {restaurant.isSubscribed && (

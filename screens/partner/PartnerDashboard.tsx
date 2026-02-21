@@ -10,6 +10,7 @@ import { PartnerUser } from './PartnerPortal';
 import SubscriptionManager from './SubscriptionManager';
 import OnboardingModal from './OnboardingModal';
 import RestaurantAnalytics from './RestaurantAnalytics';
+import MenuImportModal from '../../components/MenuImportModal';
 import { compressVideo, shouldCompressVideo } from '../../utils/videoCompression';
 import { QRCodeSVG } from 'qrcode.react';
 import { sanitizeFileName } from '../../utils/fileUtils';
@@ -81,6 +82,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   
   // Menu upload state
   const [showMenuUploadModal, setShowMenuUploadModal] = useState(false);
+  const [showMenuImportModal, setShowMenuImportModal] = useState(false);
   const [menuItemName, setMenuItemName] = useState('');
   const [menuItemCategory, setMenuItemCategory] = useState('');
   const [menuItemDescription, setMenuItemDescription] = useState('');
@@ -400,6 +402,33 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '');
 
+      // Auto-fetch Google Place ID if not already set
+      let googleData: any = {};
+      if (!partnerData.google_place_id && restaurantForm.address) {
+        try {
+          const { textSearchRestaurants } = await import('../../services/googlePlacesProxy');
+          const results = await textSearchRestaurants(
+            partnerData.latitude || 0,
+            partnerData.longitude || 0,
+            5000,
+            `${restaurantForm.name} ${restaurantForm.address}`
+          );
+          
+          if (results.length > 0) {
+            const place = results[0];
+            googleData = {
+              google_place_id: place.id,
+              google_maps_url: place.googleMapsUrl,
+              rating: place.rating,
+              total_reviews: place.totalReviews
+            };
+            console.log('[Auto-fetch] Found Google Place ID:', place.id);
+          }
+        } catch (err) {
+          console.log('[Auto-fetch] Could not fetch Google Place ID:', err);
+        }
+      }
+
       const { error } = await supabase
         .from('partners')
         .update({
@@ -412,6 +441,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           facebook_url: restaurantForm.facebookUrl,
           tiktok_url: restaurantForm.tiktokUrl,
           slug: slug,
+          ...googleData
         })
         .eq('id', partnerData.id);
 
@@ -431,7 +461,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         instagram_url: restaurantForm.instagramUrl,
         facebook_url: restaurantForm.facebookUrl,
         tiktok_url: restaurantForm.tiktokUrl,
-        slug 
+        slug,
+        ...googleData
       });
       setEditingRestaurant(false);
     } catch (error) {
@@ -449,7 +480,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     const hasVideo = mediaType === 'video' && uploadFile;
     const hasPhoto = mediaType === 'photo' && menuPhotoFile;
     
-    if ((!hasVideo && !hasPhoto) || !menuItemName.trim() || !partnerData) return;
+    // Only require name and partner data - media is optional
+    if (!menuItemName.trim() || !partnerData) return;
 
     // Block upload if trial expired
     if (isTrialExpired) {
@@ -463,6 +495,43 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     const finalCategory = menuItemCategory === '__new__' ? newCategory.trim() : menuItemCategory.trim();
     
     if (!finalCategory) return;
+
+    // If no media, create item without photo/video
+    if (!hasVideo && !hasPhoto) {
+      setIsUploading(true);
+      try {
+        const { data: item, error: itemError } = await supabase
+          .from('menu_items')
+          .insert({
+            partner_id: partnerData.id,
+            name: menuItemName.trim(),
+            category: finalCategory,
+            description: menuItemDescription.trim() || null,
+            price: menuItemPrice ? parseFloat(menuItemPrice) : null,
+            photo_url: null,
+            video_url: null,
+            sort_order: menuItems.filter(i => i.category === finalCategory).length,
+          })
+          .select()
+          .single();
+
+        if (itemError) throw itemError;
+
+        setMenuItems([...menuItems, item]);
+        if (!categories.includes(finalCategory)) {
+          setCategories([...categories, finalCategory]);
+        }
+        
+        alert('Menu item added successfully! You can add photo/video later by editing.');
+        resetMenuUploadModal();
+      } catch (error: any) {
+        console.error('Item creation error:', error);
+        alert('Failed to create item: ' + error.message);
+      } finally {
+        setIsUploading(false);
+      }
+      return;
+    }
 
     // === PHOTO UPLOAD ===
     if (mediaType === 'photo' && menuPhotoFile) {
@@ -645,9 +714,69 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     if (!finalCategory) return;
 
     setIsUploading(true);
-    setUploadProgress(50);
 
     try {
+      let photoUrl = editingMenuItem.photo_url;
+      let videoUrl = editingMenuItem.video_url;
+
+      // Handle photo upload if new photo selected
+      if (mediaType === 'photo' && menuPhotoFile) {
+        setUploadProgress(20);
+        const timestamp = Date.now();
+        const sanitizedName = sanitizeFileName(menuPhotoFile.name, menuItemName.trim());
+        const fileName = `${partnerData.id}/photos/${timestamp}-${sanitizedName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('menu-videos')
+          .upload(fileName, menuPhotoFile, {
+            upsert: true
+          });
+
+        if (uploadError) throw uploadError;
+        setUploadProgress(50);
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('menu-videos')
+          .getPublicUrl(fileName);
+
+        photoUrl = publicUrl;
+        videoUrl = ''; // Clear video if adding photo (empty string, not null)
+      }
+
+      // Handle video upload if new video selected
+      if (mediaType === 'video' && uploadFile) {
+        setUploadProgress(20);
+        
+        let fileToUpload = uploadFile;
+        if (shouldCompressVideo(uploadFile)) {
+          setUploadProgress(30);
+          fileToUpload = await compressVideo(uploadFile);
+          setUploadProgress(50);
+        }
+
+        const timestamp = Date.now();
+        const sanitizedName = sanitizeFileName(fileToUpload.name, menuItemName.trim());
+        const fileName = `${partnerData.id}/${timestamp}-${sanitizedName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('menu-videos')
+          .upload(fileName, fileToUpload, {
+            upsert: true
+          });
+
+        if (uploadError) throw uploadError;
+        setUploadProgress(70);
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('menu-videos')
+          .getPublicUrl(fileName);
+
+        videoUrl = publicUrl;
+        photoUrl = ''; // Clear photo if adding video (empty string, not null)
+      }
+
+      setUploadProgress(80);
+
       const { error } = await supabase
         .from('menu_items')
         .update({
@@ -655,6 +784,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           category: finalCategory,
           description: menuItemDescription.trim() || null,
           price: menuItemPrice ? parseFloat(menuItemPrice) : null,
+          photo_url: photoUrl,
+          video_url: videoUrl,
         })
         .eq('id', editingMenuItem.id);
 
@@ -664,7 +795,15 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       // Update local state
       setMenuItems(menuItems.map(i => 
         i.id === editingMenuItem.id 
-          ? { ...i, name: menuItemName.trim(), category: finalCategory, description: menuItemDescription.trim() || null, price: menuItemPrice ? parseFloat(menuItemPrice) : null }
+          ? { 
+              ...i, 
+              name: menuItemName.trim(), 
+              category: finalCategory, 
+              description: menuItemDescription.trim() || null, 
+              price: menuItemPrice ? parseFloat(menuItemPrice) : null,
+              photo_url: photoUrl,
+              video_url: videoUrl
+            }
           : i
       ));
 
@@ -673,11 +812,14 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         setCategories([...categories, finalCategory]);
       }
 
-      resetMenuUploadModal();
-      alert('Menu item updated successfully!');
+      setTimeout(() => {
+        resetMenuUploadModal();
+        alert('Menu item updated successfully!');
+      }, 500);
     } catch (error) {
       console.error('Update error:', error);
       alert('Failed to update menu item. Please try again.');
+      setUploadProgress(0);
     } finally {
       setIsUploading(false);
     }
@@ -1015,18 +1157,32 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             {/* Quick Actions */}
             <div className="bg-white rounded-xl border border-zinc-200 p-5">
               <h3 className="text-sm font-semibold text-zinc-900 mb-4">Quick Actions</h3>
-              <button
-                onClick={() => { setActiveTab('menu'); setShowMenuUploadModal(true); }}
-                className="flex items-center gap-3 p-4 bg-orange-50 hover:bg-orange-100 rounded-xl transition-colors w-full"
-              >
-                <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
-                  <Upload size={18} className="text-white" />
-                </div>
-                <div className="text-left">
-                  <p className="text-sm font-semibold text-zinc-900">Add Menu Video</p>
-                  <p className="text-xs text-zinc-500">{menuItems.filter(i => !i.deleted_at).length} items uploaded</p>
-                </div>
-              </button>
+              <div className="space-y-3">
+                <button
+                  onClick={() => setShowMenuImportModal(true)}
+                  className="flex items-center gap-3 p-4 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors w-full"
+                >
+                  <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                    <Upload size={18} className="text-white" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-semibold text-zinc-900">Import Menu</p>
+                    <p className="text-xs text-zinc-500">Upload CSV from Uber Eats, Square, etc.</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => { setActiveTab('menu'); setShowMenuUploadModal(true); }}
+                  className="flex items-center gap-3 p-4 bg-orange-50 hover:bg-orange-100 rounded-xl transition-colors w-full"
+                >
+                  <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+                    <Video size={18} className="text-white" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-semibold text-zinc-900">Add Menu Video</p>
+                    <p className="text-xs text-zinc-500">{menuItems.filter(i => !i.deleted_at).length} items uploaded</p>
+                  </div>
+                </button>
+              </div>
             </div>
 
             {/* Recent Videos */}
@@ -1147,18 +1303,42 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             )}
 
             {/* Add Menu Item */}
-            <div className="flex items-center justify-between">
+            <div className="space-y-3">
               <div>
                 <h2 className="text-lg font-bold text-zinc-900">Menu Items</h2>
-                <p className="text-sm text-zinc-500">{menuItems.length} items • {categories.length} categories</p>
+                <p className="text-sm text-zinc-500">{menuItems.filter(i => !i.deleted_at).length} items • {categories.length} categories</p>
               </div>
-              <button
-                onClick={() => setShowMenuUploadModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-colors"
-              >
-                <Plus size={18} />
-                Add Item
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                {menuItems.filter(i => !i.deleted_at).length > 0 && (
+                  <button
+                    onClick={async () => {
+                      setDeleteConfirmation({ 
+                        show: true, 
+                        type: 'menu',
+                        itemCount: menuItems.filter(i => !i.deleted_at).length
+                      });
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    <X size={16} />
+                    <span>Delete Menu</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowMenuImportModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+                >
+                  <Upload size={16} />
+                  <span>Import Menu</span>
+                </button>
+                <button
+                  onClick={() => setShowMenuUploadModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+                >
+                  <Plus size={16} />
+                  <span>Add Item</span>
+                </button>
+              </div>
             </div>
 
             {/* Menu Items by Category */}
@@ -1306,7 +1486,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
               {/* Restaurant Photo */}
               <div className="mb-6">
-                <label className="block text-xs font-medium text-zinc-500 mb-2">Restaurant Photo</label>
+                <label className="block text-xs font-medium text-zinc-500 mb-2">
+                  Restaurant Photo <span className="text-zinc-400 font-normal">(recommended: 500x500px)</span>
+                </label>
                 <div className="flex items-center gap-4">
                   <div className="relative w-24 h-24 bg-zinc-100 rounded-xl overflow-hidden flex-shrink-0">
                     {partnerData?.photo_url ? (
@@ -1656,9 +1838,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             </div>
 
             <div className="p-5 space-y-4">
-              {/* Media Type Toggle - Only show in add mode */}
-              {!editingMenuItem && (
-                <>
+              {/* Media Type Toggle */}
               <div className="flex bg-zinc-100 rounded-xl p-1">
                 <button
                   onClick={() => { setMediaType('video'); setMenuPhotoFile(null); setMenuPhotoPreview(null); }}
@@ -1750,8 +1930,6 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                   ? 'Videos appear in the video feed and full menu' 
                   : 'Photos appear only in the full menu'}
               </p>
-              </>
-              )}
 
               {/* Item Name */}
               <div>
@@ -2000,6 +2178,32 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             onClick={(e) => e.stopPropagation()}
           />
         </div>
+      )}
+
+      {/* Menu Import Modal */}
+      {showMenuImportModal && partnerData && (
+        <MenuImportModal
+          isOpen={showMenuImportModal}
+          onClose={() => setShowMenuImportModal(false)}
+          partnerId={partnerData.id}
+          onImportComplete={async () => {
+            // Reload menu items after import
+            const { data: items } = await supabase
+              .from('menu_items')
+              .select('*')
+              .eq('partner_id', partnerData.id)
+              .order('category')
+              .order('sort_order');
+            
+            if (items) {
+              setMenuItems(items);
+              const activeItems = items.filter(i => !i.deleted_at);
+              const cats = [...new Set(activeItems.map(i => i.category))].filter(Boolean);
+              setCategories(cats);
+            }
+            setShowMenuImportModal(false);
+          }}
+        />
       )}
 
       {/* Delete Confirmation Modal */}
