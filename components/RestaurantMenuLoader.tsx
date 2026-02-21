@@ -30,12 +30,13 @@ const RestaurantMenuLoader: React.FC<RestaurantMenuLoaderProps> = ({ slug }) => 
           return;
         }
 
-        // Fetch menu items for this restaurant
+        // Fetch menu items for this restaurant (not deleted)
         const { data: menuItems, error: menuError } = await supabase
           .from('menu_items')
           .select('*')
           .eq('partner_id', partnerData.id)
           .eq('is_active', true)
+          .is('deleted_at', null)
           .order('category', { ascending: true })
           .order('sort_order', { ascending: true });
 

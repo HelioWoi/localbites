@@ -34,6 +34,22 @@ const PartnerPortal: React.FC = () => {
   const checkSession = async () => {
     console.log('Checking session...');
     try {
+      // Check if admin is impersonating a partner
+      const impersonatePartnerId = localStorage.getItem('admin_impersonate_partner_id');
+      const impersonatePartnerEmail = localStorage.getItem('admin_impersonate_partner_email');
+      
+      if (impersonatePartnerId && impersonatePartnerEmail) {
+        // Load impersonated partner data
+        console.log('Admin impersonating partner:', impersonatePartnerEmail);
+        setUser({
+          id: impersonatePartnerId,
+          email: impersonatePartnerEmail,
+          plan: 'trial',
+        });
+        setIsLoading(false);
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       console.log('Session:', session);
       if (session?.user) {

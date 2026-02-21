@@ -29,12 +29,13 @@ const FullMenuLoader: React.FC<FullMenuLoaderProps> = ({ slug }) => {
           return;
         }
 
-        // Fetch ALL menu items (active ones)
+        // Fetch ALL menu items (active ones, not deleted)
         const { data: menuItems, error: menuError } = await supabase
           .from('menu_items')
           .select('*')
           .eq('partner_id', partnerData.id)
           .eq('is_active', true)
+          .is('deleted_at', null)
           .order('category', { ascending: true })
           .order('sort_order', { ascending: true });
 

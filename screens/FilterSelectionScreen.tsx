@@ -161,7 +161,7 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
           {/* Title */}
           <div className="text-center mb-6">
             <h1 className="text-4xl font-extrabold text-white mb-3 tracking-tight leading-tight">
-              Find Your Next <span className="text-orange-500">Yum</span>
+              Discover <span className="text-orange-500">Local Flavors</span>
             </h1>
             <p className="text-white/80 text-base leading-relaxed">
               Discover restaurants, cafes and bars near you,<br/>within a 5km radius.
@@ -341,8 +341,8 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
       <div className="hidden lg:block pt-20 pb-10 text-center">
         <h2 className="text-3xl font-black text-zinc-900 tracking-tight mb-6">MenuLove</h2>
         <h1 className="text-5xl font-extrabold text-zinc-900 mb-4 tracking-tight leading-tight">
-          Find Your Next
-          <span className="block bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">Yum</span>
+          Discover Local
+          <span className="block bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">Flavors</span>
         </h1>
         <p className="text-zinc-600 text-lg font-medium">
           Discover restaurants, cafes and bars near you

@@ -132,6 +132,15 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   // Edit menu item state
   const [editingMenuItem, setEditingMenuItem] = useState<MenuItem | null>(null);
 
+  // Delete confirmation modal state
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    show: boolean;
+    type: 'item' | 'category' | 'menu';
+    itemId?: string;
+    categoryName?: string;
+    itemCount?: number;
+  }>({ show: false, type: 'item' });
+
   // Analytics state - views tracking will be implemented when interactions table is created
   const [menuItemsWithViews, setMenuItemsWithViews] = useState<Map<string, number>>(new Map());
 
@@ -704,19 +713,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   };
 
   const handleDeleteMenuItem = async (itemId: string) => {
-    if (!confirm('Delete this menu item? This cannot be undone.')) return;
-
-    try {
-      await supabase.from('menu_items').delete().eq('id', itemId);
-      setMenuItems(menuItems.filter(i => i.id !== itemId));
-      
-      // Close modal if deleting from edit mode
-      if (editingMenuItem?.id === itemId) {
-        resetMenuUploadModal();
-      }
-    } catch (error) {
-      console.error('Delete error:', error);
-    }
+    setDeleteConfirmation({ show: true, type: 'item', itemId });
   };
 
   const handleToggleFeatured = async (itemId: string) => {
@@ -757,34 +754,13 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
   const handleDeleteCategory = async (category: string) => {
     if (!partnerData) return;
-
-    const categoryItems = menuItems.filter(i => i.category === category);
-    const confirmMessage = categoryItems.length > 0
-      ? `Delete category "${category}"?\n\nThis will also delete ${categoryItems.length} video${categoryItems.length > 1 ? 's' : ''} in this category. This action cannot be undone.`
-      : `Delete empty category "${category}"?`;
-
-    if (!window.confirm(confirmMessage)) return;
-
-    try {
-      // Delete all menu items in this category
-      const { error } = await supabase
-        .from('menu_items')
-        .delete()
-        .eq('partner_id', partnerData.id)
-        .eq('category', category);
-
-      if (error) throw error;
-
-      // Update local state
-      setMenuItems(menuItems.filter(i => i.category !== category));
-      setCategories(categories.filter(c => c !== category));
-      setEditingCategory(null);
-      
-      alert(`Category "${category}" deleted successfully`);
-    } catch (error) {
-      console.error('Delete category error:', error);
-      alert('Failed to delete category. Please try again.');
-    }
+    const categoryItems = menuItems.filter(i => i.category === category && !i.deleted_at);
+    setDeleteConfirmation({ 
+      show: true, 
+      type: 'category', 
+      categoryName: category,
+      itemCount: categoryItems.length 
+    });
   };
 
   const handleEditCategory = async () => {
@@ -1007,7 +983,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       </div>
 
       {/* Content */}
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 pb-20">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 pb-20 overflow-y-auto">
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
@@ -1048,7 +1024,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                 </div>
                 <div className="text-left">
                   <p className="text-sm font-semibold text-zinc-900">Add Menu Video</p>
-                  <p className="text-xs text-zinc-500">{menuItems.length} items uploaded</p>
+                  <p className="text-xs text-zinc-500">{menuItems.filter(i => !i.deleted_at).length} items uploaded</p>
                 </div>
               </button>
             </div>
@@ -1064,9 +1040,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                   View all <ChevronRight size={14} />
                 </button>
               </div>
-              {menuItems.length > 0 ? (
+              {menuItems.filter(i => !i.deleted_at).length > 0 ? (
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                  {menuItems.slice(0, 4).map((item) => (
+                  {menuItems.filter(i => !i.deleted_at).slice(0, 4).map((item) => (
                     <div 
                       key={item.id} 
                       className="relative aspect-square bg-zinc-100 rounded-lg overflow-hidden cursor-pointer"
@@ -1189,7 +1165,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             {categories.length > 0 ? (
               <div className="space-y-6">
                 {categories.map(category => {
-                  const categoryItems = menuItems.filter(i => i.category === category);
+                  const categoryItems = menuItems.filter(i => i.category === category && !i.deleted_at);
                   return (
                   <div key={category} className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
                     <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
@@ -1209,7 +1185,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                       </button>
                     </div>
                     <div className="p-4 grid grid-cols-3 sm:grid-cols-4 gap-3">
-                      {menuItems.filter(i => i.category === category).map(item => {
+                      {menuItems.filter(i => i.category === category && !i.deleted_at).map(item => {
                         const hasVideo = item.video_url && item.video_url !== '';
                         const hasPhoto = !!item.photo_url;
                         return (
@@ -1561,6 +1537,74 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* Archived Items */}
+            <div className="bg-white rounded-xl border border-zinc-200 p-5">
+              <h3 className="text-sm font-semibold text-zinc-900 mb-4">Archived Items</h3>
+              <p className="text-xs text-zinc-500 mb-4">
+                Items deleted in the last 7 days. After 7 days, items are permanently deleted.
+              </p>
+              
+              {(() => {
+                const archivedItems = menuItems.filter(item => item.deleted_at);
+                
+                if (archivedItems.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-zinc-400 text-sm">
+                      No archived items
+                    </div>
+                  );
+                }
+                
+                return (
+                  <div className="space-y-2">
+                    {archivedItems.map(item => (
+                      <div key={item.id} className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-zinc-900">{item.name}</p>
+                          <p className="text-xs text-zinc-500">{item.category}</p>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const { error } = await supabase
+                                .from('menu_items')
+                                .update({ deleted_at: null })
+                                .eq('id', item.id);
+                              
+                              if (error) throw error;
+                              
+                              // Reload menu items
+                              const { data: items } = await supabase
+                                .from('menu_items')
+                                .select('*')
+                                .eq('partner_id', partnerData.id)
+                                .order('category')
+                                .order('sort_order');
+                              
+                              if (items) {
+                                setMenuItems(items);
+                                const activeItems = items.filter(i => !i.deleted_at);
+                                const cats = [...new Set(activeItems.map(i => i.category))].filter(Boolean);
+                                setCategories(cats);
+                              }
+                              
+                              alert('Item restored successfully');
+                            } catch (error) {
+                              console.error('Restore error:', error);
+                              alert('Failed to restore item');
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium rounded-lg transition-colors"
+                        >
+                          Restore
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Account */}
@@ -1957,6 +2001,150 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           />
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={deleteConfirmation.show}
+        type={deleteConfirmation.type}
+        itemCount={deleteConfirmation.itemCount}
+        categoryName={deleteConfirmation.categoryName}
+        onConfirm={async () => {
+          const { type, itemId, categoryName } = deleteConfirmation;
+          
+          try {
+            if (type === 'item' && itemId) {
+              const { error } = await supabase.from('menu_items')
+                .update({ deleted_at: new Date().toISOString() })
+                .eq('id', itemId);
+              
+              if (error) throw error;
+              
+              // Update menuItems with deleted_at timestamp
+              const updatedItems = menuItems.map(i => 
+                i.id === itemId ? { ...i, deleted_at: new Date().toISOString() } : i
+              );
+              setMenuItems(updatedItems);
+              
+              // Recalculate categories based on updated items (excluding deleted)
+              const activeItems = updatedItems.filter(i => !i.deleted_at);
+              const cats = [...new Set(activeItems.map(i => i.category))].filter(Boolean);
+              setCategories(cats);
+              
+              if (editingMenuItem?.id === itemId) {
+                setShowMenuUploadModal(false);
+                setEditingMenuItem(null);
+              }
+              
+              alert('Item archived successfully');
+            } else if (type === 'category' && categoryName) {
+              const itemsToDelete = menuItems.filter(i => i.category === categoryName && !i.deleted_at);
+              const { error } = await supabase
+                .from('menu_items')
+                .update({ deleted_at: new Date().toISOString() })
+                .in('id', itemsToDelete.map(i => i.id));
+              
+              if (error) throw error;
+              
+              setMenuItems(menuItems.map(i => 
+                i.category === categoryName ? { ...i, deleted_at: new Date().toISOString() } : i
+              ));
+              setCategories(categories.filter(c => c !== categoryName));
+              setEditingCategory(null);
+              alert('Category archived successfully');
+            } else if (type === 'menu') {
+              const { error } = await supabase
+                .from('menu_items')
+                .update({ deleted_at: new Date().toISOString() })
+                .eq('partner_id', partnerData?.id)
+                .is('deleted_at', null);
+              
+              if (error) throw error;
+              
+              setMenuItems(menuItems.map(i => ({ ...i, deleted_at: new Date().toISOString() })));
+              setCategories([]);
+              alert('Menu archived successfully');
+            }
+          } catch (error) {
+            console.error('Archive error:', error);
+            alert('Failed to archive');
+          }
+          
+          setDeleteConfirmation({ show: false, type: 'item' });
+        }}
+        onCancel={() => setDeleteConfirmation({ show: false, type: 'item' })}
+      />
+    </div>
+  );
+};
+
+// Delete Confirmation Modal Component
+const DeleteConfirmModal: React.FC<{
+  isOpen: boolean;
+  type: 'item' | 'category' | 'menu';
+  itemCount?: number;
+  categoryName?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}> = ({ isOpen, type, itemCount, categoryName, onConfirm, onCancel }) => {
+  if (!isOpen) return null;
+
+  const getTitle = () => {
+    if (type === 'item') return 'Archive Menu Item?';
+    if (type === 'category') return `Archive "${categoryName}"?`;
+    return 'Archive Entire Menu?';
+  };
+
+  const getMessage = () => {
+    if (type === 'item') {
+      return 'This item will be moved to archived items. You can restore it from Settings within 7 days.';
+    }
+    if (type === 'category') {
+      return `This will archive ${itemCount} item${itemCount !== 1 ? 's' : ''} in this category. You can restore them from Settings within 7 days.`;
+    }
+    return 'All menu items will be archived. You can restore them from Settings within 7 days.';
+  };
+
+  return (
+    <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6">
+      <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
+        {/* Icon */}
+        <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <AlertCircle size={24} className="text-orange-500" />
+        </div>
+
+        {/* Title */}
+        <h3 className="text-lg font-bold text-zinc-900 text-center mb-2">
+          {getTitle()}
+        </h3>
+
+        {/* Message */}
+        <p className="text-sm text-zinc-600 text-center mb-6 leading-relaxed">
+          {getMessage()}
+        </p>
+
+        {/* Info Box */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
+          <p className="text-xs text-blue-700 font-medium">
+            💡 Items will be permanently deleted after 7 days
+          </p>
+        </div>
+
+        {/* Buttons */}
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 px-4 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold rounded-xl transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition-colors"
+          >
+            Archive
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

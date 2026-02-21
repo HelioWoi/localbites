@@ -148,7 +148,7 @@ const App: React.FC = () => {
   const [showSearch, setShowSearch] = useState(false);
   const [showReviewsFeed, setShowReviewsFeed] = useState(false);
   const [showBitesAI, setShowBitesAI] = useState(false);
-  const [showLocationError, setShowLocationError] = useState(false);
+  // Removed showLocationError - app now uses fallback location automatically
   const [hasExpandedSearch, setHasExpandedSearch] = useState(false);
   const [isExpandingSearch, setIsExpandingSearch] = useState(false);
   const [endOfFeedBuddy, setEndOfFeedBuddy] = useState(false);
@@ -734,8 +734,9 @@ const App: React.FC = () => {
               setLocation({ lat: -26.68, lng: 153.12, name: 'Sunshine Coast (Dev Mode)' });
               setState('FEED');
             } else {
-              setShowLocationError(true);
-              setState('FILTER_SELECTION');
+              // Use default location (Mooloolaba) if geolocation fails
+              setLocation({ lat: -26.68, lng: 153.12, name: 'Sunshine Coast' });
+              setState('FEED');
             }
           },
           { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -804,10 +805,15 @@ const App: React.FC = () => {
                 setState('FEED');
                 console.log('[Geolocation] ⚠️ Using dev fallback:', devLoc);
               } else {
-                // PRODUCTION: Show friendly message, stay on selection screen
-                // User can try again or contact support
-                console.error('[Geolocation] Production error:', error);
-                setShowLocationError(true);
+                // PRODUCTION: Use default location automatically
+                console.log('[Geolocation] Using default location (Mooloolaba)');
+                const fallbackLoc: UserLocation = {
+                  lat: -26.6811,
+                  lng: 153.1214,
+                  name: 'Sunshine Coast'
+                };
+                setLocation(fallbackLoc);
+                setState('FEED');
               }
             },
             {
@@ -817,8 +823,9 @@ const App: React.FC = () => {
             }
           );
         } else {
-          // Browser doesn't support geolocation at all
-          setShowLocationError(true);
+          // Browser doesn't support geolocation - use default location
+          setLocation({ lat: -26.6811, lng: 153.1214, name: 'Sunshine Coast' });
+          setState('FEED');
         }
       }}
       onSkip={() => {
@@ -948,8 +955,13 @@ const App: React.FC = () => {
                 setLocation(devLoc);
                 doTextSearch(devLoc);
               } else {
-                setIsLoading(false);
-                setShowLocationError(true);
+                // Use default location for text search
+                const fallbackLoc: UserLocation = {
+                  lat: -26.6811,
+                  lng: 153.1214,
+                  name: 'Sunshine Coast'
+                };
+                doTextSearch(fallbackLoc);
               }
             },
             {
@@ -959,8 +971,13 @@ const App: React.FC = () => {
             }
           );
         } else {
-          setIsLoading(false);
-          setShowLocationError(true);
+          // Browser doesn't support geolocation - use default for search
+          const fallbackLoc: UserLocation = {
+            lat: -26.6811,
+            lng: 153.1214,
+            name: 'Sunshine Coast'
+          };
+          doTextSearch(fallbackLoc);
         }
       }}
     />
@@ -1028,7 +1045,14 @@ const App: React.FC = () => {
                   setState('FEED');
                   console.log('[Geolocation] ⚠️ Using dev fallback (AI search):', devLoc);
                 } else {
-                  setShowLocationError(true);
+                  // Use default location for AI search
+                  const fallbackLoc: UserLocation = {
+                    lat: -26.6811,
+                    lng: 153.1214,
+                    name: 'Sunshine Coast'
+                  };
+                  setLocation(fallbackLoc);
+                  setState('FEED');
                 }
               },
               {
@@ -1042,70 +1066,8 @@ const App: React.FC = () => {
       />
     )}
 
-    {/* Location Error Overlay */}
-    {showLocationError && (
-      <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6">
-        <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center">
-          {/* Icon */}
-          <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-5">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
-              <circle cx="12" cy="10" r="3"/>
-            </svg>
-          </div>
-
-          {/* Title */}
-          <h2 className="text-xl font-black text-zinc-900 mb-2">Location access needed</h2>
-
-          {/* Description */}
-          <p className="text-sm text-zinc-500 mb-6 leading-relaxed">
-            To find restaurants near you, please allow location access when prompted.
-          </p>
-
-          {/* Try Again Button */}
-          <button
-            onClick={() => {
-              setShowLocationError(false);
-              if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                  (position) => {
-                    const loc: UserLocation = {
-                      lat: position.coords.latitude,
-                      lng: position.coords.longitude,
-                      name: 'Current Location'
-                    };
-                    setLocation(loc);
-                    setState('FEED');
-                  },
-                  () => setShowLocationError(true),
-                  { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-                );
-              }
-            }}
-            className="w-full py-3.5 bg-orange-500 text-white font-bold rounded-full hover:bg-orange-600 active:scale-95 transition-all mb-4"
-          >
-            Try Again
-          </button>
-
-          {/* Dismiss */}
-          <button
-            onClick={() => setShowLocationError(false)}
-            className="text-sm text-zinc-400 font-medium hover:text-zinc-600 transition-colors"
-          >
-            Close
-          </button>
-
-          {/* Instructions */}
-          <div className="mt-5 pt-5 border-t border-zinc-100">
-            <p className="text-[11px] text-zinc-400 leading-relaxed">
-              If you denied access, go to<br/>
-              <span className="font-semibold text-zinc-500">Settings → Safari → Location → Allow</span>
-            </p>
-          </div>
-        </div>
-      </div>
-    )}
-    </>
+    {/* Location Error Modal Removed - App now uses default location automatically */}
+  </>
   );
   if (state === 'LOCATION_SELECTOR') return <LocationSelector onLocationSelect={handleLocationSelect} />;
   if (state === 'ADMIN') return <AdminDashboard onClose={() => setState('FEED')} />;

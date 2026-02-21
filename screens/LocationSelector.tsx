@@ -310,7 +310,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ onLocationSelect })
         </div>
         <div>
           <p className="text-lg font-bold text-zinc-900">MenuLove</p>
-          <p className="text-xs text-zinc-500">Find Your Next Yum</p>
+          <p className="text-xs text-zinc-500">Discover Local Flavors</p>
         </div>
       </div>
 

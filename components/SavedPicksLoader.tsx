@@ -46,12 +46,13 @@ const SavedPicksLoader: React.FC<SavedPicksLoaderProps> = ({ slug }) => {
           return;
         }
 
-        // Fetch only saved menu items
+        // Fetch only saved menu items (not deleted)
         const { data: menuItems, error: menuError } = await supabase
           .from('menu_items')
           .select('*')
           .eq('partner_id', partnerData.id)
           .eq('is_active', true)
+          .is('deleted_at', null)
           .in('id', savedIds)
           .order('category', { ascending: true })
           .order('sort_order', { ascending: true });

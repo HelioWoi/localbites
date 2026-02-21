@@ -43,9 +43,11 @@ interface SuperAdminDashboardProps {
 }
 
 const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ user, onLogout }) => {
+  // State management
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [partners, setPartners] = useState<Partner[]>([]);
   const [filteredPartners, setFilteredPartners] = useState<Partner[]>([]);
+  const [impersonating, setImpersonating] = useState(false);
   const [metrics, setMetrics] = useState<Metrics>({
     totalPartners: 0,
     activeSubscriptions: 0,
@@ -215,6 +217,18 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ user, onLogou
       month: 'short',
       day: 'numeric',
     });
+  };
+
+  const impersonatePartner = (partnerEmail: string, partnerId: string) => {
+    if (!window.confirm(`View ${partnerEmail}'s dashboard?\n\nThis will open their dashboard in a new tab.`)) return;
+    
+    // Store impersonation info
+    localStorage.setItem('admin_impersonate_partner_id', partnerId);
+    localStorage.setItem('admin_impersonate_partner_email', partnerEmail);
+    localStorage.setItem('admin_return_email', user.email);
+    
+    // Open partner dashboard in new tab
+    window.open('/partner?impersonate=true', '_blank');
   };
 
   const exportData = () => {
@@ -494,12 +508,21 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ user, onLogou
                           {partner.trial_end_date ? formatDate(partner.trial_end_date) : 'N/A'}
                         </td>
                         <td className="px-6 py-4">
-                          <button
-                            onClick={() => window.open(`/r/${partner.slug}`, '_blank')}
-                            className="text-orange-500 hover:text-orange-600 text-sm font-medium"
-                          >
-                            View
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => impersonatePartner(partner.email, partner.id)}
+                              className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium rounded-lg transition-colors"
+                              disabled={impersonating}
+                            >
+                              {impersonating ? 'Loading...' : 'View Dashboard'}
+                            </button>
+                            <button
+                              onClick={() => window.open(`/r/${partner.slug}`, '_blank')}
+                              className="text-orange-500 hover:text-orange-600 text-sm font-medium"
+                            >
+                              Public Page
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

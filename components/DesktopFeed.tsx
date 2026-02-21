@@ -218,8 +218,8 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
         {/* Hero Content */}
         <div className={`relative flex flex-col items-center justify-center h-[calc(100%-80px)] text-center px-8 ${showAutocomplete && searchQuery.trim() && suggestions.length > 0 ? 'z-50' : 'z-[5]'}`}>
           <h1 className="text-6xl xl:text-7xl font-extrabold text-white tracking-tight leading-[1.05] mb-6 max-w-4xl">
-            Find Your Next
-            <span className="bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent"> Yum</span>
+            Discover Local
+            <span className="bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent"> Flavors</span>
           </h1>
           <p className="text-xl text-white/80 font-medium mb-4 max-w-2xl">
             Discover restaurants, cafes and bars near you, within a 5km radius.
@@ -742,7 +742,7 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
                 <span className="text-xl font-extrabold">MenuLove</span>
               </div>
               <p className="text-zinc-400 text-sm leading-relaxed">
-                Discover restaurants near you with video menus. Find Your Next Yum.
+                Discover restaurants near you with video menus.
               </p>
             </div>
             <div>
