@@ -59,6 +59,13 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   const dishesWithVideo = restaurant.dishes.filter(d => d.videoUrl);
   const savedDishes = restaurant.dishes.filter(d => savedDishIds.has(d.id));
   
+  // Video menu categories
+  const [selectedVideoCategory, setSelectedVideoCategory] = useState<string>('All');
+  const videoCategories = ['All', ...new Set(dishesWithVideo.map(d => d.category).filter(Boolean))];
+  const filteredVideos = selectedVideoCategory === 'All' 
+    ? dishesWithVideo 
+    : dishesWithVideo.filter(d => d.category === selectedVideoCategory);
+  
   // Load Google reviews for all restaurants
   useEffect(() => {
     const loadGoogleReviews = async () => {
@@ -180,12 +187,17 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   };
 
   const openVideoReels = (startIndex: number) => {
-    // Navigate to menu page with categories instead of opening modal
-    if (restaurant.isSubscribed && onNavigateToPartner) {
-      // For partner restaurants, navigate to their menu page with dish ID
+    if (restaurant.isSubscribed) {
       const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const dishId = dishesWithVideo[startIndex]?.id;
-      window.location.href = `/r/${slug}/menu${dishId ? `?dish=${dishId}` : ''}`;
+      
+      if (isStandalone) {
+        // QR code - navigate without from parameter
+        window.location.href = `/r/${slug}/menu${dishId ? `?dish=${dishId}` : ''}`;
+      } else {
+        // App feed - navigate with from=feed and restaurant slug for back navigation
+        window.location.href = `/r/${slug}/menu?dish=${dishId}&from=feed&restaurant=${slug}`;
+      }
     } else {
       // Fallback to modal for non-partner restaurants
       setActiveVideoIndex(startIndex);
@@ -484,8 +496,11 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         {/* MENU VIDEOS - Clean grid */}
         {restaurant.isSubscribed && (
           <section>
-            <h2 className="text-lg font-bold text-zinc-900 mb-1">Menu Videos</h2>
-            <p className="text-xs text-zinc-500 mb-3">Choose your menu through a video feed.</p>
+            <div className="flex items-center gap-2 mb-1">
+              <Video size={20} className="text-orange-500" />
+              <h2 className="text-lg font-bold text-zinc-900">Video Menus</h2>
+            </div>
+            <p className="text-xs text-zinc-500 mb-3">Tap any video to see the dish in detail.</p>
             
             {dishesWithVideo.length === 0 && (
               <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-8 flex flex-col items-center text-center">
@@ -497,8 +512,34 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
               </div>
             )}
 
+            {/* Category Pills - Desktop style for mobile */}
+            {dishesWithVideo.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-3 -mx-6 px-6 scrollbar-hide mb-3">
+                {videoCategories.map((category) => (
+                  <button
+                    key={category}
+                    onClick={() => setSelectedVideoCategory(category)}
+                    className={`px-5 py-2.5 rounded-full font-semibold text-sm whitespace-nowrap transition-all flex-shrink-0 ${
+                      selectedVideoCategory === category
+                        ? 'bg-orange-500 text-white shadow-md'
+                        : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
+                    }`}
+                  >
+                    {category}
+                  </button>
+                ))}
+                <a
+                  href={`/r/${restaurant.slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/full-menu`}
+                  className="px-5 py-2.5 rounded-full font-semibold text-sm whitespace-nowrap transition-all flex-shrink-0 bg-zinc-100 text-zinc-700 hover:bg-zinc-200 flex items-center gap-1.5"
+                >
+                  Full Menu
+                  <ChevronRight size={14} />
+                </a>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-3">
-              {dishesWithVideo.map((dish, index) => (
+              {filteredVideos.map((dish, index) => (
                 <button 
                   key={dish.id} 
                   className="relative aspect-square rounded-xl overflow-hidden bg-zinc-100 group text-left"
@@ -542,22 +583,12 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                   </div>
                 </button>
               ))}
-              {/* See Full Menu Card */}
-              <a 
-                href={`/r/${restaurant.slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/full-menu`}
-                className="relative aspect-square rounded-xl overflow-hidden bg-gradient-to-br from-zinc-100 to-zinc-50 border-2 border-dashed border-zinc-300 flex flex-col items-center justify-center gap-2 hover:border-orange-400 hover:from-orange-50 hover:to-white transition-all group"
-              >
-                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center group-hover:bg-orange-200 transition-colors">
-                  <UtensilsCrossed size={22} className="text-orange-500" />
-                </div>
-                <span className="text-xs font-bold text-zinc-700 group-hover:text-orange-600 transition-colors">See Full Menu</span>
-              </a>
             </div>
           </section>
         )}
 
         {/* Your Picks - Card style */}
-        {savedDishIds.size > 0 && (
+        {savedDishIds.size > 0 && isStandalone && (
           <a 
             href={`/r/${(restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/saved`}
             className="w-full bg-white rounded-2xl border border-zinc-200 p-4 flex items-center justify-between active:bg-zinc-50 transition-colors"
@@ -721,12 +752,18 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         {/* Payment info for QR code OR Disclaimer for app */}
         <div className="py-4 px-2 space-y-3">
           {isStandalone ? (
-            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-center">
-              <p className="text-sm font-semibold text-orange-900 mb-1">💳 Payment</p>
-              <p className="text-xs text-orange-700 leading-relaxed">
-                Please pay at the counter when placing your order. We accept cash and card.
-              </p>
-            </div>
+            <>
+              <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 text-center">
+                <p className="text-sm font-semibold text-zinc-900 mb-1">Payment</p>
+                <p className="text-xs text-zinc-600 leading-relaxed">
+                  Save your favorite dishes and show at the counter for payment.
+                </p>
+              </div>
+              <div className="flex flex-col items-center gap-1 pt-2">
+                <span className="text-[9px] text-zinc-400">Powered by</span>
+                <span className="text-sm font-bold text-zinc-700">MenuLove</span>
+              </div>
+            </>
           ) : (
             <>
               <p className="text-[10px] text-zinc-400 text-center leading-relaxed">

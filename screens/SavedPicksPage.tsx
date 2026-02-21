@@ -94,7 +94,10 @@ const SavedPicksPage: React.FC<SavedPicksPageProps> = ({ restaurant }) => {
 
   const handleItemClick = (item: MenuItem) => {
     if (item.videoUrl && item.videoUrl !== '') {
-      window.location.href = `/r/${restaurant.slug}/menu?from=saved&dish=${item.id}`;
+      const params = new URLSearchParams(window.location.search);
+      const fromParam = params.get('from');
+      const fromQuery = fromParam === 'profile' ? 'from=profile' : 'from=saved';
+      window.location.href = `/r/${restaurant.slug}/menu?${fromQuery}&dish=${item.id}`;
     } else if (item.photoUrl) {
       setLightboxPhoto({ url: item.photoUrl, name: item.name });
     }

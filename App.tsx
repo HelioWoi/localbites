@@ -213,11 +213,15 @@ const App: React.FC = () => {
     }
     
     // Handle single restaurant deep link
-    if (restaurantId && restaurants.length > 0 && !selectedRestaurant) {
+    if (restaurantId && restaurants.length > 0) {
       console.log('[DeepLink] Opening restaurant from URL:', restaurantId);
       
-      // Find restaurant by ID
-      const restaurant = restaurants.find(r => r.id === restaurantId);
+      // Find restaurant by ID or slug
+      const restaurant = restaurants.find(r => 
+        r.id === restaurantId || 
+        (r as any).slug === restaurantId ||
+        r.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') === restaurantId
+      );
       
       if (restaurant) {
         setSelectedRestaurant(restaurant);

@@ -310,11 +310,17 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
             onClick={() => {
               const params = new URLSearchParams(window.location.search);
               const from = params.get('from');
-              if (from === 'full-menu') {
+              const restaurantSlug = params.get('restaurant');
+              
+              if (from === 'feed' && restaurantSlug) {
+                // App feed - redirect to /?restaurant={slug} to reopen RestaurantProfile
+                window.location.href = `/?restaurant=${restaurantSlug}`;
+              } else if (from === 'full-menu') {
                 window.location.href = `/r/${restaurant.slug}/full-menu`;
               } else if (from === 'saved') {
                 window.location.href = `/r/${restaurant.slug}/saved`;
               } else {
+                // QR code - stay in /r/{slug} route
                 window.location.href = `/r/${restaurant.slug}`;
               }
             }}
@@ -326,11 +332,17 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
           <button onClick={() => {
             const params = new URLSearchParams(window.location.search);
             const from = params.get('from');
-            if (from === 'full-menu') {
+            const restaurantSlug = params.get('restaurant');
+            
+            if (from === 'feed' && restaurantSlug) {
+              // App feed - redirect to /?restaurant={slug} to reopen RestaurantProfile
+              window.location.href = `/?restaurant=${restaurantSlug}`;
+            } else if (from === 'full-menu') {
               window.location.href = `/r/${restaurant.slug}/full-menu`;
             } else if (from === 'saved') {
               window.location.href = `/r/${restaurant.slug}/saved`;
             } else {
+              // QR code - stay in /r/{slug} route
               window.location.href = `/r/${restaurant.slug}`;
             }
           }} className="flex-shrink-0">
