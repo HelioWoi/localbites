@@ -43,18 +43,41 @@ const isLegalRoute = window.location.pathname === '/policy' ||
 const isContactRoute = window.location.pathname === '/contact';
 
 const App: React.FC = () => {
-  // Check if we're on a restaurant route (moved inside component to update on route changes)
-  const isRestaurantRoute = window.location.pathname.startsWith('/r/');
-  const isMenuRoute = isRestaurantRoute && window.location.pathname.endsWith('/menu');
-  const isFullMenuRoute = isRestaurantRoute && window.location.pathname.endsWith('/full-menu');
-  const isSavedRoute = isRestaurantRoute && window.location.pathname.endsWith('/saved');
-  const isProfileRoute = isRestaurantRoute && !isMenuRoute && !isFullMenuRoute && !isSavedRoute;
+  // Check if we're on a QR code restaurant route (/r/slug)
+  const isQRCodeRoute = window.location.pathname.startsWith('/r/');
+  const isQRMenuRoute = isQRCodeRoute && window.location.pathname.endsWith('/menu');
+  const isQRFullMenuRoute = isQRCodeRoute && window.location.pathname.endsWith('/full-menu');
+  const isQRSavedRoute = isQRCodeRoute && window.location.pathname.endsWith('/saved');
+  const isQRProfileRoute = isQRCodeRoute && !isQRMenuRoute && !isQRFullMenuRoute && !isQRSavedRoute;
+
+  // Check if we're on an app feed restaurant route (/:slug, /:slug/menu, or /:slug/full-menu)
+  const pathname = window.location.pathname;
+  const pathParts = pathname.split('/').filter(Boolean);
+  const isAppFeedProfileRoute = pathname !== '/' && 
+                                 !pathname.startsWith('/r/') && 
+                                 !pathname.startsWith('/partner') && 
+                                 !pathname.startsWith('/admin') &&
+                                 pathParts.length === 1; // Only /:slug
+  const isAppFeedMenuRoute = pathname !== '/' &&
+                             !pathname.startsWith('/r/') &&
+                             !pathname.startsWith('/partner') &&
+                             !pathname.startsWith('/admin') &&
+                             pathParts.length === 2 &&
+                             pathParts[1] === 'menu'; // /:slug/menu
+  const isAppFeedFullMenuRoute = pathname !== '/' &&
+                                 !pathname.startsWith('/r/') &&
+                                 !pathname.startsWith('/partner') &&
+                                 !pathname.startsWith('/admin') &&
+                                 pathParts.length === 2 &&
+                                 pathParts[1] === 'full-menu'; // /:slug/full-menu
 
   // Extract slug from URL
   let restaurantSlug = null;
-  if (isRestaurantRoute) {
+  if (isQRCodeRoute) {
     const pathParts = window.location.pathname.split('/');
     restaurantSlug = pathParts[2]; // /r/slug or /r/slug/menu
+  } else if (isAppFeedProfileRoute || isAppFeedMenuRoute || isAppFeedFullMenuRoute) {
+    restaurantSlug = pathParts[0]; // First part is the slug
   }
 
   // If on contact page route, redirect to static HTML
@@ -84,24 +107,34 @@ const App: React.FC = () => {
     return <PartnerPortal />;
   }
 
-  // If on restaurant saved picks route, render saved picks page
-  if (isSavedRoute && restaurantSlug) {
+  // QR Code routes (/r/slug)
+  if (isQRSavedRoute && restaurantSlug) {
     return <SavedPicksLoader slug={restaurantSlug} />;
   }
 
-  // If on restaurant full menu route, render full menu page
-  if (isFullMenuRoute && restaurantSlug) {
+  if (isQRFullMenuRoute && restaurantSlug) {
     return <FullMenuLoader slug={restaurantSlug} />;
   }
 
-  // If on restaurant menu route, render menu page
-  if (isMenuRoute && restaurantSlug) {
+  if (isQRMenuRoute && restaurantSlug) {
     return <RestaurantMenuLoader slug={restaurantSlug} />;
   }
   
-  // If on restaurant profile route, render profile page
-  if (isProfileRoute && restaurantSlug) {
+  if (isQRProfileRoute && restaurantSlug) {
     return <RestaurantProfileLoader slug={restaurantSlug} />;
+  }
+
+  // App Feed routes (/:slug, /:slug/menu, and /:slug/full-menu) - NEW
+  if (isAppFeedFullMenuRoute && restaurantSlug) {
+    return <FullMenuLoader slug={restaurantSlug} />;
+  }
+
+  if (isAppFeedMenuRoute && restaurantSlug) {
+    return <RestaurantMenuLoader slug={restaurantSlug} />;
+  }
+
+  if (isAppFeedProfileRoute && restaurantSlug) {
+    return <RestaurantProfileLoader slug={restaurantSlug} isAppFeed={true} />;
   }
 
   // Desktop detection - prevents mobile feed videos from playing audio on desktop
@@ -1215,14 +1248,20 @@ const App: React.FC = () => {
                         <button
                           key={restaurant.id}
                           onClick={() => {
-                            const target = restaurant;
-                            setShowSearch(false);
                             setSearchQuery('');
                             setSearchResults([]);
-                            requestAnimationFrame(() => {
-                              setSelectedRestaurant(target);
-                              setState('PROFILE');
-                            });
+                            const slug = (restaurant as any).slug;
+                            const isMobile = !window.matchMedia('(min-width: 1024px)').matches;
+                            if (slug && restaurant.isSubscribed && isMobile) {
+                              // Mobile: navigate to URL
+                              window.location.href = `/${slug}`;
+                            } else {
+                              // Desktop or non-partner: use React state modal
+                              requestAnimationFrame(() => {
+                                setSelectedRestaurant(restaurant);
+                                setState('PROFILE');
+                              });
+                            }
                           }}
                           className="w-full flex items-center gap-4 p-4 bg-white/10 rounded-2xl text-left hover:bg-white/20 transition-colors"
                         >
@@ -1323,6 +1362,7 @@ const App: React.FC = () => {
           likesCounts={likesCounts}
           userLocation={location}
           onSelectRestaurant={(res) => {
+            // Desktop always uses React state modal
             setSelectedRestaurant(res);
             setState('PROFILE');
           }}
@@ -1640,8 +1680,16 @@ const App: React.FC = () => {
                   restaurantId={res.id}
                   onSwipeUp={() => feedRef.current?.scrollBy({ top: window.innerHeight, behavior: 'smooth' })}
                   onPartialSwipeUp={() => {
-                    setSelectedRestaurant(res);
-                    setState('PROFILE');
+                    const slug = (res as any).slug;
+                    const isMobile = !window.matchMedia('(min-width: 1024px)').matches;
+                    if (slug && res.isSubscribed && isMobile) {
+                      // Mobile: navigate to URL
+                      window.location.href = `/${slug}`;
+                    } else {
+                      // Desktop or non-partner: use React state modal
+                      setSelectedRestaurant(res);
+                      setState('PROFILE');
+                    }
                   }}
                 />
                 
@@ -1667,8 +1715,16 @@ const App: React.FC = () => {
                   // Single tap - delayed to check for double tap
                   setTimeout(() => {
                     if (lastTapRef.current?.id === res.id && Date.now() - lastTapRef.current.time >= 280) {
-                      setSelectedRestaurant(res);
-                      setState('PROFILE');
+                      const slug = (res as any).slug;
+                      const isMobile = !window.matchMedia('(min-width: 1024px)').matches;
+                      if (slug && res.isSubscribed && isMobile) {
+                        // Mobile: navigate to URL
+                        window.location.href = `/${slug}`;
+                      } else {
+                        // Desktop or non-partner: use React state modal
+                        setSelectedRestaurant(res);
+                        setState('PROFILE');
+                      }
                     }
                   }, 300);
                 }}>
@@ -1741,8 +1797,16 @@ const App: React.FC = () => {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedRestaurant(res);
-                        setState('PROFILE');
+                        const slug = (res as any).slug;
+                        const isMobile = !window.matchMedia('(min-width: 1024px)').matches;
+                        if (slug && res.isSubscribed && isMobile) {
+                          // Mobile: navigate to URL
+                          window.location.href = `/${slug}`;
+                        } else {
+                          // Desktop or non-partner: use React state modal
+                          setSelectedRestaurant(res);
+                          setState('PROFILE');
+                        }
                       }}
                       className="flex flex-col items-center gap-1"
                     >
@@ -1806,8 +1870,16 @@ const App: React.FC = () => {
                       className="text-3xl font-black text-white drop-shadow-lg tracking-tight leading-none cursor-pointer active:opacity-70 transition-opacity"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedRestaurant(res);
-                        setState('PROFILE');
+                        const slug = (res as any).slug;
+                        const isMobile = !window.matchMedia('(min-width: 1024px)').matches;
+                        if (slug && res.isSubscribed && isMobile) {
+                          // Mobile: navigate to URL
+                          window.location.href = `/${slug}`;
+                        } else {
+                          // Desktop or non-partner: use React state modal
+                          setSelectedRestaurant(res);
+                          setState('PROFILE');
+                        }
                       }}
                     >
                       {res.name}

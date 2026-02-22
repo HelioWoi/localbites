@@ -124,6 +124,12 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
+  // Banner images upload state (up to 3 images for QR code promo)
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
+  const [uploadingBannerIndex, setUploadingBannerIndex] = useState<number | null>(null);
+  const [bannerImages, setBannerImages] = useState<string[]>([]);
+  const bannerInputRefs = useRef<(HTMLInputElement | null)[]>([null, null, null]);
+
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -291,6 +297,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           facebookUrl: currentPartner.facebook_url || '',
           tiktokUrl: currentPartner.tiktok_url || ''
         });
+
+        // Load banner images
+        setBannerImages(currentPartner.banner_images || []);
 
         // Check if this is first time (no restaurant name set) and hasn't seen onboarding
         const hasSeenOnboarding = localStorage.getItem(`onboarding_completed_${user.id}`);
@@ -993,6 +1002,82 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     }
   };
 
+  // Banner images upload (up to 3 images for QR code promo)
+  const handleBannerUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !partnerData) return;
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('File too large. Maximum size is 2MB');
+      return;
+    }
+
+    setIsUploadingBanner(true);
+    setUploadingBannerIndex(index);
+
+    try {
+      const sanitizedName = sanitizeFileName(file.name, 'banner');
+      const fileName = `${partnerData.id}/banners/${Date.now()}-${sanitizedName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('menu-videos')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('menu-videos')
+        .getPublicUrl(fileName);
+
+      // Update specific index in banner images array
+      const newBanners = [...bannerImages];
+      newBanners[index] = publicUrl;
+      setBannerImages(newBanners);
+
+      // Update partner with banner images
+      const { error: updateError } = await supabase
+        .from('partners')
+        .update({ banner_images: newBanners })
+        .eq('id', partnerData.id);
+
+      if (updateError) throw updateError;
+
+      setPartnerData({ ...partnerData, banner_images: newBanners });
+    } catch (error: any) {
+      console.error('Banner upload error:', error);
+      alert('Upload failed: ' + error.message);
+    } finally {
+      setIsUploadingBanner(false);
+      setUploadingBannerIndex(null);
+      if (bannerInputRefs.current[index]) {
+        bannerInputRefs.current[index]!.value = '';
+      }
+    }
+  };
+
+  // Remove banner image
+  const handleRemoveBanner = async (index: number) => {
+    if (!partnerData) return;
+
+    const newBanners = bannerImages.filter((_, i) => i !== index);
+    setBannerImages(newBanners);
+
+    try {
+      const { error: updateError } = await supabase
+        .from('partners')
+        .update({ banner_images: newBanners })
+        .eq('id', partnerData.id);
+
+      if (updateError) throw updateError;
+
+      setPartnerData({ ...partnerData, banner_images: newBanners });
+    } catch (error: any) {
+      console.error('Banner remove error:', error);
+      alert('Failed to remove banner: ' + error.message);
+    }
+  };
+
   const copyMenuLink = () => {
     if (partnerData?.slug) {
       const url = `${window.location.origin}/r/${partnerData.slug}`;
@@ -1275,6 +1360,73 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                   ) : (
                     <p className="text-white/60 text-xs">Save your restaurant name in Settings to get your link</p>
                   )}
+                </div>
+              </div>
+            </div>
+
+            {/* Promo Banner Images (QR Code Only) */}
+            <div className="bg-white rounded-xl border border-zinc-200 p-5">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Image size={24} className="text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-base font-bold text-zinc-900 mb-1">
+                    Promo Banners <span className="text-orange-500 text-sm font-normal">(QR Code Only)</span>
+                  </h3>
+                  <p className="text-sm text-zinc-600 mb-4">Upload up to 3 promotional images. These will appear as a slider on your QR code link only.</p>
+                  
+                  <div className="grid grid-cols-3 gap-3">
+                    {[0, 1, 2].map((index) => (
+                      <div key={index} className="relative">
+                        <input
+                          ref={(el) => (bannerInputRefs.current[index] = el)}
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleBannerUpload(index, e)}
+                          className="hidden"
+                        />
+                        <button
+                          onClick={() => bannerInputRefs.current[index]?.click()}
+                          disabled={isUploadingBanner}
+                          className="relative aspect-video bg-zinc-100 rounded-lg overflow-hidden w-full hover:bg-zinc-200 transition-colors disabled:cursor-not-allowed"
+                        >
+                          {bannerImages[index] ? (
+                            <>
+                              <img src={bannerImages[index]} alt={`Banner ${index + 1}`} className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center">
+                                <div className="opacity-0 hover:opacity-100 transition-opacity bg-white/90 rounded-full p-2">
+                                  <Camera size={16} className="text-zinc-700" />
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-1">
+                              <Image size={20} className="text-zinc-300" />
+                              <span className="text-xs text-zinc-400">Banner {index + 1}</span>
+                            </div>
+                          )}
+                          {uploadingBannerIndex === index && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                              <Loader2 size={20} className="text-white animate-spin" />
+                            </div>
+                          )}
+                        </button>
+                        {bannerImages[index] && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveBanner(index);
+                            }}
+                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg z-10"
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-3">Click on any slot to upload. Max 2MB per image. Recommended: 1200x400px</p>
                 </div>
               </div>
             </div>

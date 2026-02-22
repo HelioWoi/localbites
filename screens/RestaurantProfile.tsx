@@ -1,7 +1,7 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Restaurant, Dish, Review } from '../types';
 import { ChevronLeft, Globe, MapPin, Navigation, Bookmark, PlayCircle, Camera, X, Crown, Play, Pause, Volume2, VolumeX, Star, ChevronRight, ChevronUp, ExternalLink, Home, Search, MessageSquare, Filter, Clock, Heart, Trash2, Phone, Sparkles, UtensilsCrossed, Video, Share2 } from 'lucide-react';
+import BannerSlider from '../components/BannerSlider';
 import { getPlaceDetails, textSearchRestaurants } from '../services/googlePlacesProxy';
 import DesktopBanner from '../components/DesktopBanner';
 import { trackEvent } from '../services/eventsService';
@@ -192,11 +192,11 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
       const dishId = dishesWithVideo[startIndex]?.id;
       
       if (isStandalone) {
-        // QR code - navigate without from parameter
+        // QR code standalone - navigate to /r/:slug/menu
         window.location.href = `/r/${slug}/menu${dishId ? `?dish=${dishId}` : ''}`;
       } else {
-        // App feed - navigate with from=feed and restaurant slug for back navigation
-        window.location.href = `/r/${slug}/menu?dish=${dishId}&from=feed&restaurant=${slug}`;
+        // App feed - navigate to /:slug/menu (no /r/ prefix)
+        window.location.href = `/${slug}/menu${dishId ? `?dish=${dishId}` : ''}`;
       }
     } else {
       // Fallback to modal for non-partner restaurants
@@ -451,7 +451,10 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
       )}
 
       <div className="relative h-[45vh] shrink-0">
-        {restaurant.mainPhotoUrl ? (
+        {/* QR Code route with banner images: show slider */}
+        {isStandalone && (restaurant as any).banner_images && (restaurant as any).banner_images.length > 0 ? (
+          <BannerSlider images={(restaurant as any).banner_images} />
+        ) : restaurant.mainPhotoUrl ? (
           <img src={restaurant.mainPhotoUrl} className="w-full h-full object-cover" alt={restaurant.name} />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-900 flex flex-col items-center justify-center">
@@ -486,7 +489,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         <div className="absolute bottom-6 left-6 right-6">
           <h1 className="text-3xl font-black text-white tracking-tight mb-1 drop-shadow-lg">{restaurant.name}</h1>
           {!isStandalone && (
-            <p className="text-white/70 text-sm font-medium">{restaurant.cuisine} • {restaurant.distance} • {restaurant.priceLevel}</p>
+            <p className="text-white/70 text-sm font-medium">{restaurant.cuisine}</p>
           )}
         </div>
       </div>
@@ -529,7 +532,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                   </button>
                 ))}
                 <a
-                  href={`/r/${restaurant.slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/full-menu`}
+                  href={`${isStandalone ? '/r/' : '/'}${restaurant.slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/full-menu`}
                   className="px-5 py-2.5 rounded-full font-semibold text-sm whitespace-nowrap transition-all flex-shrink-0 bg-zinc-100 text-zinc-700 hover:bg-zinc-200 flex items-center gap-1.5"
                 >
                   Full Menu

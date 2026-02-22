@@ -107,15 +107,26 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
   });
 
   const handleBack = () => {
-    // Navigate to restaurant profile
-    window.location.href = `/r/${restaurant.slug}`;
+    const pathname = window.location.pathname;
+    const isAppFeedRoute = !pathname.startsWith('/r/');
+    
+    if (isAppFeedRoute) {
+      // App feed route (/:slug/full-menu) - go back to /:slug
+      window.location.href = `/${restaurant.slug}`;
+    } else {
+      // QR code route (/r/:slug/full-menu) - go back to /r/:slug
+      window.location.href = `/r/${restaurant.slug}`;
+    }
   };
 
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
 
   const handleItemClick = (item: MenuItem) => {
     if (item.videoUrl) {
-      window.location.href = `/r/${restaurant.slug}/menu?from=full-menu&dish=${item.id}`;
+      const pathname = window.location.pathname;
+      const isAppFeedRoute = !pathname.startsWith('/r/');
+      const prefix = isAppFeedRoute ? '/' : '/r/';
+      window.location.href = `${prefix}${restaurant.slug}/menu?from=full-menu&dish=${item.id}`;
     } else {
       setSelectedItem(item);
     }
@@ -272,7 +283,12 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
       {/* Bottom Bar - Back to Video Menu */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-zinc-100 px-4 py-3 z-30">
         <button
-          onClick={() => { window.location.href = `/r/${restaurant.slug}/menu?from=full-menu`; }}
+          onClick={() => { 
+            const pathname = window.location.pathname;
+            const isAppFeedRoute = !pathname.startsWith('/r/');
+            const prefix = isAppFeedRoute ? '/' : '/r/';
+            window.location.href = `${prefix}${restaurant.slug}/menu?from=full-menu`;
+          }}
           className="w-full flex items-center justify-center gap-2 py-3 bg-zinc-900 text-white font-semibold rounded-xl hover:bg-zinc-800 transition-colors"
         >
           <Play size={18} fill="currentColor" />
@@ -361,7 +377,12 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
                 </button>
                 {selectedItem.videoUrl && (
                   <button
-                    onClick={() => { window.location.href = `/r/${restaurant.slug}/menu?from=full-menu&dish=${selectedItem.id}`; }}
+                    onClick={() => { 
+                      const pathname = window.location.pathname;
+                      const isAppFeedRoute = !pathname.startsWith('/r/');
+                      const prefix = isAppFeedRoute ? '/' : '/r/';
+                      window.location.href = `${prefix}${restaurant.slug}/menu?from=full-menu&dish=${selectedItem.id}`;
+                    }}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-900 text-white rounded-xl font-semibold text-sm hover:bg-zinc-800 transition-colors"
                   >
                     <Play size={16} fill="currentColor" />

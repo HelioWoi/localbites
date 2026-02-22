@@ -6,9 +6,10 @@ import { Loader2 } from 'lucide-react';
 
 interface RestaurantProfileLoaderProps {
   slug: string;
+  isAppFeed?: boolean;
 }
 
-const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug }) => {
+const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug, isAppFeed = false }) => {
   const [restaurant, setRestaurant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -86,6 +87,7 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug 
           priceLevel: '$$',
           isOpen: true,
           isSubscribed: true,
+          banner_images: partnerData.banner_images || [],
           dishes: (menuItems || []).map(item => ({
             id: item.id,
             name: item.name,
@@ -155,7 +157,7 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug 
       onToggleSave={() => {}}
       openReviews={false}
       onNavigateToPartner={() => {}}
-      isStandalone={true}
+      isStandalone={!isAppFeed}
     />
   );
 };
