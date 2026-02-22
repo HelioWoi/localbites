@@ -1005,7 +1005,12 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   // Banner images upload (up to 3 images for QR code promo)
   const handleBannerUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !partnerData) return;
+    if (!file || !partnerData) {
+      console.log('Upload cancelled - file or partnerData missing:', { file: !!file, partnerData: !!partnerData });
+      return;
+    }
+
+    console.log('Starting banner upload:', { index, fileName: file.name, partnerId: partnerData.id, currentBanners: bannerImages });
 
     // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
@@ -1031,19 +1036,33 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         .getPublicUrl(fileName);
 
       // Update specific index in banner images array
-      const newBanners = [...bannerImages];
+      // Ensure array always has 3 positions
+      const newBanners = [
+        bannerImages[0] || null,
+        bannerImages[1] || null,
+        bannerImages[2] || null
+      ];
       newBanners[index] = publicUrl;
-      setBannerImages(newBanners);
+      
+      // Filter out nulls for cleaner array
+      const cleanBanners = newBanners.filter(b => b !== null);
+      setBannerImages(cleanBanners);
+
+      console.log('Updating banners:', cleanBanners);
 
       // Update partner with banner images
       const { error: updateError } = await supabase
         .from('partners')
-        .update({ banner_images: newBanners })
+        .update({ banner_images: cleanBanners })
         .eq('id', partnerData.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Update error:', updateError);
+        throw updateError;
+      }
 
-      setPartnerData({ ...partnerData, banner_images: newBanners });
+      console.log('Banners updated successfully');
+      setPartnerData({ ...partnerData, banner_images: cleanBanners });
     } catch (error: any) {
       console.error('Banner upload error:', error);
       alert('Upload failed: ' + error.message);
@@ -1389,7 +1408,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                         <button
                           onClick={() => bannerInputRefs.current[index]?.click()}
                           disabled={isUploadingBanner}
-                          className="relative aspect-video bg-zinc-100 rounded-lg overflow-hidden w-full hover:bg-zinc-200 transition-colors disabled:cursor-not-allowed"
+                          className="relative aspect-square bg-zinc-100 rounded-lg overflow-hidden w-full hover:bg-zinc-200 transition-colors disabled:cursor-not-allowed"
                         >
                           {bannerImages[index] ? (
                             <>
@@ -1426,7 +1445,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                       </div>
                     ))}
                   </div>
-                  <p className="text-xs text-zinc-400 mt-3">Click on any slot to upload. Max 2MB per image. Recommended: 1200x400px</p>
+                  <p className="text-xs text-zinc-400 mt-3">Click on any slot to upload. Max 2MB per image. Recommended: 1080x1080px</p>
                 </div>
               </div>
             </div>

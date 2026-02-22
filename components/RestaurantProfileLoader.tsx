@@ -33,6 +33,7 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug,
 
         console.log('[RestaurantProfileLoader] Partner data:', partnerData);
         console.log('[RestaurantProfileLoader] Photo URL:', partnerData.photo_url);
+        console.log('[RestaurantProfileLoader] Banner images:', partnerData.banner_images);
 
         // Fetch menu items for this restaurant (not deleted)
         const { data: menuItems, error: menuError } = await supabase
