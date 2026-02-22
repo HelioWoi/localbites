@@ -28,6 +28,8 @@ export async function compressVideo(
     video.playsInline = true;
 
     video.onloadedmetadata = async () => {
+      let audioContext: AudioContext | null = null;
+      
       try {
         // Calculate dimensions maintaining aspect ratio
         let width = video.videoWidth;
@@ -55,14 +57,27 @@ export async function compressVideo(
           return;
         }
 
-        // Setup MediaRecorder
-        const stream = canvas.captureStream(30); // 30 FPS
+        // Setup MediaRecorder with audio
+        const canvasStream = canvas.captureStream(30); // 30 FPS
         const chunks: Blob[] = [];
         
-        // Use VP9 if available, fallback to VP8, then H264
-        let mimeType = 'video/webm;codecs=vp9';
+        // Create audio context to capture audio from video
+        audioContext = new AudioContext();
+        const source = audioContext.createMediaElementSource(video);
+        const destination = audioContext.createMediaStreamDestination();
+        source.connect(destination);
+        source.connect(audioContext.destination); // Also play audio
+        
+        // Combine video and audio streams
+        const stream = new MediaStream([
+          ...canvasStream.getVideoTracks(),
+          ...destination.stream.getAudioTracks()
+        ]);
+        
+        // Use VP9 with Opus audio if available, fallback to VP8
+        let mimeType = 'video/webm;codecs=vp9,opus';
         if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = 'video/webm;codecs=vp8';
+          mimeType = 'video/webm;codecs=vp8,opus';
           if (!MediaRecorder.isTypeSupported(mimeType)) {
             mimeType = 'video/webm';
           }
@@ -71,6 +86,7 @@ export async function compressVideo(
         const recorder = new MediaRecorder(stream, {
           mimeType,
           videoBitsPerSecond: 2500000, // 2.5 Mbps - good balance for mobile
+          audioBitsPerSecond: 128000, // 128 kbps for audio
         });
 
         recorder.ondataavailable = (e) => {
@@ -87,12 +103,15 @@ export async function compressVideo(
             { type: mimeType }
           );
           
+          // Clean up
+          audioContext.close();
           URL.revokeObjectURL(video.src);
           onProgress(100);
           resolve(compressedFile);
         };
 
         recorder.onerror = (e) => {
+          audioContext.close();
           URL.revokeObjectURL(video.src);
           reject(new Error('Recording failed: ' + e));
         };
@@ -132,6 +151,9 @@ export async function compressVideo(
         };
 
       } catch (error) {
+        if (audioContext) {
+          audioContext.close();
+        }
         URL.revokeObjectURL(video.src);
         reject(error);
       }
