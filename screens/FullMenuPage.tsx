@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, Play, Search, Bookmark, X } from 'lucide-react';
-import DesktopBanner from '../components/DesktopBanner';
 
 // Component to generate a thumbnail from a video
 const VideoThumbnail: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
@@ -134,10 +133,9 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
 
   return (
     <div className="min-h-screen bg-white">
-      <DesktopBanner />
       
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-white border-b border-zinc-100" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 48px)' }}>
+      <div className="sticky top-0 z-30 bg-white border-b border-zinc-100" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="flex items-center gap-3 px-4 pt-3 pb-3">
           <button 
             onClick={handleBack}

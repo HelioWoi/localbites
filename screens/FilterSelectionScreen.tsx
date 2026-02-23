@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Utensils, Coffee, Wine, IceCreamCone, Pizza, Fish, Search, MapPin, Loader2, Crown, ChevronDown, Video } from 'lucide-react';
-import DesktopBanner from '../components/DesktopBanner';
 import { supabase } from '../lib/supabase';
 
 interface FilterSelectionScreenProps {
@@ -132,8 +131,6 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      {/* Desktop Banner - Only visible on desktop */}
-      <DesktopBanner />
       
       {/* Image Hero Section - Mobile Only */}
       <div className="lg:hidden relative min-h-screen overflow-hidden">

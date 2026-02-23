@@ -61,6 +61,11 @@ const App: React.FC = () => {
                                  !pathname.startsWith('/r/') && 
                                  !pathname.startsWith('/partner') && 
                                  !pathname.startsWith('/admin') &&
+                                 pathname !== '/become-a-partner' &&
+                                 pathname !== '/policy' &&
+                                 pathname !== '/terms' &&
+                                 pathname !== '/content-moderation' &&
+                                 pathname !== '/contact' &&
                                  pathParts.length === 1; // Only /:slug
   const isAppFeedMenuRoute = pathname !== '/' &&
                              !pathname.startsWith('/r/') &&
@@ -158,6 +163,17 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>('SPLASH');
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('all');
   const [location, setLocation] = useState<UserLocation | null>(null);
+
+  // Auto-switch to FEED when resizing to desktop from mobile
+  useEffect(() => {
+    if (isDesktop && state === 'FILTER_SELECTION') {
+      // Desktop should never show filter selection, go to feed
+      if (!location) {
+        setLocation({ lat: -26.68, lng: 153.12, name: 'Sunshine Coast' });
+      }
+      setState('FEED');
+    }
+  }, [isDesktop, state, location]);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [allRestaurants, setAllRestaurants] = useState<Restaurant[]>([]); // Full list for pagination
   const [visibleCount, setVisibleCount] = useState(20); // Show 20 at a time
@@ -753,7 +769,7 @@ const App: React.FC = () => {
 
   if (state === 'SPLASH') return <SplashScreen onFinish={() => {
     if (isDesktop) {
-      // Desktop: skip filter selection, go straight to feed with geolocation
+      // Desktop: ALWAYS go straight to feed, never show filter selection
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           async (position) => {
@@ -788,7 +804,9 @@ const App: React.FC = () => {
           { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
       } else {
-        setState('FILTER_SELECTION');
+        // Desktop without geolocation support: use default location
+        setLocation({ lat: -26.68, lng: 153.12, name: 'Sunshine Coast' });
+        setState('FEED');
       }
     } else {
       // Mobile: show filter selection screen as before
@@ -1190,7 +1208,7 @@ const App: React.FC = () => {
             onOpenAI={() => setShowBitesAI(true)}
             onOpenSearch={() => setShowSearch(true)}
             onOpenFilter={() => setShowFilterModal('cuisine')}
-            isStandalone={false}
+            isStandalone={true}
             onRequestRemoval={(name, id) => setShowRemovalRequest({ name, id })}
           />
         )}

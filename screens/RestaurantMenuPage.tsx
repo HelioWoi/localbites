@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, ChevronUp, Star, MapPin, Globe, Navigation, Heart, Bookmark, X, ChevronLeft, MessageSquare, Home, Search, Sparkles, Filter, Clock, Send, Video, UtensilsCrossed } from 'lucide-react';
-import DesktopBanner from '../components/DesktopBanner';
 import { trackEvent } from '../services/eventsService';
 
 interface MenuItem {
@@ -299,11 +298,9 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
 
   return (
     <div className="h-screen w-screen bg-black overflow-hidden">
-      {/* Desktop Banner - Only visible on desktop */}
-      <DesktopBanner />
       
       {/* Header - Restaurant Info */}
-      <div className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-black/80 via-black/40 to-transparent p-6 pt-12 lg:pt-16">
+      <div className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-black/80 via-black/40 to-transparent p-6 pt-12">
         <div className="flex items-center gap-4">
           {/* Back button */}
           <button 

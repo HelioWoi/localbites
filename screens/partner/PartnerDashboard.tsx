@@ -1619,6 +1619,74 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               </div>
             </div>
 
+            {/* Featured Items Section */}
+            {menuItems.filter(i => i.is_featured && !i.deleted_at).length > 0 && (
+              <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+                <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-200 flex items-center gap-2">
+                  <Star size={18} className="text-orange-500 fill-orange-500" />
+                  <div>
+                    <h3 className="font-semibold text-zinc-900">Featured Items</h3>
+                    <p className="text-xs text-zinc-500">{menuItems.filter(i => i.is_featured && !i.deleted_at).length} items marked as featured</p>
+                  </div>
+                </div>
+                <div className="p-4 grid grid-cols-3 sm:grid-cols-4 gap-3">
+                  {menuItems.filter(i => i.is_featured && !i.deleted_at).map(item => {
+                    const hasVideo = item.video_url && item.video_url !== '';
+                    const hasPhoto = !!item.photo_url;
+                    return (
+                    <div key={item.id} className="relative group">
+                      <div 
+                        className="aspect-square bg-zinc-100 rounded-xl overflow-hidden cursor-pointer ring-2 ring-orange-400"
+                        onClick={() => hasVideo ? setPreviewVideo(item.video_url) : hasPhoto ? setPreviewPhoto(item.photo_url!) : null}
+                      >
+                        {hasVideo ? (
+                          <video src={`${item.video_url}#t=0.5`} className="w-full h-full object-cover" muted preload="metadata" />
+                        ) : hasPhoto ? (
+                          <img src={item.photo_url} className="w-full h-full object-cover" alt={item.name} />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Camera size={32} className="text-zinc-300" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="absolute top-2 left-2 flex gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleFeatured(item.id);
+                          }}
+                          className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center shadow-md hover:bg-orange-600 transition-colors"
+                          title="Featured item"
+                        >
+                          <Star size={14} className="text-white fill-white" />
+                        </button>
+                      </div>
+                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingMenuItem(item);
+                            setMenuItemName(item.name);
+                            setMenuItemCategory(item.category);
+                            setMenuItemDescription(item.description || '');
+                            setMenuItemPrice(item.price?.toString() || '');
+                            setShowMenuUploadModal(true);
+                          }}
+                          className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center shadow-md hover:bg-orange-600 transition-colors"
+                          title="Edit item"
+                        >
+                          <Edit2 size={14} className="text-white" />
+                        </button>
+                      </div>
+                      <p className="mt-1.5 text-xs font-medium text-zinc-900 line-clamp-2 leading-tight">{item.name}</p>
+                      <p className="text-xs text-orange-600 font-semibold">{item.category}</p>
+                    </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Menu Items by Category */}
             {categories.length > 0 ? (
               <div className="space-y-6">
