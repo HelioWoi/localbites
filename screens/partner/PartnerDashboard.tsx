@@ -624,8 +624,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         window.URL.revokeObjectURL(video.src);
         const duration = video.duration;
         
-        if (duration > 12) {
-          alert(`Video is too long (${Math.round(duration)}s). Please upload a video of 10 seconds or less for best engagement.`);
+        if (duration > 16) {
+          alert(`Video is too long (${Math.round(duration)}s). Please upload a video of 15 seconds or less for best engagement.`);
           reject(new Error('Video too long'));
         } else {
           resolve();
@@ -2300,7 +2300,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                     >
                       <Upload size={32} className="text-zinc-400" />
                       <p className="text-sm font-medium text-zinc-600">Click to select video</p>
-                      <p className="text-xs text-zinc-400">MP4, MOV • Max 10 seconds • Max 5MB</p>
+                      <p className="text-xs text-zinc-400">MP4, MOV • Max 15 seconds • Max 5MB</p>
                     </button>
                   )}
                   <input

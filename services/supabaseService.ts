@@ -323,6 +323,7 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
       isPartner: true,
       slug: p.slug,
       dishes: (p.menu_items || [])
+        .filter((item: any) => !item.deleted_at) // Exclude deleted items
         .sort((a: any, b: any) => {
           // Featured items first
           if (a.is_featured && !b.is_featured) return -1;
@@ -434,6 +435,7 @@ export async function getPartnerByName(name: string): Promise<Restaurant | null>
       isSubscribed: true,
       isOpen: true,
       dishes: (p.menu_items || [])
+        .filter((item: any) => !item.deleted_at) // Exclude deleted items
         .sort((a: any, b: any) => {
           if (a.is_featured && !b.is_featured) return -1;
           if (!a.is_featured && b.is_featured) return 1;
