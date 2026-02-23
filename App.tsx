@@ -7,6 +7,7 @@ import LocationSelector from './screens/LocationSelector';
 import RestaurantProfile from './screens/RestaurantProfile';
 import AdminDashboard from './screens/AdminDashboard';
 import PartnerPortal from './screens/partner/PartnerPortal';
+import PartnerLandingPage from './screens/PartnerLandingPage';
 import SuperAdminPortal from './screens/admin/SuperAdminPortal';
 import RestaurantMenuLoader from './components/RestaurantMenuLoader';
 import RestaurantProfileLoader from './components/RestaurantProfileLoader';
@@ -30,6 +31,9 @@ import { trackEvent } from './services/eventsService';
 
 // Check if we're on the admin route
 const isAdminRoute = window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin');
+
+// Check if we're on the partner landing page
+const isPartnerLandingRoute = window.location.pathname === '/become-a-partner';
 
 // Check if we're on the partner route
 const isPartnerRoute = window.location.pathname === '/partner' || window.location.pathname.startsWith('/partner');
@@ -100,6 +104,11 @@ const App: React.FC = () => {
   // If on admin route, render Super Admin Portal
   if (isAdminRoute) {
     return <SuperAdminPortal />;
+  }
+
+  // If on partner landing page, render Partner Landing Page
+  if (isPartnerLandingRoute) {
+    return <PartnerLandingPage />;
   }
 
   // If on partner route, render Partner Portal
@@ -1350,7 +1359,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="relative h-screen w-screen bg-black overflow-hidden select-none lg:h-auto lg:overflow-auto lg:bg-zinc-50">
+    <div className="relative h-screen w-screen bg-black overflow-hidden select-none lg:h-auto lg:overflow-auto lg:bg-zinc-50 lg:select-auto">
       {/* ===== DESKTOP FEED (lg: 1024px+) ===== */}
       <div className="hidden lg:block">
         <DesktopFeed
@@ -1474,9 +1483,13 @@ const App: React.FC = () => {
           </div>
           {/* Premium badge for subscribed restaurants */}
           {restaurants[activeRestaurantIndex]?.isSubscribed && (
-            <div className="w-9 h-9 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full shadow-lg flex items-center justify-center">
+            <a
+              href="/become-a-partner"
+              className="w-9 h-9 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform"
+              onClick={(e) => e.stopPropagation()}
+            >
               <Crown size={16} fill="currentColor" />
-            </div>
+            </a>
           )}
         </div>
       </div>

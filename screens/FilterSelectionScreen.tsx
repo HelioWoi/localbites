@@ -171,7 +171,7 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
           {/* Partner CTA */}
           <div className="text-center mb-7">
             <a
-              href="/partner"
+              href="/become-a-partner"
               className="inline-flex items-center gap-2 text-white/80 text-sm font-medium hover:text-white transition-colors group"
             >
               <Crown size={16} className="text-orange-400" />
@@ -246,10 +246,13 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
 
           {/* Stats */}
           <div className="flex items-center justify-center gap-4 mb-7 text-white/70 text-xs">
-            <div className="flex items-center gap-1.5">
+            <button
+              onClick={onSkip}
+              className="flex items-center gap-1.5 hover:text-white transition-colors active:scale-95"
+            >
               <div className="w-2 h-2 bg-green-400 rounded-full" />
               <span>6 restaurants nearby</span>
-            </div>
+            </button>
             <div className="flex items-center gap-1.5">
               <Video size={14} className="text-orange-400" />
               <span>1 with video menus</span>
@@ -298,39 +301,40 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
           <div className="flex-1 flex items-end justify-center pb-8">
             <div className="text-center space-y-3 px-4">
               <p className="text-[10px] text-white/70 leading-relaxed">
-                MenuLove is currently in Beta. We connect you with local businesses and help you discover what's around you. All products, services, pricing, and customer experiences are provided directly by each listed venue. Please visit our{' '}
-                <a href="/policy" className="text-orange-400 hover:text-orange-300 transition-colors font-medium">
-                  Policy
-                </a>{' '}
-                page for more details.
+                <span className="text-orange-400 font-bold">Beta Version:</span> MenuLove is currently in beta testing. We're working hard to deliver the best experience for Australian restaurants. Your feedback helps us improve and build the perfect platform for showcasing your culinary creations. Join us in revolutionizing how restaurants connect with customers through video menus.
               </p>
               <p className="text-[10px] text-white/70 leading-relaxed">
-                Contact us for any questions -{' '}
+                If you have any questions, feel free to{' '}
                 <a href="/contact" className="text-orange-400 hover:text-orange-300 transition-colors font-medium underline">
-                  Click here
-                </a>
+                  contact us here
+                </a>.
               </p>
-              <div className="pt-2 border-t border-white/10">
-                <a 
-                  href="/partner" 
-                  className="text-[10px] text-white/50 hover:text-orange-400 transition-colors font-medium"
-                >
-                  Partner Login
-                </a>
-                <span className="text-white/30"> | </span>
-                <a 
-                  href="/terms" 
-                  className="text-[10px] text-white/50 hover:text-orange-400 transition-colors font-medium"
-                >
-                  Terms
-                </a>
-                <span className="text-white/30"> | </span>
-                <a 
-                  href="/content-moderation" 
-                  className="text-[10px] text-white/50 hover:text-orange-400 transition-colors font-medium"
-                >
-                  Content Moderation
-                </a>
+              <div className="pt-2 border-t border-white/10 space-y-2">
+                <div>
+                  <a 
+                    href="/partner" 
+                    className="text-[10px] text-white/50 hover:text-orange-400 transition-colors font-medium"
+                  >
+                    Partner Portal
+                  </a>
+                  <span className="text-white/30"> | </span>
+                  <a 
+                    href="/terms" 
+                    className="text-[10px] text-white/50 hover:text-orange-400 transition-colors font-medium"
+                  >
+                    Terms
+                  </a>
+                  <span className="text-white/30"> | </span>
+                  <a 
+                    href="/content-moderation" 
+                    className="text-[10px] text-white/50 hover:text-orange-400 transition-colors font-medium"
+                  >
+                    Content Moderation
+                  </a>
+                </div>
+                <p className="text-[10px] text-white/50">
+                  Made with ❤️ in Australia | <a href="mailto:contact@menulove.com.au" className="text-orange-400 hover:text-orange-300 transition-colors">contact@menulove.com.au</a>
+                </p>
               </div>
             </div>
           </div>

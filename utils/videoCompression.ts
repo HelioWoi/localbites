@@ -24,8 +24,8 @@ export async function compressVideo(
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
     video.preload = 'metadata';
-    video.muted = true;
     video.playsInline = true;
+    video.volume = 0; // Silent playback but audio is still captured
 
     video.onloadedmetadata = async () => {
       let audioContext: AudioContext | null = null;
@@ -61,17 +61,23 @@ export async function compressVideo(
         const canvasStream = canvas.captureStream(30); // 30 FPS
         const chunks: Blob[] = [];
         
-        // Create audio context to capture audio from video
-        audioContext = new AudioContext();
-        const source = audioContext.createMediaElementSource(video);
-        const destination = audioContext.createMediaStreamDestination();
-        source.connect(destination);
-        source.connect(audioContext.destination); // Also play audio
+        // Try to capture audio from video
+        let audioTracks: MediaStreamTrack[] = [];
+        try {
+          audioContext = new AudioContext();
+          const source = audioContext.createMediaElementSource(video);
+          const destination = audioContext.createMediaStreamDestination();
+          source.connect(destination);
+          audioTracks = destination.stream.getAudioTracks();
+        } catch (audioError) {
+          console.warn('Could not capture audio, video will be silent:', audioError);
+          // Continue without audio if capture fails
+        }
         
         // Combine video and audio streams
         const stream = new MediaStream([
           ...canvasStream.getVideoTracks(),
-          ...destination.stream.getAudioTracks()
+          ...audioTracks
         ]);
         
         // Use VP9 with Opus audio if available, fallback to VP8

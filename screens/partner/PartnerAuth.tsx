@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Utensils, Mail, Lock, ArrowRight, CheckCircle, Loader2, Eye, EyeOff, Building2, Hash, AlertCircle, MapPin, Phone, Globe } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { verifyABN, formatABN, isValidABNFormat } from '../../services/abnVerification';
@@ -8,7 +8,7 @@ interface PartnerAuthProps {
 }
 
 const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
-  const [mode, setMode] = useState<'login' | 'signup' | 'magic' | 'sent'>('login');
+  const [mode, setMode] = useState<'login' | 'signup' | 'magic' | 'sent'>('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -28,6 +28,28 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
   const [verificationResult, setVerificationResult] = useState<any>(null);
   const [isValidatingPromo, setIsValidatingPromo] = useState(false);
   const [promoValidation, setPromoValidation] = useState<{ valid: boolean; type?: string; error?: string } | null>(null);
+
+  // Track if user came from landing page
+  const [isFromLandingPage, setIsFromLandingPage] = useState(false);
+
+  // Pre-fill form with data from landing page (Step 1)
+  useEffect(() => {
+    const savedData = sessionStorage.getItem('partnerSignupStep1');
+    if (savedData) {
+      try {
+        const data = JSON.parse(savedData);
+        if (data.restaurantName) setRestaurantName(data.restaurantName);
+        if (data.email) setEmail(data.email);
+        if (data.phone) setPhone(data.phone);
+        if (data.address) setAddress(data.address);
+        // Auto-switch to signup mode if coming from landing page
+        setMode('signup');
+        setIsFromLandingPage(true);
+      } catch (err) {
+        console.error('Error loading signup data:', err);
+      }
+    }
+  }, []);
 
   const handleVerifyABN = async () => {
     const cleanValue = abn.replace(/\s/g, '').replace(/[^0-9]/g, '');
@@ -279,12 +301,23 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
           <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 p-8">
+            {isFromLandingPage && mode === 'signup' && (
+              <div className="mb-4 flex items-center gap-2">
+                <div className="flex items-center gap-2 text-sm font-bold text-orange-600">
+                  <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center text-xs">2</div>
+                  <span>Step 2 of 2</span>
+                </div>
+                <div className="flex-1 h-1 bg-zinc-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-orange-500 w-full"></div>
+                </div>
+              </div>
+            )}
             <h1 className="text-2xl font-bold text-zinc-900 mb-1">
               {mode === 'signup' ? 'Create your account' : mode === 'magic' ? 'Magic link login' : 'Welcome back'}
             </h1>
             <p className="text-zinc-500 mb-6">
               {mode === 'signup' 
-                ? 'Start your 14-day free trial' 
+                ? (isFromLandingPage ? 'Complete your registration' : 'Start your 14-day free trial')
                 : mode === 'magic' 
                   ? 'We\'ll send you a login link'
                   : 'Sign in to manage your restaurant'}
@@ -569,18 +602,6 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
             </div>
           </div>
 
-          {/* Trial info */}
-          {mode === 'signup' && (
-            <div className="mt-6 p-4 bg-orange-50 rounded-xl border border-orange-100">
-              <p className="text-sm text-orange-800 font-medium mb-2">🎉 14-day free trial includes:</p>
-              <ul className="text-sm text-orange-700 space-y-1">
-                <li>• Upload up to 5 menu videos</li>
-                <li>• Basic analytics dashboard</li>
-                <li>• Appear in MenuLove feed</li>
-                <li>• No credit card required</li>
-              </ul>
-            </div>
-          )}
         </div>
       </div>
     </div>

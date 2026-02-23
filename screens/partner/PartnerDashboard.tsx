@@ -642,30 +642,34 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     setUploadProgress(10);
 
     try {
-      // Check if video needs compression
+      // TEMPORARY: Skip compression to test if that's the issue
       let fileToUpload = uploadFile;
-      const needsCompression = await shouldCompressVideo(uploadFile);
+      console.log('Skipping compression for testing - uploading original video');
+      setUploadProgress(30);
       
-      if (needsCompression) {
-        setUploadProgress(15);
-        console.log('Compressing video for optimal mobile playback...');
-        
-        // Compress video with progress callback
-        fileToUpload = await compressVideo(uploadFile, {
-          maxWidth: 720,
-          maxHeight: 1280,
-          quality: 0.8,
-          onProgress: (progress) => {
-            // Map compression progress to 15-50% of total progress
-            setUploadProgress(15 + (progress * 0.35));
-          },
-        });
-        
-        console.log(`Video compressed: ${(uploadFile.size / 1024 / 1024).toFixed(2)}MB → ${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`);
-        setUploadProgress(50);
-      } else {
-        setUploadProgress(30);
-      }
+      // Check if video needs compression
+      // const needsCompression = await shouldCompressVideo(uploadFile);
+      
+      // if (needsCompression) {
+      //   setUploadProgress(15);
+      //   console.log('Compressing video for optimal mobile playback...');
+      //   
+      //   // Compress video with progress callback
+      //   fileToUpload = await compressVideo(uploadFile, {
+      //     maxWidth: 720,
+      //     maxHeight: 1280,
+      //     quality: 0.8,
+      //     onProgress: (progress) => {
+      //       // Map compression progress to 15-50% of total progress
+      //       setUploadProgress(15 + (progress * 0.35));
+      //     },
+      //   });
+      //   
+      //   console.log(`Video compressed: ${(uploadFile.size / 1024 / 1024).toFixed(2)}MB → ${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`);
+      //   setUploadProgress(50);
+      // } else {
+      //   setUploadProgress(30);
+      // }
 
       // Sanitizar nome do arquivo para garantir URLs seguras
       const sanitizedName = sanitizeFileName(fileToUpload.name, menuItemName.trim());
@@ -682,27 +686,53 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         .from('menu-videos')
         .getPublicUrl(fileName);
 
+      console.log('Inserting menu item into database:', {
+        partner_id: partnerData.id,
+        name: menuItemName.trim(),
+        category: finalCategory,
+        video_url: publicUrl,
+      });
+
+      const insertData = {
+        partner_id: partnerData.id,
+        name: menuItemName.trim(),
+        category: finalCategory,
+        description: menuItemDescription.trim() || null,
+        price: menuItemPrice ? parseFloat(menuItemPrice) : null,
+        video_url: publicUrl,
+        sort_order: menuItems.filter(i => i.category === finalCategory).length,
+      };
+      
+      console.log('Attempting to insert menu item:', insertData);
+      console.log('Current auth user:', (await supabase.auth.getUser()).data.user?.id);
+
       const { data: item, error: itemError } = await supabase
         .from('menu_items')
-        .insert({
-          partner_id: partnerData.id,
-          name: menuItemName.trim(),
-          category: finalCategory,
-          description: menuItemDescription.trim() || null,
-          price: menuItemPrice ? parseFloat(menuItemPrice) : null,
-          video_url: publicUrl,
-          sort_order: menuItems.filter(i => i.category === finalCategory).length,
-        })
+        .insert(insertData)
         .select()
         .single();
 
-      if (itemError) throw itemError;
+      if (itemError) {
+        console.error('❌ DATABASE INSERT FAILED:', itemError);
+        console.error('Error details:', {
+          message: itemError.message,
+          details: itemError.details,
+          hint: itemError.hint,
+          code: itemError.code
+        });
+        alert(`Database error: ${itemError.message}\nDetails: ${itemError.details || 'No details'}\nHint: ${itemError.hint || 'No hint'}`);
+        throw itemError;
+      }
+      
+      console.log('✅ Menu item inserted successfully:', item);
       setUploadProgress(100);
 
       setMenuItems([...menuItems, item]);
       if (!categories.includes(finalCategory)) {
         setCategories([...categories, finalCategory]);
       }
+      
+      console.log('Updated menuItems state:', [...menuItems, item]);
       
       setTimeout(() => {
         resetMenuUploadModal();
@@ -750,23 +780,41 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           .getPublicUrl(fileName);
 
         photoUrl = publicUrl;
-        videoUrl = ''; // Clear video if adding photo (empty string, not null)
+        videoUrl = null; // Clear video if adding photo
       }
 
       // Handle video upload if new video selected
       if (mediaType === 'video' && uploadFile) {
         setUploadProgress(20);
         
+        // TEMPORARY: Skip compression to test if that's the issue
         let fileToUpload = uploadFile;
-        if (shouldCompressVideo(uploadFile)) {
-          setUploadProgress(30);
-          fileToUpload = await compressVideo(uploadFile);
-          setUploadProgress(50);
-        }
+        console.log('Skipping compression for testing - uploading original video');
+        setUploadProgress(50);
+        
+        // let fileToUpload = uploadFile;
+        // if (shouldCompressVideo(uploadFile)) {
+        //   setUploadProgress(30);
+        //   fileToUpload = await compressVideo(uploadFile);
+        //   setUploadProgress(50);
+        // }
 
         const timestamp = Date.now();
-        const sanitizedName = sanitizeFileName(fileToUpload.name, menuItemName.trim());
-        const fileName = `${partnerData.id}/${timestamp}-${sanitizedName}`;
+        // Get original file extension
+        const originalExtension = fileToUpload.name.split('.').pop()?.toLowerCase() || 'mp4';
+        // Sanitize just the name part, then add correct extension
+        const baseName = menuItemName.trim()
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9\s-]/g, '')
+          .replace(/[\s_]+/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .substring(0, 50);
+        const fileName = `${partnerData.id}/${baseName}-${timestamp}.${originalExtension}`;
+        
+        console.log('Upload filename:', fileName, 'Original file:', fileToUpload.name);
 
         const { error: uploadError } = await supabase.storage
           .from('menu-videos')
@@ -781,25 +829,83 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           .from('menu-videos')
           .getPublicUrl(fileName);
 
+        console.log('Got publicUrl from storage:', publicUrl);
         videoUrl = publicUrl;
-        photoUrl = ''; // Clear photo if adding video (empty string, not null)
+        photoUrl = null; // Clear photo if adding video
+        console.log('Set videoUrl to:', videoUrl, 'photoUrl to:', photoUrl);
       }
 
       setUploadProgress(80);
 
-      const { error } = await supabase
-        .from('menu_items')
-        .update({
-          name: menuItemName.trim(),
-          category: finalCategory,
-          description: menuItemDescription.trim() || null,
-          price: menuItemPrice ? parseFloat(menuItemPrice) : null,
-          photo_url: photoUrl,
-          video_url: videoUrl,
-        })
-        .eq('id', editingMenuItem.id);
+      console.log('Before creating updateData - videoUrl:', videoUrl, 'photoUrl:', photoUrl);
 
-      if (error) throw error;
+      const updateData = {
+        name: menuItemName.trim(),
+        category: finalCategory,
+        description: menuItemDescription.trim() || null,
+        price: menuItemPrice ? parseFloat(menuItemPrice) : null,
+        photo_url: photoUrl,
+        video_url: videoUrl,
+      };
+
+      const currentUser = (await supabase.auth.getUser()).data.user;
+      console.log('Updating menu item ID:', editingMenuItem.id);
+      console.log('Item partner_id:', editingMenuItem.partner_id);
+      console.log('Current auth user ID:', currentUser?.id);
+      console.log('IDs match?', editingMenuItem.partner_id === currentUser?.id);
+      
+      // Check if user owns this item
+      if (editingMenuItem.partner_id !== currentUser?.id) {
+        alert(`ERROR: You cannot edit this item!\n\nThis item belongs to partner: ${editingMenuItem.partner_id}\nYou are logged in as: ${currentUser?.id}\n\nPlease logout and login with the correct account.`);
+        setIsUploading(false);
+        return;
+      }
+      
+      console.log('Update data:', JSON.stringify(updateData, null, 2));
+      console.log('video_url in updateData:', updateData.video_url);
+
+      const { data: updateResult, error } = await supabase
+        .from('menu_items')
+        .update(updateData)
+        .eq('id', editingMenuItem.id)
+        .select();
+      
+      console.log('Update result:', updateResult);
+
+      if (error) {
+        console.error('❌ DATABASE UPDATE FAILED:', error);
+        console.error('Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        alert(`Database update error: ${error.message}\nDetails: ${error.details || 'No details'}\nHint: ${error.hint || 'No hint'}`);
+        throw error;
+      }
+      
+      console.log('✅ Menu item updated successfully');
+      
+      // Verify the update was actually saved
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('menu_items')
+        .select('*')
+        .eq('id', editingMenuItem.id)
+        .single();
+      
+      if (verifyError) {
+        console.error('❌ Failed to verify update:', verifyError);
+      } else {
+        console.log('✅ Verified data in database:', verifyData);
+        if (verifyData.video_url !== videoUrl) {
+          console.error('⚠️ WARNING: Database has different video_url!', {
+            expected: videoUrl,
+            actual: verifyData.video_url
+          });
+          alert('WARNING: Video URL in database does not match! Check console.');
+        }
+      }
+      
       setUploadProgress(100);
 
       // Update local state

@@ -62,7 +62,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
     if (navigator.share) {
       navigator.share({
         title: restaurant.name,
-        text: `Check out ${restaurant.name} on LocalBites!`,
+        text: `Check out ${restaurant.name} on MenuLove!`,
         url: shareUrl,
       }).catch(() => {});
     }

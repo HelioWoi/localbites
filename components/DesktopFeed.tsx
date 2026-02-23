@@ -228,7 +228,7 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
           {/* Partner CTA */}
           <div className="mb-10">
             <a
-              href="/partner"
+              href="/become-a-partner"
               className="inline-flex items-center gap-2 text-lg text-white/90 font-medium hover:text-white transition-colors group"
             >
               <Crown size={20} className="text-orange-400 group-hover:text-orange-300 transition-colors" />
@@ -346,10 +346,18 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
 
           {/* Quick Stats */}
           <div className="flex items-center gap-8 mt-8 text-white/70 text-sm">
-            <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const resultsSection = document.querySelector('.max-w-7xl.mx-auto.px-8.py-10');
+                if (resultsSection) {
+                  resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }}
+              className="flex items-center gap-2 hover:text-white transition-colors cursor-pointer"
+            >
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
               <span>{restaurants.length} restaurants nearby</span>
-            </div>
+            </button>
             <div className="flex items-center gap-2">
               <Video size={14} />
               <span>{subscribedRestaurants.length} with video menus</span>
@@ -445,7 +453,7 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
                     if (navigator.share) {
                       navigator.share({
                         title: res.name,
-                        text: `Check out ${res.name} on LocalBites!`,
+                        text: `Check out ${res.name} on MenuLove!`,
                         url: shareUrl,
                       }).catch(() => {});
                     }
@@ -507,7 +515,7 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
                     if (navigator.share) {
                       navigator.share({
                         title: res.name,
-                        text: `Check out ${res.name} on LocalBites!`,
+                        text: `Check out ${res.name} on MenuLove!`,
                         url: shareUrl,
                       }).catch(() => {});
                     }
@@ -698,7 +706,7 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
                     <h3 className="font-bold text-zinc-900 mb-1 text-sm">Own this restaurant?</h3>
                     <p className="text-zinc-600 text-xs mb-3">Add videos and attract more customers.</p>
                     <a
-                      href="/partner"
+                      href="/become-a-partner"
                       className="inline-flex items-center gap-1.5 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl transition-colors text-xs"
                     >
                       BECOME A PARTNER
@@ -728,8 +736,66 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
         </div>
       )}
 
+      {/* ===== PARTNER CTA SECTION ===== */}
+      <section className="mt-16 bg-gradient-to-br from-orange-500 via-amber-500 to-orange-600 relative overflow-hidden">
+        <div className="absolute inset-0 bg-black/10" />
+        <div className="relative max-w-7xl mx-auto px-8 py-20 text-center">
+          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6 leading-tight">
+            Turn Your Menu Into
+            <br />
+            <span className="text-yellow-300">Viral Content</span>
+          </h2>
+          <p className="text-lg sm:text-xl text-white/90 mb-8 max-w-2xl mx-auto font-medium leading-relaxed">
+            Join MenuLove and showcase your dishes with TikTok-style videos. 
+            Get discovered by customers within 5km through smart location search.
+          </p>
+          <p className="text-white/90 text-base font-semibold mb-10">
+            ✨ Beta Launch Special: $29.90/month • 14-day free trial • No credit card required
+          </p>
+          
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
+            <a
+              href="/become-a-partner"
+              className="group px-8 py-4 bg-white text-orange-600 font-black text-lg rounded-2xl hover:bg-yellow-300 hover:text-orange-700 transition-all transform hover:scale-105 shadow-2xl flex items-center gap-2"
+            >
+              Start Free Trial
+              <ChevronRight className="group-hover:translate-x-1 transition-transform" size={24} />
+            </a>
+            <a
+              href="/become-a-partner"
+              className="px-8 py-4 bg-white/10 backdrop-blur-sm text-white font-bold text-lg rounded-2xl hover:bg-white/20 transition-all border-2 border-white/30"
+            >
+              See How It Works
+            </a>
+          </div>
+
+          {/* Stats */}
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-white rounded-3xl shadow-2xl p-8 grid grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="text-center">
+                <div className="text-3xl sm:text-4xl font-black text-orange-600 mb-2">50+</div>
+                <div className="text-zinc-600 font-medium text-sm">Partner Restaurants</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl sm:text-4xl font-black text-orange-600 mb-2">10K+</div>
+                <div className="text-zinc-600 font-medium text-sm">Monthly Views</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl sm:text-4xl font-black text-orange-600 mb-2">Beta</div>
+                <div className="text-zinc-600 font-medium text-sm">Early Access</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl sm:text-4xl font-black text-orange-600 mb-2">65%</div>
+                <div className="text-zinc-600 font-medium text-sm">Decision Rate</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ===== FOOTER ===== */}
-      <footer className="bg-zinc-900 text-white mt-16">
+      <footer className="bg-zinc-900 text-white">
         <div className="max-w-7xl mx-auto px-8 py-16">
           <div className="grid grid-cols-4 gap-12">
             <div>
@@ -748,7 +814,7 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
             <div>
               <h4 className="font-bold text-sm uppercase tracking-wider text-zinc-400 mb-4">Platform</h4>
               <ul className="space-y-3 text-sm text-zinc-300">
-                <li><a href="/partner" className="hover:text-white transition-colors">For Restaurants</a></li>
+                <li><a href="/become-a-partner" className="hover:text-white transition-colors">For Restaurants</a></li>
                 <li><a href="/partner" className="hover:text-white transition-colors">Partner Portal</a></li>
                 <li><a href="/contact" className="hover:text-white transition-colors">Contact Us</a></li>
               </ul>
@@ -775,14 +841,21 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
           <div className="border-t border-zinc-800 mt-12 pt-8">
             <div className="max-w-3xl mx-auto text-center space-y-4">
               <p className="text-zinc-400 text-sm leading-relaxed">
-                <strong className="text-zinc-300">MenuLove is currently in Beta.</strong><br />
-                We connect you with local businesses and help you discover what's around you. All products, services, pricing, and customer experiences are managed directly by each listed venue. For more information, please visit our <a href="/policy" className="text-orange-400 hover:text-orange-300 transition-colors whitespace-nowrap">Policy page</a>.
+                <span className="text-orange-500 font-bold">Beta Version:</span> MenuLove is currently in beta testing. 
+                We're working hard to deliver the best experience for Australian restaurants. 
+                Your feedback helps us improve and build the perfect platform for showcasing your culinary creations. 
+                Join us in revolutionizing how restaurants connect with customers through video menus.
               </p>
               <p className="text-zinc-500 text-sm">
                 If you have any questions, feel free to <a href="/contact" className="text-orange-400 hover:text-orange-300 transition-colors">contact us here</a>.
               </p>
-              <p className="text-zinc-600 text-xs pt-4">
+            </div>
+            <div className="text-center pt-6 border-t border-zinc-800 mt-6">
+              <p className="text-zinc-400 text-sm mb-2">
                 © 2026 MenuLove Australia. All rights reserved.
+              </p>
+              <p className="text-zinc-500 text-sm">
+                Made with ❤️ in Australia | <a href="mailto:contact@menulove.com.au" className="text-orange-500 hover:text-orange-400 transition-colors">contact@menulove.com.au</a>
               </p>
             </div>
           </div>
@@ -828,7 +901,7 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
                         if (navigator.share) {
                           navigator.share({
                             title: 'My Saved Restaurants',
-                            text: `Check out my ${savedIds.size} saved restaurants on LocalBites!`,
+                            text: `Check out my ${savedIds.size} saved restaurants on MenuLove!`,
                             url: shareUrl,
                           }).catch(() => {});
                         } else {
@@ -901,7 +974,7 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
                         if (navigator.share) {
                           navigator.share({
                             title: res.name,
-                            text: `Check out ${res.name} on LocalBites!`,
+                            text: `Check out ${res.name} on MenuLove!`,
                             url: shareUrl,
                           }).catch(() => {});
                         }
