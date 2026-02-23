@@ -140,37 +140,6 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
     };
     loadGoogleReviews();
   }, [restaurant.id]);
-
-  // Sync savedDishIds when localStorage changes (from other pages like RestaurantMenuPage)
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const updated = getSavedDishes(restaurant.id);
-      console.log('[RestaurantProfile] Syncing saved dishes:', updated.size, 'items for restaurant:', restaurant.id);
-      setSavedDishIds(updated);
-    };
-
-    // Listen for storage events from other tabs/windows
-    window.addEventListener('storage', handleStorageChange);
-
-    // Also check periodically for same-tab updates (storage event doesn't fire in same tab)
-    const interval = setInterval(handleStorageChange, 1000);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
-  }, [restaurant.id]);
-
-  // Debug log for Your Picks visibility
-  useEffect(() => {
-    console.log('[RestaurantProfile] Your Picks debug:', {
-      savedDishIdsSize: savedDishIds.size,
-      isStandalone,
-      shouldShow: savedDishIds.size > 0 && isStandalone,
-      restaurantId: restaurant.id,
-      slug: (restaurant as any).slug
-    });
-  }, [savedDishIds, isStandalone, restaurant.id]);
   
   // Toggle save dish
   const toggleSaveDish = (dishId: string) => {

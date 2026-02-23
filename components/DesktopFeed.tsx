@@ -425,7 +425,7 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-2xl font-extrabold text-zinc-900 tracking-tight">
-                  <Crown size={24} className="inline-block mr-2 text-orange-500" />
+                  <Video size={24} className="inline-block mr-2 text-orange-500" />
                   Video Menus
                 </h2>
                 <p className="text-sm text-zinc-500 mt-1">See the food in action with video menus</p>

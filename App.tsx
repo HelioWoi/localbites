@@ -61,11 +61,6 @@ const App: React.FC = () => {
                                  !pathname.startsWith('/r/') && 
                                  !pathname.startsWith('/partner') && 
                                  !pathname.startsWith('/admin') &&
-                                 pathname !== '/become-a-partner' &&
-                                 pathname !== '/policy' &&
-                                 pathname !== '/terms' &&
-                                 pathname !== '/content-moderation' &&
-                                 pathname !== '/contact' &&
                                  pathParts.length === 1; // Only /:slug
   const isAppFeedMenuRoute = pathname !== '/' &&
                              !pathname.startsWith('/r/') &&
@@ -1208,7 +1203,7 @@ const App: React.FC = () => {
             onOpenAI={() => setShowBitesAI(true)}
             onOpenSearch={() => setShowSearch(true)}
             onOpenFilter={() => setShowFilterModal('cuisine')}
-            isStandalone={true}
+            isStandalone={false}
             onRequestRemoval={(name, id) => setShowRemovalRequest({ name, id })}
           />
         )}

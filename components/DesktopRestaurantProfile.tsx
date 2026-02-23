@@ -32,10 +32,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
   const [showFullMenu, setShowFullMenu] = useState(false);
   const [selectedDishId, setSelectedDishId] = useState<string | null>(null);
   const [likedVideos, setLikedVideos] = useState<Set<string>>(new Set());
-  const [savedVideos, setSavedVideos] = useState<Set<string>>(() => {
-    const stored = localStorage.getItem(`saved_dishes_${restaurant.id}`);
-    return stored ? new Set(JSON.parse(stored)) : new Set();
-  });
+  const [savedVideos, setSavedVideos] = useState<Set<string>>(new Set());
 
   const hasVideos = restaurant.dishes && restaurant.dishes.length > 0;
 
@@ -50,9 +47,9 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
     ? videoDishes 
     : videoDishes.filter(d => d.category === selectedCategory);
 
-  // Apply saved filter if active - show ALL saved items (videos AND photos)
+  // Apply saved filter if active
   const filteredDishes = showSavedOnly 
-    ? (restaurant.dishes || []).filter(d => savedVideos.has(d.id))
+    ? categoryFiltered?.filter(d => savedVideos.has(d.id)) || []
     : categoryFiltered;
 
   // Get saved videos count
@@ -360,7 +357,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
                   key={dish.id}
                   className="relative aspect-[9/16] rounded-2xl overflow-hidden group"
                 >
-                  {/* Video or Photo */}
+                  {/* Video */}
                   <div 
                     onClick={() => {
                       setSelectedDishId(dish.id);
@@ -386,12 +383,6 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
                           e.currentTarget.pause();
                           e.currentTarget.currentTime = 0.1;
                         }}
-                      />
-                    ) : dish.photoUrl ? (
-                      <img
-                        src={dish.photoUrl}
-                        alt={dish.name}
-                        className="w-full h-full object-cover"
                       />
                     ) : (
                       <div className="w-full h-full bg-zinc-200 flex items-center justify-center">
@@ -450,7 +441,6 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
                           } else {
                             next.add(dish.id);
                           }
-                          localStorage.setItem(`saved_dishes_${restaurant.id}`, JSON.stringify([...next]));
                           return next;
                         });
                       }}

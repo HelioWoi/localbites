@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Search, ChevronDown, ChevronUp, Video, Image as ImageIcon, Bookmark, Share2, Utensils, Coffee, Wine, IceCream, Pizza, Fish } from 'lucide-react';
 import { Restaurant, Dish } from '../types';
 
@@ -21,15 +21,6 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const [lightboxPhoto, setLightboxPhoto] = useState<{ url: string; name: string } | null>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const savedScrollPosition = useRef<number>(0);
-  
-  // Track saved items from localStorage
-  const [savedItems, setSavedItems] = useState<Set<string>>(() => {
-    const stored = localStorage.getItem(`saved_dishes_${restaurant.id}`);
-    return stored ? new Set(JSON.parse(stored)) : new Set();
-  });
 
   // Group dishes by category
   const dishesByCategory = (restaurant.dishes || []).reduce((acc, dish) => {
@@ -105,33 +96,6 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
     setExpandedCategories(next);
   };
 
-  // Restore scroll position when lightbox closes
-  useEffect(() => {
-    if (!lightboxPhoto && savedScrollPosition.current > 0) {
-      // Use requestAnimationFrame for reliable scroll restoration
-      requestAnimationFrame(() => {
-        if (scrollContainerRef.current) {
-          scrollContainerRef.current.scrollTop = savedScrollPosition.current;
-          console.log('[FullMenuModal] Restored scroll to:', savedScrollPosition.current);
-        }
-      });
-    }
-  }, [lightboxPhoto]);
-
-  // Toggle save for individual items
-  const toggleSaveItem = (itemId: string) => {
-    setSavedItems(prev => {
-      const next = new Set(prev);
-      if (next.has(itemId)) {
-        next.delete(itemId);
-      } else {
-        next.add(itemId);
-      }
-      localStorage.setItem(`saved_dishes_${restaurant.id}`, JSON.stringify([...next]));
-      return next;
-    });
-  };
-
   // Determine if item is video or photo based on videoUrl
   const isVideo = (dish: Dish) => {
     return !!(dish.videoUrl && dish.videoUrl.length > 0);
@@ -199,7 +163,7 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
         </div>
 
         {/* Menu Items - Scrollable */}
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto px-6 py-4">
           {Object.keys(filteredCategories).length === 0 ? (
             <div className="text-center py-12">
               <p className="text-zinc-400">No items found</p>
@@ -238,30 +202,16 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
                   {expandedCategories.has(category) && (
                     <div className="divide-y divide-zinc-100">
                       {dishes.map((dish) => (
-                        <div
+                        <button
                           key={dish.id}
                           id={`dish-${dish.id}`}
+                          onClick={() => onSelectItem(dish.id)}
                           className={`w-full px-5 py-4 hover:bg-zinc-50 transition-colors flex items-center gap-4 text-left ${
                             selectedDishId === dish.id ? 'bg-orange-50 border-l-4 border-orange-500' : ''
                           }`}
                         >
                           {/* Thumbnail */}
-                          <div 
-                            className="relative w-20 h-20 rounded-xl overflow-hidden bg-zinc-100 flex-shrink-0 cursor-pointer"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (isVideo(dish) && dish.videoUrl) {
-                                onSelectItem(dish.id);
-                              } else if (dish.photoUrl) {
-                                // Save scroll position BEFORE opening lightbox
-                                if (scrollContainerRef.current) {
-                                  savedScrollPosition.current = scrollContainerRef.current.scrollTop;
-                                  console.log('[FullMenuModal] Saved scroll position:', savedScrollPosition.current);
-                                }
-                                setLightboxPhoto({ url: dish.photoUrl, name: dish.name });
-                              }
-                            }}
-                          >
+                          <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-zinc-100 flex-shrink-0">
                             {isVideo(dish) && dish.videoUrl ? (
                               <>
                                 <video
@@ -320,32 +270,13 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
                             )}
                           </div>
 
-                          {/* Price & Save Button */}
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            {dish.price && (
-                              <div className="text-lg font-bold text-orange-500">
-                                ${dish.price}
-                              </div>
-                            )}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleSaveItem(dish.id);
-                              }}
-                              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                                savedItems.has(dish.id) 
-                                  ? 'bg-orange-500 hover:bg-orange-600' 
-                                  : 'bg-zinc-100 hover:bg-zinc-200'
-                              }`}
-                              title={savedItems.has(dish.id) ? 'Saved' : 'Save'}
-                            >
-                              <Bookmark 
-                                size={14} 
-                                className={savedItems.has(dish.id) ? 'text-white fill-white' : 'text-zinc-600'} 
-                              />
-                            </button>
-                          </div>
-                        </div>
+                          {/* Price */}
+                          {dish.price && (
+                            <div className="text-lg font-bold text-orange-500 flex-shrink-0">
+                              ${dish.price}
+                            </div>
+                          )}
+                        </button>
                       ))}
                     </div>
                   )}
@@ -355,32 +286,6 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
           )}
         </div>
       </div>
-
-      {/* Photo Lightbox */}
-      {lightboxPhoto && (
-        <div 
-          className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-sm flex items-center justify-center p-8"
-          onClick={() => setLightboxPhoto(null)}
-        >
-          <div className="relative max-w-5xl max-h-[90vh] w-full h-full flex items-center justify-center">
-            <img
-              src={lightboxPhoto.url}
-              alt={lightboxPhoto.name}
-              className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            />
-            <button
-              onClick={() => setLightboxPhoto(null)}
-              className="absolute top-4 right-4 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm flex items-center justify-center transition-colors"
-            >
-              <X size={24} className="text-white" />
-            </button>
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm px-6 py-3 rounded-full">
-              <p className="text-white font-semibold">{lightboxPhoto.name}</p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
