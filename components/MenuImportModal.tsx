@@ -62,11 +62,16 @@ const MenuImportModal: React.FC<MenuImportModalProps> = ({ isOpen, onClose, part
   };
 
   const parseCSV = (text: string): ParsedMenuItem[] => {
-    const lines = text.split('\n').filter(line => line.trim());
-    if (lines.length === 0) return [];
+    // Use xlsx library to properly parse CSV with quoted fields
+    // This respects commas inside quoted fields like "Pineapple, pear, green apple"
+    const workbook = XLSX.read(text, { type: 'string', raw: true });
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' }) as string[][];
+    
+    if (data.length === 0) return [];
 
-    // Get headers (first line)
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    // Get headers (first row)
+    const headers = data[0].map(h => String(h).trim().toLowerCase());
     
     // Find column indices
     const nameIndex = headers.findIndex(h => h.includes('name') || h.includes('item') || h.includes('dish'));
@@ -76,13 +81,14 @@ const MenuImportModal: React.FC<MenuImportModalProps> = ({ isOpen, onClose, part
 
     // Parse data rows
     const items: ParsedMenuItem[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim());
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row || row.length === 0) continue; // Skip empty rows
       
-      const name = nameIndex >= 0 ? values[nameIndex] : '';
-      const category = categoryIndex >= 0 ? values[categoryIndex] : 'Uncategorized';
-      const description = descriptionIndex >= 0 ? values[descriptionIndex] : '';
-      const priceStr = priceIndex >= 0 ? values[priceIndex] : '';
+      const name = nameIndex >= 0 ? String(row[nameIndex] || '').trim() : '';
+      const category = categoryIndex >= 0 ? String(row[categoryIndex] || '').trim() : 'Uncategorized';
+      const description = descriptionIndex >= 0 ? String(row[descriptionIndex] || '').trim() : '';
+      const priceStr = priceIndex >= 0 ? String(row[priceIndex] || '').trim() : '';
       const price = priceStr ? parseFloat(priceStr.replace(/[^0-9.]/g, '')) : undefined;
 
       const errors: string[] = [];

@@ -3,7 +3,7 @@ import {
   LogOut, Plus, Play, Trash2, Eye, Heart, MapPin,
   Loader2, X, Upload, Check, Settings, BarChart3,
   Video, Crown, AlertCircle, ChevronRight, Calendar,
-  TrendingUp, Clock, Edit2, Save, QrCode, Copy, ExternalLink, Menu, Camera, Image, Star, CreditCard
+  TrendingUp, Clock, Edit2, Save, QrCode, Copy, ExternalLink, Menu, Camera, Image, Star, CreditCard, Search, CheckCircle
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { PartnerUser } from './PartnerPortal';
@@ -79,6 +79,10 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const [partnerData, setPartnerData] = useState<PartnerData | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const [menuSearchQuery, setMenuSearchQuery] = useState('');
+  
+  // Toast notification state
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
   // Menu upload state
   const [showMenuUploadModal, setShowMenuUploadModal] = useState(false);
@@ -519,7 +523,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             description: menuItemDescription.trim() || null,
             price: menuItemPrice ? parseFloat(menuItemPrice) : null,
             photo_url: null,
-            video_url: null,
+            video_url: '',
             sort_order: menuItems.filter(i => i.category === finalCategory).length,
           })
           .select()
@@ -780,7 +784,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           .getPublicUrl(fileName);
 
         photoUrl = publicUrl;
-        videoUrl = null; // Clear video if adding photo
+        videoUrl = ''; // Clear video if adding photo
       }
 
       // Handle video upload if new video selected
@@ -831,7 +835,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
         console.log('Got publicUrl from storage:', publicUrl);
         videoUrl = publicUrl;
-        photoUrl = null; // Clear photo if adding video
+        photoUrl = null; // Clear photo if adding video (photo_url can be null)
         console.log('Set videoUrl to:', videoUrl, 'photoUrl to:', photoUrl);
       }
 
@@ -930,7 +934,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
       setTimeout(() => {
         resetMenuUploadModal();
-        alert('Menu item updated successfully!');
+        setToast({ message: 'Menu item updated successfully!', type: 'success' });
+        setTimeout(() => setToast(null), 3000);
       }, 500);
     } catch (error) {
       console.error('Update error:', error);
@@ -1587,6 +1592,26 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                 <p className="text-sm text-zinc-500">{menuItems.filter(i => !i.deleted_at).length} items • {categories.length} categories</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
+                {/* Search Input */}
+                <div className="relative flex-1 min-w-[200px] max-w-xs">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                  <input
+                    type="text"
+                    value={menuSearchQuery}
+                    onChange={(e) => setMenuSearchQuery(e.target.value)}
+                    placeholder="Search menu items..."
+                    className="w-full pl-9 pr-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                  />
+                  {menuSearchQuery && (
+                    <button
+                      onClick={() => setMenuSearchQuery('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-100 rounded transition-colors"
+                    >
+                      <X size={14} className="text-zinc-400" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
                 {menuItems.filter(i => !i.deleted_at).length > 0 && (
                   <button
                     onClick={async () => {
@@ -1616,21 +1641,34 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                   <Plus size={16} />
                   <span>Add Item</span>
                 </button>
+                </div>
               </div>
             </div>
 
             {/* Featured Items Section */}
-            {menuItems.filter(i => i.is_featured && !i.deleted_at).length > 0 && (
+            {menuItems.filter(i => {
+              if (!i.is_featured || i.deleted_at) return false;
+              if (menuSearchQuery && !i.name.toLowerCase().includes(menuSearchQuery.toLowerCase())) return false;
+              return true;
+            }).length > 0 && (
               <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
                 <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-200 flex items-center gap-2">
                   <Star size={18} className="text-orange-500 fill-orange-500" />
                   <div>
                     <h3 className="font-semibold text-zinc-900">Featured Items</h3>
-                    <p className="text-xs text-zinc-500">{menuItems.filter(i => i.is_featured && !i.deleted_at).length} items marked as featured</p>
+                    <p className="text-xs text-zinc-500">{menuItems.filter(i => {
+                      if (!i.is_featured || i.deleted_at) return false;
+                      if (menuSearchQuery && !i.name.toLowerCase().includes(menuSearchQuery.toLowerCase())) return false;
+                      return true;
+                    }).length} items marked as featured</p>
                   </div>
                 </div>
                 <div className="p-4 grid grid-cols-3 sm:grid-cols-4 gap-3">
-                  {menuItems.filter(i => i.is_featured && !i.deleted_at).map(item => {
+                  {menuItems.filter(i => {
+                    if (!i.is_featured || i.deleted_at) return false;
+                    if (menuSearchQuery && !i.name.toLowerCase().includes(menuSearchQuery.toLowerCase())) return false;
+                    return true;
+                  }).map(item => {
                     const hasVideo = item.video_url && item.video_url !== '';
                     const hasPhoto = !!item.photo_url;
                     return (
@@ -1691,7 +1729,16 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             {categories.length > 0 ? (
               <div className="space-y-6">
                 {categories.map(category => {
-                  const categoryItems = menuItems.filter(i => i.category === category && !i.deleted_at);
+                  const categoryItems = menuItems.filter(i => {
+                    if (i.deleted_at) return false;
+                    if (i.category !== category) return false;
+                    if (menuSearchQuery && !i.name.toLowerCase().includes(menuSearchQuery.toLowerCase())) return false;
+                    return true;
+                  });
+                  
+                  // Skip empty categories when search is active
+                  if (categoryItems.length === 0) return null;
+                  
                   return (
                   <div key={category} className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
                     <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
@@ -1711,7 +1758,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                       </button>
                     </div>
                     <div className="p-4 grid grid-cols-3 sm:grid-cols-4 gap-3">
-                      {menuItems.filter(i => i.category === category && !i.deleted_at).map(item => {
+                      {categoryItems.map(item => {
                         const hasVideo = item.video_url && item.video_url !== '';
                         const hasPhoto = !!item.photo_url;
                         return (
@@ -2219,6 +2266,33 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                         <X size={16} />
                       </button>
                     </div>
+                  ) : editingMenuItem?.video_url ? (
+                    <div className="space-y-3">
+                      <div className="relative aspect-[9/16] max-h-64 bg-zinc-900 rounded-xl overflow-hidden mx-auto">
+                        <video src={`${editingMenuItem.video_url}#t=0.5`} className="w-full h-full object-contain" controls />
+                        <div className="absolute top-2 right-2 flex gap-2">
+                          <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="p-2 bg-orange-500 rounded-full text-white hover:bg-orange-600 shadow-lg"
+                            title="Change video"
+                          >
+                            <Upload size={16} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (confirm('Remove this video? The item will have no video.')) {
+                                setEditingMenuItem({ ...editingMenuItem, video_url: '' });
+                              }
+                            }}
+                            className="p-2 bg-red-500 rounded-full text-white hover:bg-red-600 shadow-lg"
+                            title="Remove video"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-center text-zinc-500">Current video • Click icons to change or remove</p>
+                    </div>
                   ) : (
                     <button
                       onClick={() => fileInputRef.current?.click()}
@@ -2251,6 +2325,33 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                       >
                         <X size={16} />
                       </button>
+                    </div>
+                  ) : editingMenuItem?.photo_url ? (
+                    <div className="space-y-3">
+                      <div className="relative w-64 aspect-square bg-zinc-100 rounded-xl overflow-hidden mx-auto">
+                        <img src={editingMenuItem.photo_url} className="w-full h-full object-cover" alt="Current photo" />
+                        <div className="absolute top-2 right-2 flex gap-2">
+                          <button
+                            onClick={() => menuPhotoInputRef.current?.click()}
+                            className="p-2 bg-orange-500 rounded-full text-white hover:bg-orange-600 shadow-lg"
+                            title="Change photo"
+                          >
+                            <Upload size={16} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (confirm('Remove this photo? The item will have no photo.')) {
+                                setEditingMenuItem({ ...editingMenuItem, photo_url: null });
+                              }
+                            }}
+                            className="p-2 bg-red-500 rounded-full text-white hover:bg-red-600 shadow-lg"
+                            title="Remove photo"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-center text-zinc-500">Current photo • Click icons to change or remove</p>
                     </div>
                   ) : (
                     <button
@@ -2550,6 +2651,38 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             setShowMenuImportModal(false);
           }}
         />
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-6 right-6 z-[10000] animate-in slide-in-from-top-2 duration-300">
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg backdrop-blur-sm ${
+            toast.type === 'success' 
+              ? 'bg-white border border-green-200' 
+              : 'bg-white border border-red-200'
+          }`}>
+            <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+              toast.type === 'success' ? 'bg-green-100' : 'bg-red-100'
+            }`}>
+              {toast.type === 'success' ? (
+                <CheckCircle size={18} className="text-green-600" />
+              ) : (
+                <AlertCircle size={18} className="text-red-600" />
+              )}
+            </div>
+            <p className={`text-sm font-medium ${
+              toast.type === 'success' ? 'text-green-900' : 'text-red-900'
+            }`}>
+              {toast.message}
+            </p>
+            <button
+              onClick={() => setToast(null)}
+              className="flex-shrink-0 ml-2 p-1 hover:bg-zinc-100 rounded-lg transition-colors"
+            >
+              <X size={14} className="text-zinc-400" />
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Delete Confirmation Modal */}
