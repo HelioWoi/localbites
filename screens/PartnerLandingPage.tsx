@@ -84,14 +84,17 @@ const PartnerLandingPage: React.FC = () => {
         <div className="absolute inset-0 bg-black/10" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 pb-32">
           {/* Logo */}
-          <div className="absolute top-6 left-4 sm:left-6 lg:left-8 flex items-center gap-2">
+          <a 
+            href="https://menulove.com.au" 
+            className="absolute top-6 left-4 sm:left-6 lg:left-8 flex items-center gap-2 hover:opacity-80 transition-opacity"
+          >
             <img 
               src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png" 
               alt="MenuLove" 
               className="w-7 h-7 sm:w-8 sm:h-8"
             />
             <span className="text-white font-black text-xl sm:text-2xl">MenuLove</span>
-          </div>
+          </a>
           
           <div className="text-center">
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6 leading-tight">
@@ -103,9 +106,14 @@ const PartnerLandingPage: React.FC = () => {
               Join MenuLove and showcase your dishes with TikTok-style videos. 
               Get discovered by customers within 5km through smart location search.
             </p>
-            <p className="text-white/90 text-base font-semibold mb-8">
-              ✨ Beta Launch Special: $29.90/month • 14-day free trial • No credit card required
-            </p>
+            <div className="mb-8">
+              <p className="text-yellow-300 text-xl font-black mb-2 animate-pulse">
+                🔥 Only 10 FREE Beta Spots Left
+              </p>
+              <p className="text-white/80 text-sm">
+                30-day trial • No credit card required • Sunshine Coast only
+              </p>
+            </div>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <button
                 onClick={scrollToForm}
@@ -115,10 +123,10 @@ const PartnerLandingPage: React.FC = () => {
                 <ArrowRight className="group-hover:translate-x-1 transition-transform" size={24} />
               </button>
               <a
-                href="#features"
+                href="https://menulove.com.au"
                 className="px-8 py-4 bg-white/10 backdrop-blur-sm text-white font-bold text-lg rounded-2xl hover:bg-white/20 transition-all border-2 border-white/30"
               >
-                See How It Works
+                See Live Example
               </a>
             </div>
           </div>
@@ -194,7 +202,7 @@ const PartnerLandingPage: React.FC = () => {
             <div className="bg-white rounded-3xl shadow-2xl p-8 border border-zinc-100">
               <div className="text-center mb-6">
                 <h3 className="text-2xl font-black text-zinc-900 mb-2">Create your account</h3>
-                <p className="text-zinc-600">Start your 14-day free trial</p>
+                <p className="text-zinc-600">Start your 30-day free trial</p>
               </div>
               <form className="space-y-4" onSubmit={(e) => { 
                 e.preventDefault(); 
@@ -323,13 +331,13 @@ const PartnerLandingPage: React.FC = () => {
                 BETA SPECIAL
               </div>
               <div className="text-white/90 text-sm font-bold uppercase tracking-wider mb-3 mt-6">
-                Beta Launch Pricing
+                Limited Beta Access
               </div>
-              <div className="flex items-baseline justify-center gap-2 mb-2">
-                <span className="text-6xl font-black text-white">$29.90</span>
-                <span className="text-2xl text-white/80 font-bold">/month</span>
+              <div className="mb-2">
+                <p className="text-6xl font-black text-white mb-2">FREE</p>
+                <p className="text-yellow-300 text-2xl font-black animate-pulse">Only 10 Spots Left</p>
               </div>
-              <p className="text-white/80 text-sm mb-6">Limited time beta pricing</p>
+              <p className="text-white/80 text-sm mb-6">30-day trial • No credit card required • Sunshine Coast only</p>
               <ul className="text-left space-y-3 mb-8 text-white">
                 <li className="flex items-center gap-3">
                   <Star className="text-yellow-300 flex-shrink-0" size={22} fill="currentColor" />
@@ -349,7 +357,7 @@ const PartnerLandingPage: React.FC = () => {
                 </li>
                 <li className="flex items-center gap-3">
                   <Star className="text-yellow-300 flex-shrink-0" size={20} fill="currentColor" />
-                  <span className="font-semibold">14-day free trial</span>
+                  <span className="font-semibold">30-day free trial</span>
                 </li>
               </ul>
               <button
@@ -374,7 +382,7 @@ const PartnerLandingPage: React.FC = () => {
             Ready to Grow Your Restaurant?
           </h2>
           <p className="text-lg text-white/90 mb-10 max-w-2xl mx-auto leading-relaxed">
-            Join hundreds of restaurants already using MenuLove to attract more customers through video menus and smart location discovery
+            Be among the first restaurants to revolutionize how customers discover your menu through engaging video content and smart location-based discovery
           </p>
           <button
             onClick={scrollToForm}
@@ -383,8 +391,11 @@ const PartnerLandingPage: React.FC = () => {
             Click Here and Start Using
             <ArrowRight size={24} />
           </button>
-          <p className="text-white/90 text-base font-semibold mb-3">
-            ✨ Beta Special: Only $29.90/month
+          <p className="text-yellow-300 text-lg font-black mb-3 animate-pulse">
+            🔥 Only 10 FREE Beta Spots Left
+          </p>
+          <p className="text-white/80 text-sm mb-3">
+            30-day trial • No credit card required • Sunshine Coast only
           </p>
           <p className="mt-6 text-white/80">
             Questions? Email us at <a href="mailto:contact@menulove.com.au" className="underline font-bold hover:text-yellow-300 transition-colors">contact@menulove.com.au</a>

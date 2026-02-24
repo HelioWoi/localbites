@@ -749,9 +749,14 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
             Join MenuLove and showcase your dishes with TikTok-style videos. 
             Get discovered by customers within 5km through smart location search.
           </p>
-          <p className="text-white/90 text-base font-semibold mb-10">
-            ✨ Beta Launch Special: $29.90/month • 14-day free trial • No credit card required
-          </p>
+          <div className="mb-10">
+            <p className="text-yellow-300 text-xl font-black mb-2 animate-pulse">
+              🔥 Only 10 FREE Beta Spots Left
+            </p>
+            <p className="text-white/80 text-sm">
+              30-day trial • No credit card required
+            </p>
+          </div>
           
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
