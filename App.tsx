@@ -1274,9 +1274,11 @@ const App: React.FC = () => {
                             setSearchResults([]);
                             const slug = (restaurant as any).slug;
                             const isMobile = !window.matchMedia('(min-width: 1024px)').matches;
+                            const hasVideos = restaurant.dishes?.some(d => d.videoUrl);
+                            
                             if (slug && restaurant.isSubscribed && isMobile) {
-                              // Mobile: navigate to URL
-                              window.location.href = `/${slug}`;
+                              // Mobile partner: go directly to video feed if has videos, otherwise profile
+                              window.location.href = hasVideos ? `/${slug}/menu` : `/${slug}`;
                             } else {
                               // Desktop or non-partner: use React state modal
                               requestAnimationFrame(() => {
@@ -1708,9 +1710,11 @@ const App: React.FC = () => {
                   onPartialSwipeUp={() => {
                     const slug = (res as any).slug;
                     const isMobile = !window.matchMedia('(min-width: 1024px)').matches;
+                    const hasVideos = res.dishes?.some(d => d.videoUrl);
+                    
                     if (slug && res.isSubscribed && isMobile) {
-                      // Mobile: navigate to URL
-                      window.location.href = `/${slug}`;
+                      // Mobile partner: go directly to video feed if has videos, otherwise profile
+                      window.location.href = hasVideos ? `/${slug}/menu` : `/${slug}`;
                     } else {
                       // Desktop or non-partner: use React state modal
                       setSelectedRestaurant(res);
@@ -1743,9 +1747,11 @@ const App: React.FC = () => {
                     if (lastTapRef.current?.id === res.id && Date.now() - lastTapRef.current.time >= 280) {
                       const slug = (res as any).slug;
                       const isMobile = !window.matchMedia('(min-width: 1024px)').matches;
+                      const hasVideos = res.dishes?.some(d => d.videoUrl);
+                      
                       if (slug && res.isSubscribed && isMobile) {
-                        // Mobile: navigate to URL
-                        window.location.href = `/${slug}`;
+                        // Mobile partner: go directly to video feed if has videos, otherwise profile
+                        window.location.href = hasVideos ? `/${slug}/menu` : `/${slug}`;
                       } else {
                         // Desktop or non-partner: use React state modal
                         setSelectedRestaurant(res);
@@ -1819,14 +1825,14 @@ const App: React.FC = () => {
                       <span className="text-white text-[10px] font-medium">{res.totalReviews || 0}</span>
                     </button>
                     
-                    {/* See More button (Eye icon) */}
+                    {/* See More button (Eye icon) - Always opens profile for detailed info */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         const slug = (res as any).slug;
                         const isMobile = !window.matchMedia('(min-width: 1024px)').matches;
                         if (slug && res.isSubscribed && isMobile) {
-                          // Mobile: navigate to URL
+                          // Mobile: navigate to profile (not video feed - user wants more info)
                           window.location.href = `/${slug}`;
                         } else {
                           // Desktop or non-partner: use React state modal
@@ -1898,9 +1904,11 @@ const App: React.FC = () => {
                         e.stopPropagation();
                         const slug = (res as any).slug;
                         const isMobile = !window.matchMedia('(min-width: 1024px)').matches;
+                        const hasVideos = res.dishes?.some(d => d.videoUrl);
+                        
                         if (slug && res.isSubscribed && isMobile) {
-                          // Mobile: navigate to URL
-                          window.location.href = `/${slug}`;
+                          // Mobile partner: go directly to video feed if has videos, otherwise profile
+                          window.location.href = hasVideos ? `/${slug}/menu` : `/${slug}`;
                         } else {
                           // Desktop or non-partner: use React state modal
                           setSelectedRestaurant(res);
