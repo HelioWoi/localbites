@@ -607,8 +607,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     // === VIDEO UPLOAD ===
     if (!uploadFile) return;
 
-    // Validate file size (5MB max)
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    // Validate file size (6MB technical limit, 5MB user-facing)
+    const maxSize = 6 * 1024 * 1024; // 6MB (margin for safety)
     if (uploadFile.size > maxSize) {
       const sizeMB = (uploadFile.size / (1024 * 1024)).toFixed(1);
       alert(`Video is too large (${sizeMB}MB). Maximum size is 5MB.\n\nTip: Compress your video to 720p quality.\nUse this free tool: https://www.freeconvert.com/video-compressor`);

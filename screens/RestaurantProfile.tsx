@@ -37,6 +37,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   const [isMuted, setIsMuted] = useState(true);
   const videoReelsRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+  const gridVideoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   
   // Reviews Reels state
   const [showReviewsReel, setShowReviewsReel] = useState(openReviews);
@@ -140,6 +141,23 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
     };
     loadGoogleReviews();
   }, [restaurant.id]);
+  
+  // Restart grid videos when closing fullscreen feed
+  useEffect(() => {
+    if (!showVideoReels) {
+      // When fullscreen closes, restart all grid videos
+      const timer = setTimeout(() => {
+        gridVideoRefs.current.forEach(video => {
+          if (video) {
+            video.play().catch(() => {
+              // Ignore autoplay errors (browser policy)
+            });
+          }
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [showVideoReels]);
   
   // Toggle save dish
   const toggleSaveDish = (dishId: string) => {
@@ -497,7 +515,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         {restaurant.isSubscribed && (
           <section>
             <div className="flex items-center gap-2 mb-1">
-              <Video size={20} className="text-orange-500" />
+              <Crown size={20} className="text-orange-500" />
               <h2 className="text-lg font-bold text-zinc-900">Video Menus</h2>
             </div>
             <p className="text-xs text-zinc-500 mb-3">Tap any video to see the dish in detail.</p>
@@ -547,6 +565,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                 >
                   {dish.videoUrl ? (
                     <video 
+                      ref={(el) => (gridVideoRefs.current[index] = el)}
                       src={dish.videoUrl} 
                       className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" 
                       muted 
