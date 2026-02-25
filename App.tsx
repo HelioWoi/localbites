@@ -74,13 +74,19 @@ const App: React.FC = () => {
                                  !pathname.startsWith('/admin') &&
                                  pathParts.length === 2 &&
                                  pathParts[1] === 'full-menu'; // /:slug/full-menu
+  const isAppFeedSavedRoute = pathname !== '/' &&
+                              !pathname.startsWith('/r/') &&
+                              !pathname.startsWith('/partner') &&
+                              !pathname.startsWith('/admin') &&
+                              pathParts.length === 2 &&
+                              pathParts[1] === 'saved'; // /:slug/saved
 
   // Extract slug from URL
   let restaurantSlug = null;
   if (isQRCodeRoute) {
     const pathParts = window.location.pathname.split('/');
     restaurantSlug = pathParts[2]; // /r/slug or /r/slug/menu
-  } else if (isAppFeedProfileRoute || isAppFeedMenuRoute || isAppFeedFullMenuRoute) {
+  } else if (isAppFeedProfileRoute || isAppFeedMenuRoute || isAppFeedFullMenuRoute || isAppFeedSavedRoute) {
     restaurantSlug = pathParts[0]; // First part is the slug
   }
 
@@ -140,6 +146,10 @@ const App: React.FC = () => {
 
   if (isAppFeedMenuRoute && restaurantSlug) {
     return <RestaurantMenuLoader slug={restaurantSlug} />;
+  }
+
+  if (isAppFeedSavedRoute && restaurantSlug) {
+    return <SavedPicksLoader slug={restaurantSlug} />;
   }
 
   if (isAppFeedProfileRoute && restaurantSlug) {

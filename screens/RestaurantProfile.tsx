@@ -52,6 +52,14 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   // Saved dishes state
   const [savedDishIds, setSavedDishIds] = useState<Set<string>>(() => getSavedDishes(restaurant.id));
   
+  // Reload saved dishes when component mounts (e.g., returning from menu page)
+  useEffect(() => {
+    console.log('[RestaurantProfile] Component mounted, reloading saved dishes');
+    const updated = getSavedDishes(restaurant.id);
+    console.log('[RestaurantProfile] Loaded saved dishes:', Array.from(updated));
+    setSavedDishIds(updated);
+  }, [restaurant.id]);
+  
   // Google reviews state (for non-partner restaurants)
   const [googleReviews, setGoogleReviews] = useState<Review[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
@@ -142,17 +150,95 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
     loadGoogleReviews();
   }, [restaurant.id]);
   
+  // Auto-play videos in 3-second cycles
+  useEffect(() => {
+    const playTimers = new Map<HTMLVideoElement, NodeJS.Timeout>();
+
+    const playVideoCycle = (video: HTMLVideoElement) => {
+      // Reset to start
+      video.currentTime = 0;
+      
+      // Play for 3 seconds
+      video.play().catch(() => {});
+      
+      // Pause after 3 seconds and schedule next cycle
+      const timer = setTimeout(() => {
+        video.pause();
+        
+        // Wait a moment and start next cycle
+        const nextCycleTimer = setTimeout(() => {
+          playVideoCycle(video);
+        }, 100); // Small delay before next cycle
+        
+        playTimers.set(video, nextCycleTimer);
+      }, 3000);
+      
+      playTimers.set(video, timer);
+    };
+
+    // Start cycles for all videos
+    gridVideoRefs.current.forEach((video) => {
+      if (video) {
+        playVideoCycle(video);
+      }
+    });
+
+    return () => {
+      // Cleanup all timers
+      playTimers.forEach((timer) => clearTimeout(timer));
+      playTimers.clear();
+      
+      // Pause all videos
+      gridVideoRefs.current.forEach((video) => {
+        if (video) {
+          video.pause();
+        }
+      });
+    };
+  }, [filteredVideos]);
+  
+  // Sync saved dishes when changed in video feed
+  useEffect(() => {
+    const handleStorageChange = () => {
+      // Reload saved dishes from storage
+      const updated = getSavedDishes(restaurant.id);
+      setSavedDishIds(updated);
+    };
+
+    // Listen for storage changes (from video feed)
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen for custom event (same-tab changes)
+    window.addEventListener('savedDishesChanged', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('savedDishesChanged', handleStorageChange);
+    };
+  }, [restaurant.id]);
   
   // Toggle save dish
   const toggleSaveDish = (dishId: string) => {
+    console.log('[RestaurantProfile] Toggle save dish:', dishId);
+    console.log('[RestaurantProfile] Restaurant ID:', restaurant.id);
+    console.log('[RestaurantProfile] Current saved:', Array.from(savedDishIds));
+    
     const newSaved = new Set(savedDishIds);
     if (newSaved.has(dishId)) {
       newSaved.delete(dishId);
+      console.log('[RestaurantProfile] Removed from saved');
     } else {
       newSaved.add(dishId);
+      console.log('[RestaurantProfile] Added to saved');
     }
+    
+    console.log('[RestaurantProfile] New saved:', Array.from(newSaved));
     setSavedDishIds(newSaved);
     saveDishesToStorage(restaurant.id, newSaved);
+    
+    // Dispatch event for same-tab sync
+    window.dispatchEvent(new Event('savedDishesChanged'));
+    console.log('[RestaurantProfile] Event dispatched');
   };
 
   // Combine restaurant reviews with Google reviews
@@ -273,13 +359,15 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                 />
                 
                 {/* Right side action buttons */}
-                <div className="absolute right-4 bottom-40 flex flex-col items-center gap-4 z-20">
+                <div className="absolute right-4 bottom-[200px] flex flex-col items-center gap-4 z-30 pointer-events-auto">
                   <button 
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
+                      console.log('[RestaurantProfile] Bookmark clicked!');
                       toggleSaveDish(dish.id);
                     }}
-                    className="flex flex-col items-center gap-1"
+                    className="flex flex-col items-center gap-1 pointer-events-auto touch-manipulation"
                   >
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${savedDishIds.has(dish.id) ? 'bg-orange-500' : 'bg-white/20 backdrop-blur-md'}`}>
                       <Bookmark size={24} className={savedDishIds.has(dish.id) ? "text-white fill-white" : "text-white"} />
@@ -547,7 +635,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                   className="relative aspect-square rounded-xl overflow-hidden bg-zinc-100 group text-left"
                   onClick={() => openVideoReels(index)}
                 >
-                  {/* Video with hover play (YouTube style) */}
+                  {/* Video with 3-second auto-play cycles */}
                   {dish.videoUrl ? (
                     <video 
                       ref={(el) => (gridVideoRefs.current[index] = el)}
@@ -555,20 +643,10 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                       className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" 
                       muted 
                       playsInline
-                      loop
                       preload="metadata"
                       poster={dish.thumbnailUrl || restaurant.mainPhotoUrl}
                       onLoadedData={(e) => {
                         // Show first frame
-                        e.currentTarget.currentTime = 0.1;
-                      }}
-                      onPointerEnter={(e) => {
-                        // Play on hover/touch (works for both mouse and touch)
-                        e.currentTarget.play().catch(() => {});
-                      }}
-                      onPointerLeave={(e) => {
-                        // Pause when pointer leaves
-                        e.currentTarget.pause();
                         e.currentTarget.currentTime = 0.1;
                       }}
                     />
@@ -592,9 +670,12 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         )}
 
         {/* Your Picks - Card style */}
-        {savedDishIds.size > 0 && isStandalone && (
+        {savedDishIds.size > 0 && (
           <a 
-            href={`/r/${(restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/saved`}
+            href={isStandalone 
+              ? `/r/${(restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/saved`
+              : `/${(restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/saved`
+            }
             className="w-full bg-white rounded-2xl border border-zinc-200 p-4 flex items-center justify-between active:bg-zinc-50 transition-colors"
           >
             <div className="flex items-center gap-3">

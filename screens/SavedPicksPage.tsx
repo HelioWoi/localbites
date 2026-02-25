@@ -88,7 +88,9 @@ const SavedPicksPage: React.FC<SavedPicksPageProps> = ({ restaurant }) => {
   };
 
   const handleBack = () => {
-    window.location.href = `/r/${restaurant.slug}`;
+    // Check if we're on /r/ route or app feed route
+    const isQRRoute = window.location.pathname.startsWith('/r/');
+    window.location.href = isQRRoute ? `/r/${restaurant.slug}` : `/${restaurant.slug}`;
   };
 
   const handleItemClick = (item: MenuItem) => {
@@ -96,7 +98,9 @@ const SavedPicksPage: React.FC<SavedPicksPageProps> = ({ restaurant }) => {
       const params = new URLSearchParams(window.location.search);
       const fromParam = params.get('from');
       const fromQuery = fromParam === 'profile' ? 'from=profile' : 'from=saved';
-      window.location.href = `/r/${restaurant.slug}/menu?${fromQuery}&dish=${item.id}`;
+      const isQRRoute = window.location.pathname.startsWith('/r/');
+      const menuPath = isQRRoute ? `/r/${restaurant.slug}/menu` : `/${restaurant.slug}/menu`;
+      window.location.href = `${menuPath}?${fromQuery}&dish=${item.id}`;
     } else if (item.photoUrl) {
       setLightboxPhoto({ url: item.photoUrl, name: item.name });
     }

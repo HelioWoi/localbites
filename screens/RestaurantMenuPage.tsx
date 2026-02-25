@@ -154,11 +154,23 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   
   // Toggle save
   const toggleSave = (itemId: string) => {
+    console.log('[RestaurantMenuPage] Toggle save:', itemId);
     setSavedItems(prev => {
       const next = new Set(prev);
-      if (next.has(itemId)) next.delete(itemId);
-      else next.add(itemId);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+        console.log('[RestaurantMenuPage] Removed from saved');
+      } else {
+        next.add(itemId);
+        console.log('[RestaurantMenuPage] Added to saved');
+      }
       localStorage.setItem(`saved_dishes_${restaurant.id}`, JSON.stringify([...next]));
+      console.log('[RestaurantMenuPage] Saved to localStorage:', Array.from(next));
+      
+      // Dispatch event for sync with RestaurantProfile
+      window.dispatchEvent(new Event('savedDishesChanged'));
+      console.log('[RestaurantMenuPage] Event dispatched');
+      
       return next;
     });
   };
