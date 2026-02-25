@@ -221,12 +221,33 @@ export async function searchRestaurantsByQuery(
   }
 
   try {
+    // 1. First, search partners (they have full data with videos)
+    let partnerRestaurants: Restaurant[] = [];
+    try {
+      const hasData = await hasSupabaseData();
+      if (hasData) {
+        console.log('[MenuLove] Searching partners for:', query);
+        const allPartners = await getPartnerRestaurants(location.lat, location.lng);
+        
+        // Filter partners by query (name or cuisine)
+        const queryLower = query.toLowerCase();
+        partnerRestaurants = allPartners.filter(r => 
+          r.name.toLowerCase().includes(queryLower) || 
+          r.cuisine.toLowerCase().includes(queryLower)
+        );
+        console.log('[MenuLove] Found', partnerRestaurants.length, 'matching partners');
+      }
+    } catch (error) {
+      console.error('[MenuLove] Partner search error:', error);
+    }
+
+    // 2. Then search Google Places
     const MAX_SEARCH_RADIUS = 10000; // 10km max for text search
     const radius = Math.min(location.radius || 5000, MAX_SEARCH_RADIUS);
     const googlePlaces = await textSearchRestaurants(location.lat, location.lng, radius, query);
     
     // Convert Google Places to Restaurant format
-    const restaurants: Restaurant[] = googlePlaces.map(place => ({
+    const googleRestaurants: Restaurant[] = googlePlaces.map(place => ({
       id: place.id,
       name: place.name,
       cuisine: place.cuisine,
@@ -246,10 +267,15 @@ export async function searchRestaurantsByQuery(
       openingHours: place.openingHours || [],
     }));
 
+    // 3. Merge: Partners first, then Google (avoid duplicates)
+    const partnerNames = new Set(partnerRestaurants.map(r => r.name.toLowerCase()));
+    const filteredGoogle = googleRestaurants.filter(r => !partnerNames.has(r.name.toLowerCase()));
+    const merged = [...partnerRestaurants, ...filteredGoogle];
+
     // Enrich with filter data
-    const enriched = restaurants.map(r => enrichRestaurantWithFilters(r));
+    const enriched = merged.map(r => enrichRestaurantWithFilters(r));
     
-    console.log('[MenuLove] Text search returned', enriched.length, 'restaurants for:', query);
+    console.log('[MenuLove] Text search returned', enriched.length, 'restaurants (', partnerRestaurants.length, 'partners +', filteredGoogle.length, 'Google) for:', query);
     return enriched;
   } catch (error) {
     console.error('[MenuLove] Text search error:', error);

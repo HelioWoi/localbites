@@ -21,9 +21,35 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [savedDishes, setSavedDishes] = useState<Set<string>>(() => {
+    // Load saved dishes from localStorage
+    const saved = localStorage.getItem(`saved_dishes_${restaurant.id}`);
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
+  const [showSavedOnly, setShowSavedOnly] = useState(false);
+  const [enlargedPhoto, setEnlargedPhoto] = useState<{ url: string; name: string } | null>(null);
+
+  // Toggle saved dish
+  const toggleSaveDish = (dishId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newSaved = new Set(savedDishes);
+    if (newSaved.has(dishId)) {
+      newSaved.delete(dishId);
+    } else {
+      newSaved.add(dishId);
+    }
+    setSavedDishes(newSaved);
+    localStorage.setItem(`saved_dishes_${restaurant.id}`, JSON.stringify([...newSaved]));
+    
+    // Dispatch custom event to sync with DesktopRestaurantProfile
+    window.dispatchEvent(new Event('savedDishesChanged'));
+  };
 
   // Group dishes by category
-  const dishesByCategory = (restaurant.dishes || []).reduce((acc, dish) => {
+  const allDishes = restaurant.dishes || [];
+  const dishesToShow = showSavedOnly ? allDishes.filter(d => savedDishes.has(d.id)) : allDishes;
+  
+  const dishesByCategory = dishesToShow.reduce((acc, dish) => {
     const category = dish.category || 'Other';
     if (!acc[category]) {
       acc[category] = [];
@@ -40,6 +66,18 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
       setExpandedCategories(new Set([categories[0]]));
     }
   }, [categories.length]);
+
+  // Listen for "Your Picks" event from DesktopRestaurantProfile
+  useEffect(() => {
+    const handleOpenYourPicks = () => {
+      setShowSavedOnly(true);
+    };
+
+    window.addEventListener('openYourPicks', handleOpenYourPicks);
+    return () => {
+      window.removeEventListener('openYourPicks', handleOpenYourPicks);
+    };
+  }, []);
 
   // Debug: Log dishes to check thumbnailUrl
   useEffect(() => {
@@ -73,7 +111,7 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
   }, [selectedDishId, restaurant.dishes]);
 
   // Filter dishes by search query
-  const filteredCategories = searchQuery
+  const filteredCategories: Record<string, Dish[]> = searchQuery
     ? categories.reduce((acc, category) => {
         const filtered = dishesByCategory[category].filter(dish =>
           dish.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -149,21 +187,34 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
             </div>
           </div>
 
-          {/* Search Bar */}
-          <div className="relative">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
-            <input
-              type="text"
-              placeholder="Search menu..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-            />
+          {/* Search Bar & Filter */}
+          <div className="space-y-3">
+            <div className="relative">
+              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+              <input
+                type="text"
+                placeholder="Search menu..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              />
+            </div>
+            
+            {/* Your Picks Toggle */}
+            {savedDishes.size > 0 && (
+              <button
+                onClick={() => setShowSavedOnly(!showSavedOnly)}
+                className="w-full px-4 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white"
+              >
+                <Bookmark size={16} className="fill-white" />
+                Your Picks ({savedDishes.size})
+              </button>
+            )}
           </div>
         </div>
 
         {/* Menu Items - Scrollable */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className={`flex-1 overflow-y-auto px-6 py-4 ${showSavedOnly ? 'bg-orange-50/30' : ''}`}>
           {Object.keys(filteredCategories).length === 0 ? (
             <div className="text-center py-12">
               <p className="text-zinc-400">No items found</p>
@@ -202,16 +253,26 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
                   {expandedCategories.has(category) && (
                     <div className="divide-y divide-zinc-100">
                       {dishes.map((dish) => (
-                        <button
+                        <div
                           key={dish.id}
                           id={`dish-${dish.id}`}
-                          onClick={() => onSelectItem(dish.id)}
-                          className={`w-full px-5 py-4 hover:bg-zinc-50 transition-colors flex items-center gap-4 text-left ${
+                          className={`w-full px-5 py-4 hover:bg-zinc-50 transition-colors flex items-center gap-4 ${
                             selectedDishId === dish.id ? 'bg-orange-50 border-l-4 border-orange-500' : ''
                           }`}
                         >
                           {/* Thumbnail */}
-                          <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-zinc-100 flex-shrink-0">
+                          <div 
+                            className="relative w-20 h-20 rounded-xl overflow-hidden bg-zinc-100 flex-shrink-0 cursor-pointer"
+                            onClick={() => {
+                              if (isVideo(dish)) {
+                                // Video: open video modal
+                                onSelectItem(dish.id);
+                              } else if (dish.photoUrl) {
+                                // Photo: open lightbox
+                                setEnlargedPhoto({ url: dish.photoUrl, name: dish.name });
+                              }
+                            }}
+                          >
                             {isVideo(dish) && dish.videoUrl ? (
                               <>
                                 <video
@@ -270,13 +331,27 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
                             )}
                           </div>
 
-                          {/* Price */}
-                          {dish.price && (
-                            <div className="text-lg font-bold text-orange-500 flex-shrink-0">
-                              ${dish.price}
-                            </div>
-                          )}
-                        </button>
+                          {/* Price & Bookmark */}
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            {dish.price && (
+                              <div className="text-lg font-bold text-orange-500">
+                                ${dish.price}
+                              </div>
+                            )}
+                            
+                            {/* Bookmark Button */}
+                            <button
+                              onClick={(e) => toggleSaveDish(dish.id, e)}
+                              className="p-2 hover:bg-zinc-100 rounded-lg transition-colors group"
+                              title={savedDishes.has(dish.id) ? 'Remove from Your Picks' : 'Save to Your Picks'}
+                            >
+                              <Bookmark
+                                size={20}
+                                className={savedDishes.has(dish.id) ? 'text-orange-500 fill-orange-500' : 'text-zinc-400 group-hover:text-orange-500'}
+                              />
+                            </button>
+                          </div>
+                        </div>
                       ))}
                     </div>
                   )}
@@ -286,6 +361,41 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Photo Lightbox */}
+      {enlargedPhoto && (
+        <div 
+          className="fixed inset-0 bg-black/95 z-[60] flex items-center justify-center p-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            setEnlargedPhoto(null);
+          }}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setEnlargedPhoto(null);
+            }}
+            className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm hover:bg-white/20 flex items-center justify-center transition-colors z-10"
+          >
+            <X size={24} className="text-white" />
+          </button>
+          
+          <div 
+            className="max-w-4xl max-h-[90vh] w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={enlargedPhoto.url}
+              alt={enlargedPhoto.name}
+              className="w-full h-full object-contain rounded-2xl"
+            />
+            <p className="text-white text-center mt-4 text-lg font-semibold">
+              {enlargedPhoto.name}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

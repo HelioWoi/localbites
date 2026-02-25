@@ -27,12 +27,36 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
   onSelectVideo,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [showSavedOnly, setShowSavedOnly] = useState(false);
   const [showAllHours, setShowAllHours] = useState(false);
   const [showFullMenu, setShowFullMenu] = useState(false);
   const [selectedDishId, setSelectedDishId] = useState<string | null>(null);
   const [likedVideos, setLikedVideos] = useState<Set<string>>(new Set());
-  const [savedVideos, setSavedVideos] = useState<Set<string>>(new Set());
+  const [savedVideos, setSavedVideos] = useState<Set<string>>(() => {
+    // Load saved dishes from localStorage (synced with FullMenuModal)
+    const saved = localStorage.getItem(`saved_dishes_${restaurant.id}`);
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
+
+  // Sync with localStorage changes (when FullMenuModal saves/removes dishes)
+  React.useEffect(() => {
+    const handleStorageChange = () => {
+      const saved = localStorage.getItem(`saved_dishes_${restaurant.id}`);
+      if (saved) {
+        setSavedVideos(new Set(JSON.parse(saved)));
+      } else {
+        setSavedVideos(new Set());
+      }
+    };
+
+    // Listen for custom event from FullMenuModal
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('savedDishesChanged', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('savedDishesChanged', handleStorageChange);
+    };
+  }, [restaurant.id]);
 
   const hasVideos = restaurant.dishes && restaurant.dishes.length > 0;
 
@@ -47,10 +71,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
     ? videoDishes 
     : videoDishes.filter(d => d.category === selectedCategory);
 
-  // Apply saved filter if active
-  const filteredDishes = showSavedOnly 
-    ? categoryFiltered?.filter(d => savedVideos.has(d.id)) || []
-    : categoryFiltered;
+  const filteredDishes = categoryFiltered;
 
   // Get saved videos count
   const savedCount = savedVideos.size;
@@ -311,12 +332,9 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
               {videoCategories.map((cat) => (
                 <button
                   key={cat}
-                  onClick={() => {
-                    setSelectedCategory(cat);
-                    setShowSavedOnly(false);
-                  }}
+                  onClick={() => setSelectedCategory(cat)}
                   className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all ${
-                    selectedCategory === cat && !showSavedOnly
+                    selectedCategory === cat
                       ? 'bg-orange-500 text-white'
                       : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                   }`}
@@ -332,21 +350,25 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
                 <ChevronRight size={14} />
               </button>
 
-              {/* Your Picks Button */}
-              <button
-                onClick={() => setShowSavedOnly(!showSavedOnly)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-2xl border transition-all whitespace-nowrap flex-shrink-0 ${
-                  showSavedOnly
-                    ? 'border-orange-500 bg-orange-50'
-                    : 'border-zinc-200 bg-white hover:border-zinc-300'
-                }`}
-              >
-                <Bookmark size={16} className="text-orange-500 fill-orange-500" />
-                <span className="font-bold text-sm text-zinc-900">
-                  Your Picks
-                </span>
-                <span className="text-sm text-orange-500">({savedCount})</span>
-              </button>
+              {/* Your Picks Button - Opens Full Menu with saved filter */}
+              {savedCount > 0 && (
+                <button
+                  onClick={() => {
+                    setShowFullMenu(true);
+                    // Signal to FullMenuModal to show saved only
+                    setTimeout(() => {
+                      window.dispatchEvent(new CustomEvent('openYourPicks'));
+                    }, 100);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-2xl border border-zinc-200 bg-white hover:border-orange-300 hover:bg-orange-50 transition-all whitespace-nowrap flex-shrink-0"
+                >
+                  <Bookmark size={16} className="text-orange-500 fill-orange-500" />
+                  <span className="font-bold text-sm text-zinc-900">
+                    Your Picks
+                  </span>
+                  <span className="text-sm text-orange-500">({savedCount})</span>
+                </button>
+              )}
             </div>
 
             {/* Video Grid - Scrollable */}
@@ -441,6 +463,12 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
                           } else {
                             next.add(dish.id);
                           }
+                          // Sync with localStorage (shared with FullMenuModal)
+                          localStorage.setItem(`saved_dishes_${restaurant.id}`, JSON.stringify([...next]));
+                          
+                          // Dispatch custom event to sync with FullMenuModal
+                          window.dispatchEvent(new Event('savedDishesChanged'));
+                          
                           return next;
                         });
                       }}

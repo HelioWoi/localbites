@@ -179,14 +179,14 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
 
         {/* Top Nav */}
         <nav className="relative z-10 flex items-center justify-between px-12 py-6">
-          <div className="flex items-center gap-3">
+          <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer">
             <img
               src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png"
               alt="MenuLove"
               className="w-10 h-10 rounded-xl shadow-lg"
             />
             <span className="text-2xl font-extrabold text-white tracking-tight">MenuLove</span>
-          </div>
+          </a>
           <div className="flex items-center gap-3">
             <button
               onClick={() => {

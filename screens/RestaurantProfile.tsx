@@ -142,22 +142,6 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
     loadGoogleReviews();
   }, [restaurant.id]);
   
-  // Restart grid videos when closing fullscreen feed
-  useEffect(() => {
-    if (!showVideoReels) {
-      // When fullscreen closes, restart all grid videos
-      const timer = setTimeout(() => {
-        gridVideoRefs.current.forEach(video => {
-          if (video) {
-            video.play().catch(() => {
-              // Ignore autoplay errors (browser policy)
-            });
-          }
-        });
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [showVideoReels]);
   
   // Toggle save dish
   const toggleSaveDish = (dishId: string) => {
@@ -563,6 +547,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                   className="relative aspect-square rounded-xl overflow-hidden bg-zinc-100 group text-left"
                   onClick={() => openVideoReels(index)}
                 >
+                  {/* Video with hover play (YouTube style) */}
                   {dish.videoUrl ? (
                     <video 
                       ref={(el) => (gridVideoRefs.current[index] = el)}
@@ -570,29 +555,29 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                       className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" 
                       muted 
                       playsInline
-                      webkit-playsinline="true"
-                      crossOrigin="anonymous"
-                      preload="auto"
-                      autoPlay
                       loop
+                      preload="metadata"
                       poster={dish.thumbnailUrl || restaurant.mainPhotoUrl}
-                      onError={(e) => {
-                        console.error('Video failed to load:', dish.videoUrl);
-                        // Fallback to thumbnail if video fails
-                        const target = e.currentTarget;
-                        target.style.display = 'none';
-                        const parent = target.parentNode as HTMLElement;
-                        if (parent) {
-                          const img = document.createElement('img');
-                          img.src = dish.thumbnailUrl || restaurant.mainPhotoUrl || '';
-                          img.className = 'w-full h-full object-cover';
-                          img.alt = dish.name;
-                          parent.insertBefore(img, target);
-                        }
+                      onLoadedData={(e) => {
+                        // Show first frame
+                        e.currentTarget.currentTime = 0.1;
+                      }}
+                      onPointerEnter={(e) => {
+                        // Play on hover/touch (works for both mouse and touch)
+                        e.currentTarget.play().catch(() => {});
+                      }}
+                      onPointerLeave={(e) => {
+                        // Pause when pointer leaves
+                        e.currentTarget.pause();
+                        e.currentTarget.currentTime = 0.1;
                       }}
                     />
                   ) : (
-                    <img src={dish.thumbnailUrl || restaurant.mainPhotoUrl} className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" alt={dish.name} />
+                    <img 
+                      src={dish.thumbnailUrl || restaurant.mainPhotoUrl} 
+                      className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" 
+                      alt={dish.name}
+                    />
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-2.5">
                     <p className="text-white font-semibold text-xs">{dish.name}</p>
