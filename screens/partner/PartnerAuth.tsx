@@ -8,9 +8,11 @@ interface PartnerAuthProps {
 }
 
 const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
-  const [mode, setMode] = useState<'login' | 'signup' | 'magic' | 'sent'>('signup');
+  const [mode, setMode] = useState<'login' | 'signup' | 'magic' | 'sent' | 'reset-password'>('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -31,6 +33,17 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
 
   // Track if user came from landing page
   const [isFromLandingPage, setIsFromLandingPage] = useState(false);
+
+  // Check for password recovery token in URL
+  useEffect(() => {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const type = hashParams.get('type');
+    
+    if (type === 'recovery') {
+      console.log('[PartnerAuth] Password recovery detected');
+      setMode('reset-password');
+    }
+  }, []);
 
   // Pre-fill form with data from landing page (Step 1)
   useEffect(() => {
@@ -256,6 +269,135 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
       setIsLoading(false);
     }
   };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword.trim() || !confirmPassword.trim()) return;
+
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) throw error;
+
+      alert('Password updated successfully!');
+      window.location.href = '/partner';
+    } catch (err: any) {
+      setError(err.message || 'Failed to update password');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (mode === 'reset-password') {
+    return (
+      <div className="min-h-screen bg-zinc-50 flex flex-col">
+        <div className="pt-16 pb-8 flex items-center justify-center">
+          <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <img 
+              src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png" 
+              alt="MenuLove" 
+              className="w-12 h-12 rounded-xl"
+            />
+            <div>
+              <span className="text-xl font-bold text-zinc-900">MenuLove</span>
+              <span className="text-xl font-light text-zinc-400 ml-1">Partner</span>
+            </div>
+          </a>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="w-full max-w-md">
+            <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 p-8">
+              <h1 className="text-2xl font-bold text-zinc-900 mb-1">Reset your password</h1>
+              <p className="text-zinc-500 mb-6">Enter your new password below</p>
+
+              <form onSubmit={handleResetPassword}>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-500 mb-2">
+                      New password
+                    </label>
+                    <div className="relative">
+                      <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Minimum 6 characters"
+                        className="w-full pl-12 pr-12 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-500 mb-2">
+                      Confirm new password
+                    </label>
+                    <div className="relative">
+                      <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Re-enter your password"
+                        className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 p-3 rounded-lg flex items-start gap-2">
+                      <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-red-900">{error}</p>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
+                  >
+                    {isLoading ? (
+                      <Loader2 size={20} className="animate-spin" />
+                    ) : (
+                      <>
+                        Update password
+                        <ArrowRight size={18} />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (mode === 'sent') {
     return (
