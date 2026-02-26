@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Smartphone, 
   TrendingUp, 
@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 
 const PartnerLandingPage: React.FC = () => {
+  const [formSubmitted, setFormSubmitted] = useState(false);
+
   const scrollToForm = () => {
     const formSection = document.getElementById('signup-form');
     if (formSection) {
@@ -80,8 +82,12 @@ const PartnerLandingPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-white">
       {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-orange-500 via-amber-500 to-orange-600">
-        <div className="absolute inset-0 bg-black/10" />
+      <div className="relative overflow-hidden">
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: 'url(https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/page-become-partner.jpg)' }}
+        />
+        <div className="absolute inset-0 bg-black/60" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 pb-32">
           {/* Logo */}
           <a 
@@ -167,7 +173,7 @@ const PartnerLandingPage: React.FC = () => {
               <img
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/img_coffeeshop.jpg"
                 alt="Coffee shop using MenuLove"
-                className="w-full h-[500px] object-cover"
+                className="w-full h-[500px] object-cover object-left-center"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
             </div>
@@ -281,22 +287,27 @@ const PartnerLandingPage: React.FC = () => {
 
             {/* Right: Signup Form */}
             <div className="bg-white rounded-3xl shadow-2xl p-8 border border-zinc-100">
-              <div className="text-center mb-6">
-                <h3 className="text-2xl font-black text-zinc-900 mb-2">Create your account</h3>
-                <p className="text-zinc-600">Start your 30-day free trial</p>
-              </div>
-              <form className="space-y-4" onSubmit={(e) => { 
-                e.preventDefault(); 
-                const formData = new FormData(e.currentTarget);
-                const signupData = {
-                  restaurantName: formData.get('restaurantName'),
-                  email: formData.get('email'),
-                  phone: formData.get('phone'),
-                  address: formData.get('address')
-                };
-                sessionStorage.setItem('partnerSignupStep1', JSON.stringify(signupData));
-                window.location.href = '/partner';
-              }}>
+              {!formSubmitted ? (
+                <>
+                  <div className="text-center mb-6">
+                    <h3 className="text-2xl font-black text-zinc-900 mb-2">Create your account</h3>
+                    <p className="text-zinc-600">Start your 30-day free trial</p>
+                  </div>
+                  <form className="space-y-4" onSubmit={(e) => { 
+                    e.preventDefault(); 
+                    const formData = new FormData(e.currentTarget);
+                    const signupData = {
+                      restaurantName: formData.get('restaurantName'),
+                      email: formData.get('email'),
+                      phone: formData.get('phone'),
+                      address: formData.get('address')
+                    };
+                    sessionStorage.setItem('partnerSignupStep1', JSON.stringify(signupData));
+                    setFormSubmitted(true);
+                    setTimeout(() => {
+                      window.location.href = '/partner';
+                    }, 2000);
+                  }}>
                 <div>
                   <label className="block text-sm font-bold text-zinc-700 mb-2">Restaurant name</label>
                   <input
@@ -348,6 +359,24 @@ const PartnerLandingPage: React.FC = () => {
                   Already have an account? <a href="/partner" className="text-orange-600 font-bold hover:underline">Sign in</a>
                 </p>
               </form>
+              </>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <CheckCircle2 className="text-green-600" size={48} />
+                  </div>
+                  <h3 className="text-2xl font-black text-zinc-900 mb-3">Thank You!</h3>
+                  <p className="text-zinc-600 mb-6 leading-relaxed">
+                    Your information has been saved.<br />
+                    Redirecting you to complete your registration...
+                  </p>
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -456,8 +485,13 @@ const PartnerLandingPage: React.FC = () => {
       </div>
 
       {/* CTA Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="bg-gradient-to-br from-orange-500 to-amber-500 rounded-3xl p-12 sm:p-16 text-center shadow-2xl">
+      <div className="relative bg-gradient-to-br from-orange-500 to-amber-500 py-20 overflow-hidden">
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: 'url(https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/img_Why.jpg)' }}
+        />
+        <div className="absolute inset-0 bg-black/50" />
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center p-12 sm:p-16">
           <Sparkles className="mx-auto mb-4 text-yellow-300" size={40} />
           <h2 className="text-3xl sm:text-4xl font-black text-white mb-6 leading-tight">
             Ready to Grow Your Restaurant?
