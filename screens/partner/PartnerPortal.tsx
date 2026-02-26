@@ -81,6 +81,9 @@ const PartnerPortal: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    // Clear admin impersonation data
+    localStorage.removeItem('admin_impersonate_partner_id');
+    localStorage.removeItem('admin_impersonate_partner_email');
     await supabase.auth.signOut();
     setUser(null);
   };
