@@ -19,6 +19,8 @@ import DesktopFeed from './components/DesktopFeed';
 import DesktopRestaurantProfile from './components/DesktopRestaurantProfile';
 import BitesAI from './components/BitesAI';
 import RemovalRequestPage from './screens/RemovalRequestPage';
+import VideoMenuPlatformPage from './screens/VideoMenuPlatformPage';
+import WhyVideoMenusPage from './screens/WhyVideoMenusPage';
 import { getNearbyRestaurants, getRestaurantDetails, getRemainingSearches, searchRestaurantsByQuery } from './services/geminiService';
 import { TriageData } from './services/aiAssistant';
 import { likeRestaurant, unlikeRestaurant, saveRestaurant, unsaveRestaurant, getUserLikes, getUserSaves, getAllLikesCounts } from './services/interactionService';
@@ -45,6 +47,10 @@ const isLegalRoute = window.location.pathname === '/policy' ||
 
 // Check if we're on contact page
 const isContactRoute = window.location.pathname === '/contact';
+
+// Check if we're on SEO pages
+const isVideoMenuPlatformRoute = window.location.pathname === '/video-menu-platform';
+const isWhyVideoMenusRoute = window.location.pathname === '/why-video-menus-increase-orders';
 
 const App: React.FC = () => {
   // Check if we're on a QR code restaurant route (/r/slug)
@@ -105,6 +111,15 @@ const App: React.FC = () => {
     };
     window.location.href = legalPageMap[window.location.pathname];
     return null;
+  }
+
+  // If on SEO pages, render them
+  if (isVideoMenuPlatformRoute) {
+    return <VideoMenuPlatformPage />;
+  }
+
+  if (isWhyVideoMenusRoute) {
+    return <WhyVideoMenusPage />;
   }
 
   // If on admin route, render Super Admin Portal

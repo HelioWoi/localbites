@@ -751,17 +751,24 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
       )}
 
       {/* ===== PARTNER CTA SECTION ===== */}
-      <section className="mt-16 bg-gradient-to-br from-orange-500 via-amber-500 to-orange-600 relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/10" />
+      <section className="mt-16 relative overflow-hidden">
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: 'url(https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/img-site.jpg)' }}
+        />
+        <div className="absolute inset-0 bg-black/50" />
         <div className="relative max-w-7xl mx-auto px-8 py-20 text-center">
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6 leading-tight">
             Turn Your Menu Into
             <br />
             <span className="text-yellow-300">Viral Content</span>
           </h2>
-          <p className="text-lg sm:text-xl text-white/90 mb-8 max-w-2xl mx-auto font-medium leading-relaxed">
-            Join MenuLove and showcase your dishes with TikTok-style videos. 
-            Get discovered by customers within 5km through smart location search.
+          <p className="text-lg sm:text-xl text-white/90 mb-8 max-w-3xl mx-auto font-medium leading-relaxed">
+            Join MenuLove and showcase your dishes with 
+            <br />
+            TikTok-style videos. Get discovered by customers 
+            <br />
+            within 5km through smart location search.
           </p>
           <div className="mb-10">
             <p className="text-yellow-300 text-xl font-black mb-2 animate-pulse">
@@ -1137,9 +1144,9 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({
         </div>
 
 
-        {/* Closed badge (top-left) */}
+        {/* Closed badge (top-left) - Always visible when closed */}
         {!calculateIsOpenNow(restaurant.openingHours) && (
-          <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-red-500 px-2.5 py-1 rounded-full z-10">
+          <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-red-500 px-2.5 py-1 rounded-full z-30 shadow-lg">
             <span className="text-xs font-bold text-white">Closed</span>
           </div>
         )}

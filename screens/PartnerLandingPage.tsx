@@ -149,6 +149,87 @@ const PartnerLandingPage: React.FC = () => {
         </div>
       </div>
 
+      {/* How It Works Section */}
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl sm:text-5xl font-black text-zinc-900 mb-4">
+              How MenuLove Works
+            </h2>
+            <p className="text-xl text-zinc-600 max-w-2xl mx-auto">
+              Transform your restaurant's menu into engaging video content in 3 simple steps
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Image Side */}
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+              <img
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/img_coffeeshop.jpg"
+                alt="Coffee shop using MenuLove"
+                className="w-full h-[500px] object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+            </div>
+
+            {/* Steps Side */}
+            <div className="space-y-8">
+              <div className="flex gap-6">
+                <div className="flex-shrink-0 w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center text-white font-black text-xl">
+                  1
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-zinc-900 mb-2">
+                    Create Your Video Menu
+                  </h3>
+                  <p className="text-zinc-600 leading-relaxed">
+                    Upload short videos of your best dishes. Show the sizzle, the presentation, the experience. No professional equipment needed.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-6">
+                <div className="flex-shrink-0 w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center text-white font-black text-xl">
+                  2
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-zinc-900 mb-2">
+                    Get Discovered Locally
+                  </h3>
+                  <p className="text-zinc-600 leading-relaxed">
+                    Customers within 5km find you through our location-based search. Your videos appear in their feed like TikTok.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-6">
+                <div className="flex-shrink-0 w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center text-white font-black text-xl">
+                  3
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-zinc-900 mb-2">
+                    Watch Orders Increase
+                  </h3>
+                  <p className="text-zinc-600 leading-relaxed">
+                    Video menus increase order value by 65%. Customers see your food in action and make faster, bigger decisions.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-6">
+                <button
+                  onClick={scrollToForm}
+                  className="inline-flex items-center gap-2 px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold text-lg rounded-xl transition-all transform hover:scale-105 shadow-lg"
+                >
+                  Start Your Free Trial
+                  <ArrowRight size={20} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Signup Form Section */}
       <div id="signup-form" className="bg-gradient-to-br from-zinc-50 to-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
