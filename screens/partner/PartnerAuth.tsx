@@ -34,13 +34,6 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
   // Track if user came from landing page
   const [isFromLandingPage, setIsFromLandingPage] = useState(false);
 
-  // Clear any admin impersonation data on mount
-  useEffect(() => {
-    // Clear admin impersonation to prevent loading wrong partner data
-    localStorage.removeItem('admin_impersonate_partner_id');
-    localStorage.removeItem('admin_impersonate_partner_email');
-  }, []);
-
   // Check for password recovery token in URL
   useEffect(() => {
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -65,6 +58,10 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
         // Auto-switch to signup mode if coming from landing page
         setMode('signup');
         setIsFromLandingPage(true);
+        
+        // Clear admin impersonation ONLY when coming from landing page signup
+        localStorage.removeItem('admin_impersonate_partner_id');
+        localStorage.removeItem('admin_impersonate_partner_email');
       } catch (err) {
         console.error('Error loading signup data:', err);
       }
