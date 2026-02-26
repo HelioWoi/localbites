@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MenuLove — Video Menus & Smart Discovery for Cafés & Restaurants</title>
+    <meta name="description" content="Discover cafés and restaurants through engaging video menus. MenuLove helps you find your next yum with AI-powered recommendations and real-time availability.">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://menulove.com.au/">
+    <meta property="og:title" content="MenuLove — Video Menus & Smart Discovery">
+    <meta property="og:description" content="Discover cafés and restaurants through engaging video menus. Find your next yum with MenuLove.">
+    <meta property="og:image" content="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png">
+    <meta property="og:site_name" content="MenuLove">
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://menulove.com.au/">
+    <meta name="twitter:title" content="MenuLove — Video Menus & Smart Discovery">
+    <meta name="twitter:description" content="Discover cafés and restaurants through engaging video menus.">
+    <meta name="twitter:image" content="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png">
+    
+    <link rel="icon" type="image/png" href="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png">
+    <link rel="canonical" href="https://menulove.com.au/">
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #18181b;
+            background: #ffffff;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+        
+        /* Header */
+        header { 
+            background: #fff;
+            padding: 20px 0;
+            border-bottom: 1px solid #f4f4f5;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-content { 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo { 
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+        .logo img { width: 40px; height: 40px; border-radius: 10px; }
+        .logo span { font-size: 22px; font-weight: 800; color: #18181b; }
+        .nav-links { display: flex; gap: 24px; align-items: center; }
+        .nav-links a { 
+            text-decoration: none;
+            color: #71717a;
+            font-weight: 500;
+            font-size: 15px;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover { color: #f97316; }
+        .btn-primary {
+            background: #f97316;
+            color: white;
+            padding: 10px 24px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 15px;
+            transition: all 0.2s;
+        }
+        .btn-primary:hover { background: #ea580c; transform: translateY(-1px); }
+        
+        /* Hero */
+        .hero {
+            padding: 80px 0 60px;
+            background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
+        }
+        .hero-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+        h1 {
+            font-size: 56px;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 20px;
+            color: #18181b;
+        }
+        .hero p {
+            font-size: 20px;
+            color: #71717a;
+            margin-bottom: 32px;
+        }
+        .hero-buttons {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .btn-large {
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .btn-orange {
+            background: #f97316;
+            color: white;
+        }
+        .btn-orange:hover { background: #ea580c; transform: translateY(-2px); }
+        .btn-outline {
+            background: white;
+            color: #18181b;
+            border: 2px solid #e5e7eb;
+        }
+        .btn-outline:hover { border-color: #f97316; color: #f97316; }
+        .hero-image img {
+            width: 100%;
+            max-width: 500px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+        }
+        
+        /* Features */
+        .features {
+            padding: 80px 0;
+            background: white;
+        }
+        .section-title {
+            text-align: center;
+            font-size: 40px;
+            font-weight: 800;
+            margin-bottom: 16px;
+        }
+        .section-subtitle {
+            text-align: center;
+            font-size: 18px;
+            color: #71717a;
+            margin-bottom: 60px;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 40px;
+        }
+        .feature-card {
+            padding: 32px;
+            background: #fafafa;
+            border-radius: 16px;
+            text-align: center;
+        }
+        .feature-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        .feature-card h3 {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .feature-card p {
+            color: #71717a;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+        
+        /* How it works */
+        .how-it-works {
+            padding: 80px 0;
+            background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
+        }
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 40px;
+            margin-top: 60px;
+        }
+        .step {
+            text-align: center;
+        }
+        .step-number {
+            width: 60px;
+            height: 60px;
+            background: #f97316;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 800;
+            margin: 0 auto 20px;
+        }
+        .step h3 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .step p {
+            color: #71717a;
+            font-size: 15px;
+        }
+        
+        /* CTA */
+        .cta {
+            padding: 80px 0;
+            background: #18181b;
+            color: white;
+            text-align: center;
+        }
+        .cta h2 {
+            font-size: 40px;
+            font-weight: 800;
+            margin-bottom: 20px;
+        }
+        .cta p {
+            font-size: 18px;
+            color: #a1a1aa;
+            margin-bottom: 32px;
+        }
+        
+        /* Footer */
+        footer {
+            padding: 40px 0;
+            background: #fafafa;
+            text-align: center;
+        }
+        footer p {
+            color: #71717a;
+            font-size: 14px;
+        }
+        footer a {
+            color: #f97316;
+            text-decoration: none;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero-content { grid-template-columns: 1fr; }
+            .features-grid { grid-template-columns: 1fr; }
+            .steps { grid-template-columns: 1fr; }
+            h1 { font-size: 36px; }
+            .section-title { font-size: 32px; }
+            .nav-links { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <a href="/" class="logo">
+                    <img src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png" alt="MenuLove">
+                    <span>MenuLove</span>
+                </a>
+                <nav class="nav-links">
+                    <a href="/app">Discover</a>
+                    <a href="/partner">For Restaurants</a>
+                    <a href="/app" class="btn-primary">Open App</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <div>
+                    <h1>Find Your Next Yum</h1>
+                    <p>Discover cafés and restaurants through engaging video menus. See dishes come to life before you visit.</p>
+                    <div class="hero-buttons">
+                        <a href="/app" class="btn-large btn-orange">Start Exploring</a>
+                        <a href="/partner" class="btn-large btn-outline">List Your Restaurant</a>
+                    </div>
+                </div>
+                <div class="hero-image">
+                    <img src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/mockup%20mobile.png" alt="MenuLove App">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features">
+        <div class="container">
+            <h2 class="section-title">Why MenuLove?</h2>
+            <p class="section-subtitle">The smartest way to discover your next favorite spot</p>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🎥</div>
+                    <h3>Video Menus</h3>
+                    <p>Watch dishes being prepared and served. See exactly what you're ordering before you arrive.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3>AI-Powered Discovery</h3>
+                    <p>Get personalized recommendations based on your preferences and location.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📍</div>
+                    <h3>Real-Time Updates</h3>
+                    <p>See which restaurants are open now, check wait times, and discover new spots nearby.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="how-it-works">
+        <div class="container">
+            <h2 class="section-title">How It Works</h2>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>Browse Video Menus</h3>
+                    <p>Swipe through engaging videos of dishes from cafés and restaurants near you.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>Save Your Favorites</h3>
+                    <p>Bookmark dishes you love and build your personal collection of must-try items.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>Visit & Enjoy</h3>
+                    <p>Get directions, call ahead, or just show up and enjoy your next yum.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta">
+        <div class="container">
+            <h2>Ready to Find Your Next Yum?</h2>
+            <p>Join thousands discovering amazing cafés and restaurants</p>
+            <a href="/app" class="btn-large btn-orange">Get Started Free</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 MenuLove Australia. All rights reserved. | <a href="/partner">Partner With Us</a></p>
+        </div>
+    </footer>
+</body>
+</html>

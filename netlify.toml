@@ -2,7 +2,40 @@
   command = "npm run build"
   publish = "dist"
 
+# Serve static files first (robots.txt, sitemap.xml)
 [[redirects]]
-  from = "/*"
+  from = "/robots.txt"
+  to = "/robots.txt"
+  status = 200
+
+[[redirects]]
+  from = "/sitemap.xml"
+  to = "/sitemap.xml"
+  status = 200
+
+# Serve static landing page at root
+[[redirects]]
+  from = "/"
+  to = "/landing.html"
+  status = 200
+
+# SPA fallback for app routes only
+[[redirects]]
+  from = "/app/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/r/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/partner/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin/*"
   to = "/index.html"
   status = 200
