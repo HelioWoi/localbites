@@ -853,13 +853,20 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       };
 
       const currentUser = (await supabase.auth.getUser()).data.user;
+      
+      // Check if admin is impersonating
+      const impersonatePartnerId = localStorage.getItem('admin_impersonate_partner_id');
+      const effectiveUserId = impersonatePartnerId || currentUser?.id;
+      
       console.log('Updating menu item ID:', editingMenuItem.id);
       console.log('Item partner_id:', editingMenuItem.partner_id);
       console.log('Current auth user ID:', currentUser?.id);
-      console.log('IDs match?', editingMenuItem.partner_id === currentUser?.id);
+      console.log('Admin impersonate ID:', impersonatePartnerId);
+      console.log('Effective user ID:', effectiveUserId);
+      console.log('IDs match?', editingMenuItem.partner_id === effectiveUserId);
       
-      // Check if user owns this item
-      if (editingMenuItem.partner_id !== currentUser?.id) {
+      // Check if user owns this item (or admin is impersonating)
+      if (editingMenuItem.partner_id !== effectiveUserId) {
         alert(`ERROR: You cannot edit this item!\n\nThis item belongs to partner: ${editingMenuItem.partner_id}\nYou are logged in as: ${currentUser?.id}\n\nPlease logout and login with the correct account.`);
         setIsUploading(false);
         return;
