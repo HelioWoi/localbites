@@ -228,54 +228,66 @@ export async function searchRestaurantsByQuery(
       if (hasData) {
         console.log('[MenuLove] Searching partners for:', query);
         const allPartners = await getPartnerRestaurants(location.lat, location.lng);
+        console.log('[MenuLove] Total partners available:', allPartners.length);
         
         // Filter partners by query (name or cuisine)
-        const queryLower = query.toLowerCase();
-        partnerRestaurants = allPartners.filter(r => 
-          r.name.toLowerCase().includes(queryLower) || 
-          r.cuisine.toLowerCase().includes(queryLower)
-        );
+        const queryLower = query.toLowerCase().trim();
+        partnerRestaurants = allPartners.filter(r => {
+          const nameMatch = r.name.toLowerCase().includes(queryLower);
+          const cuisineMatch = r.cuisine.toLowerCase().includes(queryLower);
+          if (nameMatch || cuisineMatch) {
+            console.log('[MenuLove] Partner match:', r.name, '- isSubscribed:', r.isSubscribed);
+          }
+          return nameMatch || cuisineMatch;
+        });
         console.log('[MenuLove] Found', partnerRestaurants.length, 'matching partners');
       }
     } catch (error) {
       console.error('[MenuLove] Partner search error:', error);
     }
 
-    // 2. Then search Google Places
-    const MAX_SEARCH_RADIUS = 10000; // 10km max for text search
-    const radius = Math.min(location.radius || 5000, MAX_SEARCH_RADIUS);
-    const googlePlaces = await textSearchRestaurants(location.lat, location.lng, radius, query);
+    // 2. Search Google Places only if no partners found
+    // This ensures partners always show up, even if far away
+    let googleRestaurants: Restaurant[] = [];
     
-    // Convert Google Places to Restaurant format
-    const googleRestaurants: Restaurant[] = googlePlaces.map(place => ({
-      id: place.id,
-      name: place.name,
-      cuisine: place.cuisine,
-      priceLevel: place.priceLevel,
-      distance: place.distance,
-      isOpen: place.isOpen ?? true,
-      rating: place.rating,
-      totalReviews: place.totalReviews,
-      address: place.address,
-      phone: place.phone,
-      website: place.website,
-      googleMapsUrl: place.googleMapsUrl,
-      mainPhotoUrl: place.photoUrl,
-      isSubscribed: false,
-      dishes: [],
-      reviews: place.reviews || [],
-      openingHours: place.openingHours || [],
-    }));
+    if (partnerRestaurants.length === 0) {
+      // No partners found - search Google Places
+      const MAX_SEARCH_RADIUS = 10000; // 10km max for text search
+      const radius = Math.min(location.radius || 5000, MAX_SEARCH_RADIUS);
+      const googlePlaces = await textSearchRestaurants(location.lat, location.lng, radius, query);
+      
+      // Convert Google Places to Restaurant format
+      googleRestaurants = googlePlaces.map(place => ({
+        id: place.id,
+        name: place.name,
+        cuisine: place.cuisine,
+        priceLevel: place.priceLevel,
+        distance: place.distance,
+        isOpen: place.isOpen ?? true,
+        rating: place.rating,
+        totalReviews: place.totalReviews,
+        address: place.address,
+        phone: place.phone,
+        website: place.website,
+        googleMapsUrl: place.googleMapsUrl,
+        mainPhotoUrl: place.photoUrl,
+        isSubscribed: false,
+        dishes: [],
+        reviews: place.reviews || [],
+        openingHours: place.openingHours || [],
+      }));
+    } else {
+      console.log('[MenuLove] Partners found - skipping Google Places search to prioritize partner data');
+    }
 
-    // 3. Merge: Partners first, then Google (avoid duplicates)
-    const partnerNames = new Set(partnerRestaurants.map(r => r.name.toLowerCase()));
-    const filteredGoogle = googleRestaurants.filter(r => !partnerNames.has(r.name.toLowerCase()));
-    const merged = [...partnerRestaurants, ...filteredGoogle];
+    // 3. Merge: Partners first (always), then Google only if no partners
+    const merged = [...partnerRestaurants, ...googleRestaurants];
+    console.log('[MenuLove] Merged restaurants:', merged.map(r => `${r.name} (partner: ${r.isSubscribed})`));
 
     // Enrich with filter data
     const enriched = merged.map(r => enrichRestaurantWithFilters(r));
     
-    console.log('[MenuLove] Text search returned', enriched.length, 'restaurants (', partnerRestaurants.length, 'partners +', filteredGoogle.length, 'Google) for:', query);
+    console.log('[MenuLove] Text search returned', enriched.length, 'restaurants (', partnerRestaurants.length, 'partners +', googleRestaurants.length, 'Google) for:', query);
     return enriched;
   } catch (error) {
     console.error('[MenuLove] Text search error:', error);

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { textSearchRestaurants } from '../services/googlePlacesProxy';
 import RestaurantProfile from '../screens/RestaurantProfile';
+import DesktopRestaurantProfile from './DesktopRestaurantProfile';
 import { Loader2 } from 'lucide-react';
 
 interface RestaurantProfileLoaderProps {
@@ -13,6 +14,15 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug,
   const [restaurant, setRestaurant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
+
+  // Desktop detection
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   useEffect(() => {
     const loadRestaurant = async () => {
@@ -95,7 +105,8 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug,
             description: item.description,
             category: item.category,
             videoUrl: item.video_url,
-            thumbnailUrl: item.video_url,
+            photoUrl: item.photo_url,
+            thumbnailUrl: item.video_url || item.photo_url,
             price: item.price,
             isFeatured: item.is_featured || false,
           })),
@@ -105,6 +116,7 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug,
             description: item.description,
             category: item.category,
             videoUrl: item.video_url,
+            photoUrl: item.photo_url,
             price: item.price,
           })),
           categories,
@@ -147,6 +159,18 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug,
           Discover Restaurants
         </a>
       </div>
+    );
+  }
+
+  // Render desktop or mobile version based on screen size
+  if (isDesktop) {
+    return (
+      <DesktopRestaurantProfile 
+        restaurant={restaurant}
+        onClose={() => window.location.href = '/'}
+        isSaved={false}
+        onToggleSave={() => {}}
+      />
     );
   }
 

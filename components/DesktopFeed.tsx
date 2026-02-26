@@ -149,7 +149,21 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
     : restaurants;
 
   // Separate subscribed (with video) and non-subscribed
-  const subscribedRestaurants = filteredRestaurants.filter(r => r.isSubscribed);
+  const allSubscribedRestaurants = filteredRestaurants.filter(r => r.isSubscribed);
+  
+  // TEMPORARY LOGIC: Always show partner banners until we have 10+ partners
+  // This helps showcase the platform to new cafes/restaurants
+  // TODO: When we have 10+ partners, revert to standard filtering (5km radius, open now, etc)
+  const subscribedRestaurants = allSubscribedRestaurants.length < 10
+    ? allSubscribedRestaurants // Show all partners regardless of filters
+    : allSubscribedRestaurants.filter(r => {
+        // Apply "Open Now" filter only when we have 10+ partners
+        if (showOpenOnly) {
+          return calculateIsOpenNow(r);
+        }
+        return true;
+      });
+  
   const otherRestaurants = filteredRestaurants.filter(r => !r.isSubscribed);
   const displayedOtherRestaurants = otherRestaurants.slice(0, itemsToShow);
   const hasMore = otherRestaurants.length > itemsToShow;
