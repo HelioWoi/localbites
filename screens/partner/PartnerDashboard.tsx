@@ -255,7 +255,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const loadData = async () => {
     console.log('loadData started');
     try {
-      // Load partner data
+      // Load partner data by ID first
       const { data: partner, error: partnerError } = await supabase
         .from('partners')
         .select('*')
@@ -266,12 +266,40 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
       let currentPartner = partner;
 
-      // If no partner exists, create one
-      if (!currentPartner) {
-        console.log('No partner found, creating one...');
-        const trialEnds = new Date();
-        trialEnds.setDate(trialEnds.getDate() + 30);
+      // Fallback: if not found by ID, try by email (handles ID mismatch after re-signup)
+      if (!currentPartner && user.email) {
+        console.log('Partner not found by ID, trying by email:', user.email);
+        const { data: partnerByEmail } = await supabase
+          .from('partners')
+          .select('*')
+          .eq('email', user.email)
+          .maybeSingle();
 
+        if (partnerByEmail) {
+          console.log('Partner found by email, fixing ID mismatch...');
+          // Update the partner ID to match the current auth user ID
+          const { data: updatedPartner, error: updateError } = await supabase
+            .from('partners')
+            .update({ id: user.id })
+            .eq('email', user.email)
+            .select()
+            .single();
+
+          if (updateError) {
+            console.error('Error fixing partner ID:', updateError);
+            // Still use the partner data we found
+            currentPartner = partnerByEmail;
+          } else {
+            console.log('Partner ID fixed:', updatedPartner);
+            currentPartner = updatedPartner;
+          }
+        }
+      }
+
+      // If no partner exists, only create if we have pending signup data
+      if (!currentPartner) {
+        console.log('No partner found, checking for pending signup data...');
+        
         // Check for pending signup data (saved during registration)
         let pendingData: any = null;
         try {
@@ -279,43 +307,53 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           if (raw) pendingData = JSON.parse(raw);
         } catch (e) { /* ignore */ }
 
-        const restaurantName = pendingData?.restaurant_name || '';
-        const slug = restaurantName
-          ? restaurantName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-          : '';
+        // Only create partner if we have pending signup data (signup flow)
+        // Otherwise, partner should already exist (login flow)
+        if (pendingData) {
+          console.log('Found pending signup data, creating partner...');
+          const trialEnds = new Date();
+          trialEnds.setDate(trialEnds.getDate() + 30);
 
-        const partnerInsert = {
-          id: user.id,
-          email: user.email,
-          restaurant_name: restaurantName || null,
-          abn: pendingData?.abn || null,
-          address: pendingData?.address || null,
-          postal_code: pendingData?.postal_code || null,
-          phone: pendingData?.phone || null,
-          website: pendingData?.website || null,
-          slug: slug || null,
-          plan: pendingData?.hasLifetimeAccess ? 'lifetime' : 'trial',
-          trial_ends_at: pendingData?.hasLifetimeAccess ? null : trialEnds.toISOString(),
-          subscription_status: 'active',
-          lifetime_access: pendingData?.hasLifetimeAccess || false,
-        };
+          const restaurantName = pendingData?.restaurant_name || '';
+          const slug = restaurantName
+            ? restaurantName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+            : '';
 
-        const { data: newPartner, error: createError } = await supabase
-          .from('partners')
-          .upsert(partnerInsert, { onConflict: 'id' })
-          .select()
-          .single();
+          const partnerInsert = {
+            id: user.id,
+            email: user.email,
+            restaurant_name: restaurantName || null,
+            abn: pendingData?.abn || null,
+            address: pendingData?.address || null,
+            postal_code: pendingData?.postal_code || null,
+            phone: pendingData?.phone || null,
+            website: pendingData?.website || null,
+            slug: slug || null,
+            plan: pendingData?.hasLifetimeAccess ? 'lifetime' : 'trial',
+            trial_ends_at: pendingData?.hasLifetimeAccess ? null : trialEnds.toISOString(),
+            subscription_status: 'active',
+            lifetime_access: pendingData?.hasLifetimeAccess || false,
+          };
 
-        if (createError) {
-          console.error('Error creating partner:', createError);
+          const { data: newPartner, error: createError } = await supabase
+            .from('partners')
+            .upsert(partnerInsert, { onConflict: 'id' })
+            .select()
+            .single();
+
+          if (createError) {
+            console.error('Error creating partner:', createError);
+          } else {
+            console.log('Partner created/updated:', newPartner);
+            currentPartner = newPartner;
+            // Clear pending signup data
+            localStorage.removeItem('pending_partner_signup');
+          }
         } else {
-          console.log('Partner created/updated:', newPartner);
-          currentPartner = newPartner;
-          // Clear pending signup data
-          localStorage.removeItem('pending_partner_signup');
+          console.log('No pending signup data - partner should exist but was not found. This may be a data issue.');
         }
 
-        // If upsert did not return a record (or creation failed due to RLS/other issues), try fetching again.
+        // If still no partner, try fetching again in case it exists but wasn't returned
         if (!currentPartner) {
           const { data: refetchedPartner, error: refetchError } = await supabase
             .from('partners')

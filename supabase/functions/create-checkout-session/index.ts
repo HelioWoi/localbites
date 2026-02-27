@@ -102,7 +102,7 @@ serve(async (req) => {
 
     console.log("[Checkout] Creating checkout session with customer:", customerId);
     
-    // Create checkout session
+    // Create checkout session (no Stripe trial - partner already had 30-day in-app trial)
     const sessionParams = new URLSearchParams({
       customer: customerId,
       mode: 'subscription',
@@ -112,7 +112,6 @@ serve(async (req) => {
       success_url: successUrl || 'https://menulove.com.au/partner?success=true',
       cancel_url: cancelUrl || 'https://menulove.com.au/partner?canceled=true',
       'metadata[partner_id]': partnerId,
-      'subscription_data[trial_period_days]': '14',
       'subscription_data[metadata][partner_id]': partnerId,
     });
     
