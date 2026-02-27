@@ -771,8 +771,9 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         <button
           onClick={async () => {
             const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            // Public share link uses /restaurant-name (not /r/ - that's QR code only)
             const shareUrl = restaurant.isSubscribed 
-              ? `${window.location.origin}/r/${slug}`
+              ? `${window.location.origin}/${slug}`
               : `${window.location.origin}${window.location.pathname}?restaurant=${encodeURIComponent(restaurant.id)}`;
             const shareData = {
               title: restaurant.name,
