@@ -84,6 +84,14 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   // Toast notification state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
+  // Password change modal
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  
   // Menu upload state
   const [showMenuUploadModal, setShowMenuUploadModal] = useState(false);
   const [showMenuImportModal, setShowMenuImportModal] = useState(false);
@@ -225,6 +233,14 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     console.log('PartnerDashboard mounted or user changed, loading data...');
     console.log('Current user:', user);
     loadData();
+    
+    // Check if should show password modal after welcome modal
+    const shouldShowPasswordModal = sessionStorage.getItem('show_password_modal');
+    if (shouldShowPasswordModal) {
+      console.log('[PartnerDashboard] Opening password modal after welcome');
+      sessionStorage.removeItem('show_password_modal');
+      setShowPasswordModal(true);
+    }
   }, [user]);
 
   const loadData = async () => {
@@ -484,7 +500,84 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     }
   };
 
+  // Password change handler
+  const handleChangePassword = async () => {
+    setPasswordError('');
+    
+    // Validation
+    if (!newPasswordInput || !confirmPasswordInput) {
+      setPasswordError('Please fill in all fields');
+      return;
+    }
+    
+    if (newPasswordInput !== confirmPasswordInput) {
+      setPasswordError('New passwords do not match');
+      return;
+    }
+    
+    if (newPasswordInput.length < 6) {
+      setPasswordError('Password must be at least 6 characters');
+      return;
+    }
+    
+    setIsChangingPassword(true);
+    
+    try {
+      // Update to new password directly (no current password needed)
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPasswordInput,
+      });
+      
+      if (updateError) throw updateError;
+      
+      // Success
+      alert('Password updated successfully!');
+      setShowPasswordModal(false);
+      setCurrentPassword('');
+      setNewPasswordInput('');
+      setConfirmPasswordInput('');
+    } catch (error: any) {
+      setPasswordError(error.message || 'Failed to update password');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   // Menu item handlers
+  // Helper function to insert menu item (handles admin impersonation)
+  const insertMenuItem = async (insertData: any) => {
+    const impersonatePartnerId = localStorage.getItem('admin_impersonate_partner_id');
+    const isAdminImpersonating = !!impersonatePartnerId;
+
+    if (isAdminImpersonating) {
+      console.log('Using admin Edge Function for INSERT');
+      const { data: edgeData, error: edgeError } = await supabase.functions.invoke('admin-update-menu-item', {
+        body: {
+          insertData,
+          adminImpersonatePartnerId: impersonatePartnerId
+        }
+      });
+
+      if (edgeError) {
+        throw edgeError;
+      }
+      if (edgeData?.error) {
+        throw new Error(edgeData.error);
+      }
+      return edgeData?.data;
+    } else {
+      // Normal insert for non-admin users
+      const { data, error } = await supabase
+        .from('menu_items')
+        .insert(insertData)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    }
+  };
+
   const handleMenuUpload = async () => {
     // If editing, use update function instead
     if (editingMenuItem) {
@@ -514,22 +607,16 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     if (!hasVideo && !hasPhoto) {
       setIsUploading(true);
       try {
-        const { data: item, error: itemError } = await supabase
-          .from('menu_items')
-          .insert({
-            partner_id: partnerData.id,
-            name: menuItemName.trim(),
-            category: finalCategory,
-            description: menuItemDescription.trim() || null,
-            price: menuItemPrice ? parseFloat(menuItemPrice) : null,
-            photo_url: null,
-            video_url: '',
-            sort_order: menuItems.filter(i => i.category === finalCategory).length,
-          })
-          .select()
-          .single();
-
-        if (itemError) throw itemError;
+        const item = await insertMenuItem({
+          partner_id: partnerData.id,
+          name: menuItemName.trim(),
+          category: finalCategory,
+          description: menuItemDescription.trim() || null,
+          price: menuItemPrice ? parseFloat(menuItemPrice) : null,
+          photo_url: null,
+          video_url: '',
+          sort_order: menuItems.filter(i => i.category === finalCategory).length,
+        });
 
         setMenuItems([...menuItems, item]);
         if (!categories.includes(finalCategory)) {
@@ -567,22 +654,16 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           .from('menu-videos')
           .getPublicUrl(fileName);
 
-        const { data: item, error: itemError } = await supabase
-          .from('menu_items')
-          .insert({
-            partner_id: partnerData.id,
-            name: menuItemName.trim(),
-            category: finalCategory,
-            description: menuItemDescription.trim() || null,
-            price: menuItemPrice ? parseFloat(menuItemPrice) : null,
-            photo_url: publicUrl,
-            video_url: '',
-            sort_order: menuItems.filter(i => i.category === finalCategory).length,
-          })
-          .select()
-          .single();
-
-        if (itemError) throw itemError;
+        const item = await insertMenuItem({
+          partner_id: partnerData.id,
+          name: menuItemName.trim(),
+          category: finalCategory,
+          description: menuItemDescription.trim() || null,
+          price: menuItemPrice ? parseFloat(menuItemPrice) : null,
+          photo_url: publicUrl,
+          video_url: '',
+          sort_order: menuItems.filter(i => i.category === finalCategory).length,
+        });
         setUploadProgress(100);
 
         setMenuItems([...menuItems, item]);
@@ -710,23 +791,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       console.log('Attempting to insert menu item:', insertData);
       console.log('Current auth user:', (await supabase.auth.getUser()).data.user?.id);
 
-      const { data: item, error: itemError } = await supabase
-        .from('menu_items')
-        .insert(insertData)
-        .select()
-        .single();
-
-      if (itemError) {
-        console.error('❌ DATABASE INSERT FAILED:', itemError);
-        console.error('Error details:', {
-          message: itemError.message,
-          details: itemError.details,
-          hint: itemError.hint,
-          code: itemError.code
-        });
-        alert(`Database error: ${itemError.message}\nDetails: ${itemError.details || 'No details'}\nHint: ${itemError.hint || 'No hint'}`);
-        throw itemError;
-      }
+      const item = await insertMenuItem(insertData);
       
       console.log('✅ Menu item inserted successfully:', item);
       setUploadProgress(100);
@@ -752,6 +817,14 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   };
 
   const handleUpdateMenuItem = async () => {
+    console.log('=== handleUpdateMenuItem STARTED ===');
+    console.log('Form state at save time:');
+    console.log('  menuItemName:', menuItemName);
+    console.log('  menuItemCategory:', menuItemCategory);
+    console.log('  menuItemDescription:', menuItemDescription);
+    console.log('  menuItemPrice:', menuItemPrice);
+    console.log('  editingMenuItem:', editingMenuItem);
+    
     if (!editingMenuItem || !menuItemName.trim() || !partnerData) return;
 
     const finalCategory = menuItemCategory === '__new__' ? newCategory.trim() : menuItemCategory.trim();
@@ -842,12 +915,17 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       setUploadProgress(80);
 
       console.log('Before creating updateData - videoUrl:', videoUrl, 'photoUrl:', photoUrl);
+      console.log('Price field - raw value:', menuItemPrice);
+      
+      // Parse price correctly - empty string should be null, not 0
+      const parsedPrice = menuItemPrice && menuItemPrice.trim() !== '' ? parseFloat(menuItemPrice) : null;
+      console.log('Price field - parsed:', parsedPrice);
 
       const updateData = {
         name: menuItemName.trim(),
         category: finalCategory,
         description: menuItemDescription.trim() || null,
-        price: menuItemPrice ? parseFloat(menuItemPrice) : null,
+        price: parsedPrice,
         photo_url: photoUrl,
         video_url: videoUrl,
       };
@@ -875,13 +953,49 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       console.log('Update data:', JSON.stringify(updateData, null, 2));
       console.log('video_url in updateData:', updateData.video_url);
 
-      const { data: updateResult, error } = await supabase
-        .from('menu_items')
-        .update(updateData)
-        .eq('id', editingMenuItem.id)
-        .select();
+      // If admin is impersonating, use Edge Function to bypass RLS
+      // because RLS policies check auth.uid() which will be the admin's ID
+      const isAdminImpersonating = !!impersonatePartnerId;
+      console.log('Is admin impersonating?', isAdminImpersonating);
+
+      let updateResult;
+      let error;
+
+      if (isAdminImpersonating) {
+        console.log('Using admin Edge Function to bypass RLS');
+        const { data: edgeData, error: edgeError } = await supabase.functions.invoke('admin-update-menu-item', {
+          body: {
+            itemId: editingMenuItem.id,
+            updateData,
+            adminImpersonatePartnerId: impersonatePartnerId
+          }
+        });
+        
+        console.log('Edge Function response:', edgeData);
+        console.log('Edge Function error:', edgeError);
+        
+        if (edgeError) {
+          error = edgeError;
+        } else if (edgeData?.error) {
+          error = { message: edgeData.error };
+        } else {
+          updateResult = edgeData?.data ? [edgeData.data] : null;
+        }
+      } else {
+        const { data, error: dbError } = await supabase
+          .from('menu_items')
+          .update(updateData)
+          .eq('id', editingMenuItem.id)
+          .select('*');
+        
+        updateResult = data;
+        error = dbError;
+      }
       
       console.log('Update result:', updateResult);
+      console.log('Update result price:', updateResult?.[0]?.price);
+      console.log('Expected price:', updateData.price);
+      console.log('Full update result object:', JSON.stringify(updateResult, null, 2));
 
       if (error) {
         console.error('❌ DATABASE UPDATE FAILED:', error);
@@ -908,12 +1022,19 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         console.error('❌ Failed to verify update:', verifyError);
       } else {
         console.log('✅ Verified data in database:', verifyData);
+        console.log('Price verification - Expected:', updateData.price, 'Actual in DB:', verifyData.price);
         if (verifyData.video_url !== videoUrl) {
           console.error('⚠️ WARNING: Database has different video_url!', {
             expected: videoUrl,
             actual: verifyData.video_url
           });
           alert('WARNING: Video URL in database does not match! Check console.');
+        }
+        if (verifyData.price !== updateData.price) {
+          console.error('⚠️ WARNING: Database has different price!', {
+            expected: updateData.price,
+            actual: verifyData.price
+          });
         }
       }
       
@@ -1710,11 +1831,16 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            console.log('Editing item:', item);
+                            console.log('Item price:', item.price);
+                            console.log('Price as string:', item.price?.toString());
                             setEditingMenuItem(item);
                             setMenuItemName(item.name);
                             setMenuItemCategory(item.category);
                             setMenuItemDescription(item.description || '');
-                            setMenuItemPrice(item.price?.toString() || '');
+                            const priceValue = item.price?.toString() || '';
+                            console.log('Setting menuItemPrice to:', priceValue);
+                            setMenuItemPrice(priceValue);
                             setShowMenuUploadModal(true);
                           }}
                           className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center shadow-md hover:bg-orange-600 transition-colors"
@@ -2200,12 +2326,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                 <div>
                   <label className="block text-xs font-medium text-zinc-500 mb-1">Password</label>
                   <button
-                    onClick={() => {
-                      supabase.auth.resetPasswordForEmail(user.email, {
-                        redirectTo: `${window.location.origin}/partner`,
-                      });
-                      alert('Password reset email sent!');
-                    }}
+                    onClick={() => setShowPasswordModal(true)}
                     className="text-sm text-orange-500 font-medium hover:underline"
                   >
                     Change password
@@ -2461,10 +2582,17 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">$</span>
                   <input
+                    key={`price-${editingMenuItem?.id || 'new'}`}
                     type="number"
                     step="0.01"
                     value={menuItemPrice}
-                    onChange={(e) => setMenuItemPrice(e.target.value)}
+                    onClick={() => console.log('Price input clicked, current value:', menuItemPrice)}
+                    onFocus={() => console.log('Price input focused, current value:', menuItemPrice)}
+                    onChange={(e) => {
+                      console.log('Price input changed to:', e.target.value);
+                      setMenuItemPrice(e.target.value);
+                    }}
+                    onBlur={() => console.log('Price input blur, final value:', menuItemPrice)}
                     placeholder="0.00"
                     className="w-full px-4 py-3 pl-8 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
                   />
@@ -2763,6 +2891,93 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         }}
         onCancel={() => setDeleteConfirmation({ show: false, type: 'item' })}
       />
+
+      {/* Password Change Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-zinc-900">Change Password</h2>
+              <button
+                onClick={() => {
+                  setShowPasswordModal(false);
+                  setPasswordError('');
+                  setCurrentPassword('');
+                  setNewPasswordInput('');
+                  setConfirmPasswordInput('');
+                }}
+                className="text-zinc-400 hover:text-zinc-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-2">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  value={newPasswordInput}
+                  onChange={(e) => setNewPasswordInput(e.target.value)}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Minimum 6 characters"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-2">
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  value={confirmPasswordInput}
+                  onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Re-enter new password"
+                />
+              </div>
+
+              {passwordError && (
+                <div className="bg-red-50 border border-red-200 p-3 rounded-lg flex items-start gap-2">
+                  <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-900">{passwordError}</p>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setPasswordError('');
+                    setCurrentPassword('');
+                    setNewPasswordInput('');
+                    setConfirmPasswordInput('');
+                  }}
+                  className="flex-1 px-4 py-3 bg-zinc-100 text-zinc-700 rounded-xl font-medium hover:bg-zinc-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleChangePassword}
+                  disabled={isChangingPassword}
+                  className="flex-1 px-4 py-3 bg-orange-500 text-white rounded-xl font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isChangingPassword ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Password'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

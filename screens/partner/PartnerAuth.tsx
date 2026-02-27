@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Utensils, Mail, Lock, ArrowRight, CheckCircle, Loader2, Eye, EyeOff, Building2, Hash, AlertCircle, MapPin, Phone, Globe } from 'lucide-react';
+import { Utensils, Mail, Lock, ArrowRight, CheckCircle, Loader2, Eye, EyeOff, Building2, Hash, AlertCircle, MapPin, Phone, Globe, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { verifyABN, formatABN, isValidABNFormat } from '../../services/abnVerification';
 
@@ -8,7 +8,27 @@ interface PartnerAuthProps {
 }
 
 const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
-  const [mode, setMode] = useState<'login' | 'signup' | 'magic' | 'sent' | 'reset-password'>('signup');
+  // Check for password recovery token BEFORE initializing state
+  const fullHash = window.location.hash;
+  const hashParams = new URLSearchParams(fullHash.substring(1));
+  const typeParam = hashParams.get('type');
+  const accessToken = hashParams.get('access_token');
+  // Check for recovery in multiple ways: type=recovery, #reset, or access_token with recovery
+  const isRecovery = typeParam === 'recovery' || 
+                     fullHash === '#reset' || 
+                     (accessToken && fullHash.includes('type=recovery'));
+  
+  console.log('=== [PartnerAuth] Recovery Detection ===');
+  console.log('Full URL:', window.location.href);
+  console.log('Hash:', fullHash);
+  console.log('Type param:', typeParam);
+  console.log('Access token exists?', !!accessToken);
+  console.log('Is recovery?', isRecovery);
+  console.log('Initial mode will be:', isRecovery ? 'reset-password' : 'signup');
+  
+  const [mode, setMode] = useState<'login' | 'signup' | 'magic' | 'sent' | 'reset-password'>(
+    isRecovery ? 'reset-password' : 'login'
+  );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -33,20 +53,57 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
 
   // Track if user came from landing page
   const [isFromLandingPage, setIsFromLandingPage] = useState(false);
+  
+  // Forgot password modal
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [isSendingReset, setIsSendingReset] = useState(false);
+  const [showMagicLinkSentModal, setShowMagicLinkSentModal] = useState(false);
+  const [sentToEmail, setSentToEmail] = useState('');
 
-  // Check for password recovery token in URL
+  // Listen for auth events
   useEffect(() => {
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const type = hashParams.get('type');
-    
-    if (type === 'recovery') {
-      console.log('[PartnerAuth] Password recovery detected');
-      setMode('reset-password');
-    }
-  }, []);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[PartnerAuth] Auth event:', event);
+      
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log('[PartnerAuth] Password recovery event detected - switching to reset mode');
+        setMode('reset-password');
+      }
+      
+      if (event === 'SIGNED_IN' && session) {
+        console.log('[PartnerAuth] SIGNED_IN event - session:', session);
+        console.log('[PartnerAuth] User metadata:', session.user.app_metadata);
+        console.log('[PartnerAuth] AMR:', session.user.app_metadata?.amr);
+        
+        // Check if this was a magic link login (OTP)
+        const amr = session.user.app_metadata?.amr;
+        const isMagicLink = amr && amr.some((m: any) => m.method === 'otp');
+        
+        console.log('[PartnerAuth] Is magic link?', isMagicLink);
+        
+        if (isMagicLink) {
+          console.log('[PartnerAuth] Magic link login detected - setting sessionStorage');
+          sessionStorage.setItem('magic_link_login', 'true');
+          console.log('[PartnerAuth] sessionStorage set:', sessionStorage.getItem('magic_link_login'));
+        }
+        
+        onAuthSuccess();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [onAuthSuccess]);
 
   // Pre-fill form with data from landing page (Step 1)
   useEffect(() => {
+    // Don't override if this is a password recovery
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const type = hashParams.get('type');
+    if (type === 'recovery') {
+      return; // Don't pre-fill or change mode if recovering password
+    }
+
     const savedData = sessionStorage.getItem('partnerSignupStep1');
     if (savedData) {
       try {
@@ -145,6 +202,11 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
     setError('');
 
     try {
+      // CRITICAL: Sign out any existing session before creating new account
+      await supabase.auth.signOut();
+      console.log('[Signup] Signed out any existing session');
+      
+
       // Validate promo code if provided
       let hasLifetimeAccess = false;
       if (promoCode.trim()) {
@@ -292,16 +354,28 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
     setError('');
 
     try {
+      console.log('[Reset Password] Attempting to update password...');
+      
+      // Check current session
+      const { data: sessionData } = await supabase.auth.getSession();
+      console.log('[Reset Password] Current session:', sessionData.session ? 'exists' : 'missing');
+      console.log('[Reset Password] Session user:', sessionData.session?.user?.email);
+      
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[Reset Password] Update error:', error);
+        throw error;
+      }
 
+      console.log('[Reset Password] Password updated successfully!');
       alert('Password updated successfully!');
       window.location.href = '/partner';
     } catch (err: any) {
-      setError(err.message || 'Failed to update password');
+      console.error('[Reset Password] Failed:', err);
+      setError(err.message || 'Failed to update password. Please try requesting a new reset link.');
     } finally {
       setIsLoading(false);
     }
@@ -716,6 +790,16 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
               {mode === 'login' && (
                 <>
                   <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotPasswordModal(true);
+                      setForgotPasswordEmail(email);
+                    }}
+                    className="w-full text-center text-sm text-orange-500 font-medium hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                  <button
                     onClick={() => { setMode('magic'); setError(''); }}
                     className="w-full text-center text-sm text-zinc-500 hover:text-zinc-700"
                   >
@@ -750,6 +834,142 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
 
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotPasswordModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-zinc-900">Reset Password</h2>
+              <button
+                onClick={() => {
+                  setShowForgotPasswordModal(false);
+                  setForgotPasswordEmail('');
+                  setError('');
+                }}
+                className="text-zinc-400 hover:text-zinc-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <p className="text-sm text-zinc-600 mb-4">
+              Enter your email address and we'll send you a link to reset your password.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-2">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                  <input
+                    type="email"
+                    value={forgotPasswordEmail}
+                    onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    placeholder="your@email.com"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 p-3 rounded-lg flex items-start gap-2">
+                  <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-900">{error}</p>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setShowForgotPasswordModal(false);
+                    setForgotPasswordEmail('');
+                    setError('');
+                  }}
+                  className="flex-1 px-4 py-3 bg-zinc-100 text-zinc-700 rounded-xl font-medium hover:bg-zinc-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!forgotPasswordEmail || !forgotPasswordEmail.includes('@')) {
+                      setError('Please enter a valid email address');
+                      return;
+                    }
+                    setIsSendingReset(true);
+                    setError('');
+                    try {
+                      // Use magic link with shouldCreateUser: false to only allow existing users
+                      const { error } = await supabase.auth.signInWithOtp({
+                        email: forgotPasswordEmail,
+                        options: {
+                          shouldCreateUser: false,
+                          emailRedirectTo: `${window.location.origin}/partner`,
+                        }
+                      });
+                      if (error) throw error;
+                      
+                      // Show success modal instead of alert
+                      setSentToEmail(forgotPasswordEmail);
+                      setShowForgotPasswordModal(false);
+                      setShowMagicLinkSentModal(true);
+                      setForgotPasswordEmail('');
+                    } catch (err: any) {
+                      setError(err.message || 'Failed to send login link');
+                    } finally {
+                      setIsSendingReset(false);
+                    }
+                  }}
+                  disabled={isSendingReset}
+                  className="flex-1 px-4 py-3 bg-orange-500 text-white rounded-xl font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isSendingReset ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    'Send Reset Link'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Magic Link Sent Success Modal */}
+      {showMagicLinkSentModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle size={32} className="text-emerald-600" />
+              </div>
+              <h2 className="text-xl font-bold text-zinc-900 mb-2">Check your email</h2>
+              <p className="text-sm text-zinc-600 mb-2">
+                We sent a login link to
+              </p>
+              <p className="font-semibold text-zinc-900 mb-6">{sentToEmail}</p>
+              <p className="text-sm text-zinc-500 mb-6">
+                Click the link in the email to sign in. After signing in, you can change your password from Settings.
+              </p>
+              <button
+                onClick={() => {
+                  setShowMagicLinkSentModal(false);
+                  setSentToEmail('');
+                }}
+                className="w-full px-4 py-3 bg-orange-500 text-white rounded-xl font-medium hover:bg-orange-600 transition-colors"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
