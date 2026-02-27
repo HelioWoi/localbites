@@ -257,32 +257,33 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
         }
 
         // Create partner record with all business info
+        // Generate unique slug with timestamp to avoid conflicts
+        const baseSlug = restaurantName.trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '');
+        const uniqueSlug = `${baseSlug}-${Date.now().toString(36)}`;
+
         const partnerData = {
           id: data.user.id,
           email: email.trim(),
           restaurant_name: restaurantName.trim(),
-          abn: abn.trim() ? abn.trim().replace(/\s/g, '') : null, // Remove spaces from ABN (11 digits max)
+          abn: abn.trim() ? abn.trim().replace(/\s/g, '') : null,
           address: address.trim(),
-          postal_code: postalCode.trim().replace(/\s/g, ''), // Remove spaces from postal code
-          phone: phone.trim().replace(/\s/g, ''), // Remove spaces from phone
+          postal_code: postalCode.trim().replace(/\s/g, ''),
+          phone: phone.trim().replace(/\s/g, ''),
           website: website.trim() || null,
           latitude,
           longitude,
+          slug: uniqueSlug,
           plan: hasLifetimeAccess ? 'lifetime' : 'trial',
           trial_ends_at: hasLifetimeAccess ? null : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           subscription_status: 'active',
           lifetime_access: hasLifetimeAccess,
-          is_verified: false, // Manual verification for now
+          is_verified: false,
         };
         
-        console.log('[Signup] Partner data to insert:', {
-          abn_length: partnerData.abn?.length,
-          postal_code_length: partnerData.postal_code.length,
-          phone_length: partnerData.phone.length,
-          abn: partnerData.abn,
-          postal_code: partnerData.postal_code,
-          phone: partnerData.phone
-        });
+        console.log('[Signup] Creating partner with unique slug:', uniqueSlug);
         
         const { error: insertError } = await supabase.from('partners').insert(partnerData);
         if (insertError) {
@@ -552,7 +553,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
             </h1>
             <p className="text-zinc-500 mb-6">
               {mode === 'signup' 
-                ? (isFromLandingPage ? 'Complete your registration' : 'Start your 14-day free trial')
+                ? (isFromLandingPage ? 'Complete your registration' : 'Start your 30-day free trial')
                 : mode === 'magic' 
                   ? 'We\'ll send you a login link'
                   : 'Sign in to manage your restaurant'}

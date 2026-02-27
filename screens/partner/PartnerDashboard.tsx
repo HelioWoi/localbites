@@ -179,11 +179,20 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         .eq('id', partnerData.id)
         .single();
       
+      console.log('[PartnerDashboard] Subscription status check:', {
+        partner_id: partnerData.id,
+        trial_ends_at: partner?.trial_ends_at,
+        subscription_status: partner?.subscription_status,
+        subscription_end_date: partner?.subscription_end_date,
+        lifetime_access: partner?.lifetime_access
+      });
+      
       // Priority 0: Lifetime Access (NEVER EXPIRES)
       if (partner?.lifetime_access === true) {
         setSubscriptionDaysLeft(999); // Show as unlimited
         setHasActiveSubscription(true);
         setHasPaidSubscription(true); // Treat as premium
+        console.log('[PartnerDashboard] Lifetime access detected');
         return;
       }
       
@@ -226,7 +235,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   
   // Trial is active only if user is on FREE trial (not paid subscription)
   const isTrialActive = hasActiveSubscription && !hasPaidSubscription && subscriptionDaysLeft > 0 && subscriptionDaysLeft <= 30;
-  const isTrialExpired = !hasActiveSubscription && subscriptionDaysLeft === 0;
+  const isTrialExpired = !!partnerData && !hasActiveSubscription && subscriptionDaysLeft === 0;
   const maxVideos = hasActiveSubscription ? Infinity : 5;
 
   useEffect(() => {
@@ -261,7 +270,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       if (!currentPartner) {
         console.log('No partner found, creating one...');
         const trialEnds = new Date();
-        trialEnds.setDate(trialEnds.getDate() + 14);
+        trialEnds.setDate(trialEnds.getDate() + 30);
 
         // Check for pending signup data (saved during registration)
         let pendingData: any = null;
@@ -275,33 +284,47 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           ? restaurantName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
           : '';
 
+        const partnerInsert = {
+          id: user.id,
+          email: user.email,
+          restaurant_name: restaurantName || null,
+          abn: pendingData?.abn || null,
+          address: pendingData?.address || null,
+          postal_code: pendingData?.postal_code || null,
+          phone: pendingData?.phone || null,
+          website: pendingData?.website || null,
+          slug: slug || null,
+          plan: pendingData?.hasLifetimeAccess ? 'lifetime' : 'trial',
+          trial_ends_at: pendingData?.hasLifetimeAccess ? null : trialEnds.toISOString(),
+          subscription_status: 'active',
+          lifetime_access: pendingData?.hasLifetimeAccess || false,
+        };
+
         const { data: newPartner, error: createError } = await supabase
           .from('partners')
-          .insert({
-            id: user.id,
-            email: user.email,
-            restaurant_name: restaurantName || null,
-            abn: pendingData?.abn || null,
-            address: pendingData?.address || null,
-            postal_code: pendingData?.postal_code || null,
-            phone: pendingData?.phone || null,
-            website: pendingData?.website || null,
-            slug: slug || null,
-            plan: pendingData?.hasLifetimeAccess ? 'lifetime' : 'trial',
-            trial_ends_at: pendingData?.hasLifetimeAccess ? null : trialEnds.toISOString(),
-            subscription_status: 'active',
-            lifetime_access: pendingData?.hasLifetimeAccess || false,
-          })
+          .upsert(partnerInsert, { onConflict: 'id' })
           .select()
           .single();
 
         if (createError) {
           console.error('Error creating partner:', createError);
         } else {
-          console.log('Partner created:', newPartner);
+          console.log('Partner created/updated:', newPartner);
           currentPartner = newPartner;
           // Clear pending signup data
           localStorage.removeItem('pending_partner_signup');
+        }
+
+        // If upsert did not return a record (or creation failed due to RLS/other issues), try fetching again.
+        if (!currentPartner) {
+          const { data: refetchedPartner, error: refetchError } = await supabase
+            .from('partners')
+            .select('*')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          console.log('Partner refetched:', refetchedPartner, refetchError);
+          if (refetchedPartner) currentPartner = refetchedPartner;
         }
       }
 
