@@ -281,42 +281,50 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
       )}
 
       {!isActive && !isLifetime && (
-      <div className="grid md:grid-cols-2 gap-6 mb-8">
-            {/* Monthly Plan */}
-            <div className="bg-white border-2 border-zinc-200 rounded-3xl p-8 hover:border-orange-500 transition-all">
+      <div className="max-w-md mx-auto mb-8">
+            {/* Monthly Plan Only */}
+            <div className="bg-white border-2 border-zinc-200 rounded-3xl p-8 shadow-sm">
               <div className="text-center mb-6">
-                <h3 className="text-xl font-bold text-zinc-900 mb-2">Monthly</h3>
+                <h3 className="text-2xl font-bold text-zinc-900 mb-2">Monthly</h3>
                 <div className="flex items-baseline justify-center gap-1">
                   <span className="text-5xl font-bold text-zinc-900">$29.90</span>
                   <span className="text-zinc-500">/month</span>
                 </div>
               </div>
 
-              <div className="border border-zinc-200 rounded-xl p-3 mb-4">
-                <p className="text-zinc-600 text-sm font-medium text-center">
-                  14-day free trial
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-6">
+                <p className="text-orange-600 text-sm font-medium text-center">
+                  30-day free trial
                 </p>
               </div>
 
               <ul className="space-y-3 mb-6">
-                <li className="flex items-center gap-2">
-                  <Check size={20} className="text-green-500" />
+                <li className="flex items-start gap-2">
+                  <Check size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
                   <span className="text-zinc-700">Unlimited video uploads</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <Check size={20} className="text-green-500" />
+                <li className="flex items-start gap-2">
+                  <Check size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-700">QR Code menu for your restaurant</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-700">Smart search & discovery</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
                   <span className="text-zinc-700">Premium profile badge</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <Check size={20} className="text-green-500" />
+                <li className="flex items-start gap-2">
+                  <Check size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
                   <span className="text-zinc-700">Featured in search results</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <Check size={20} className="text-green-500" />
+                <li className="flex items-start gap-2">
+                  <Check size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
                   <span className="text-zinc-700">Analytics dashboard</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <Check size={20} className="text-green-500" />
+                <li className="flex items-start gap-2">
+                  <Check size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
                   <span className="text-zinc-700">Priority support</span>
                 </li>
               </ul>
@@ -337,69 +345,6 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
                   <>
                     <CreditCard size={20} />
                     Subscribe Monthly
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Annual Plan */}
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-3xl p-8 relative overflow-hidden">
-              <div className="absolute top-4 right-4 bg-white text-orange-500 px-3 py-1 rounded-full text-xs font-bold">
-                SAVE 19%
-              </div>
-
-              <div className="text-center mb-6">
-                <h3 className="text-xl font-bold mb-2">Annual</h3>
-                <div className="flex items-baseline justify-center gap-1">
-                  <span className="text-5xl font-bold">$290</span>
-                  <span className="text-white/80">/year</span>
-                </div>
-                <p className="text-white/60 text-sm mt-1">$24.17/month</p>
-              </div>
-
-              <ul className="space-y-3 mb-6">
-                <li className="flex items-center gap-2">
-                  <Check size={20} className="text-white" />
-                  <span>Unlimited video uploads</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check size={20} className="text-white" />
-                  <span>Premium profile badge</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check size={20} className="text-white" />
-                  <span>Featured in search results</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check size={20} className="text-white" />
-                  <span>Analytics dashboard</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check size={20} className="text-white" />
-                  <span>Priority support</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check size={20} className="text-white font-bold" />
-                  <span className="font-bold">Save $68.80/year</span>
-                </li>
-              </ul>
-
-              <p className="text-white/60 text-sm text-center mb-8">Cancel anytime</p>
-
-              <button
-                onClick={() => handleSubscribe(PRICE_IDS.annual)}
-                disabled={processingCheckout}
-                className="w-full bg-white text-orange-500 font-bold py-4 rounded-2xl hover:bg-white/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {processingCheckout ? (
-                  <>
-                    <Loader2 size={20} className="animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <CreditCard size={20} />
-                    Subscribe Annually
                   </>
                 )}
               </button>

@@ -329,8 +329,11 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
                     Content Moderation
                   </a>
                 </div>
-                <p className="text-[10px] text-white/50">
-                  Made with ❤️ in Australia | <a href="mailto:contact@menulove.com.au" className="text-orange-400 hover:text-orange-300 transition-colors">contact@menulove.com.au</a>
+                <p className="text-[10px] text-white/50 mb-1">
+                  Made with <span className="text-red-500">❤️</span> in Australia | <a href="mailto:contact@menulove.com.au" className="text-orange-400 hover:text-orange-300 transition-colors">contact@menulove.com.au</a>
+                </p>
+                <p className="text-[10px] text-white/40">
+                  All rights reserved.
                 </p>
               </div>
             </div>

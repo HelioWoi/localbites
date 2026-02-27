@@ -21,6 +21,7 @@ import BitesAI from './components/BitesAI';
 import RemovalRequestPage from './screens/RemovalRequestPage';
 import VideoMenuPlatformPage from './screens/VideoMenuPlatformPage';
 import WhyVideoMenusPage from './screens/WhyVideoMenusPage';
+import HelpPage from './screens/HelpPage';
 import { getNearbyRestaurants, getRestaurantDetails, getRemainingSearches, searchRestaurantsByQuery } from './services/geminiService';
 import { TriageData } from './services/aiAssistant';
 import { likeRestaurant, unlikeRestaurant, saveRestaurant, unsaveRestaurant, getUserLikes, getUserSaves, getAllLikesCounts } from './services/interactionService';
@@ -51,6 +52,9 @@ const isContactRoute = window.location.pathname === '/contact';
 // Check if we're on SEO pages
 const isVideoMenuPlatformRoute = window.location.pathname === '/video-menu-platform';
 const isWhyVideoMenusRoute = window.location.pathname === '/why-video-menus-increase-orders';
+
+// Check if we're on help page
+const isHelpRoute = window.location.pathname === '/help';
 
 const App: React.FC = () => {
   // Check if we're on a QR code restaurant route (/r/slug)
@@ -120,6 +124,10 @@ const App: React.FC = () => {
 
   if (isWhyVideoMenusRoute) {
     return <WhyVideoMenusPage />;
+  }
+
+  if (isHelpRoute) {
+    return <HelpPage />;
   }
 
   // If on admin route, render Super Admin Portal

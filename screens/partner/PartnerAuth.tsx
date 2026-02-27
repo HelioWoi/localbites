@@ -257,23 +257,38 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
         }
 
         // Create partner record with all business info
-        await supabase.from('partners').insert({
+        const partnerData = {
           id: data.user.id,
           email: email.trim(),
           restaurant_name: restaurantName.trim(),
-          abn: abn.trim() || null,
+          abn: abn.trim() ? abn.trim().replace(/\s/g, '') : null, // Remove spaces from ABN (11 digits max)
           address: address.trim(),
-          postal_code: postalCode.trim(),
-          phone: phone.trim(),
+          postal_code: postalCode.trim().replace(/\s/g, ''), // Remove spaces from postal code
+          phone: phone.trim().replace(/\s/g, ''), // Remove spaces from phone
           website: website.trim() || null,
           latitude,
           longitude,
           plan: hasLifetimeAccess ? 'lifetime' : 'trial',
-          trial_ends_at: hasLifetimeAccess ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+          trial_ends_at: hasLifetimeAccess ? null : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           subscription_status: 'active',
           lifetime_access: hasLifetimeAccess,
           is_verified: false, // Manual verification for now
+        };
+        
+        console.log('[Signup] Partner data to insert:', {
+          abn_length: partnerData.abn?.length,
+          postal_code_length: partnerData.postal_code.length,
+          phone_length: partnerData.phone.length,
+          abn: partnerData.abn,
+          postal_code: partnerData.postal_code,
+          phone: partnerData.phone
         });
+        
+        const { error: insertError } = await supabase.from('partners').insert(partnerData);
+        if (insertError) {
+          console.error('[Signup] Error creating partner:', insertError);
+          throw insertError;
+        }
 
         // Record promo code usage if valid
         if (hasLifetimeAccess && promoCode.trim()) {

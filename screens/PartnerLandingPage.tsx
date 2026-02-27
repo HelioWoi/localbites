@@ -539,11 +539,8 @@ const PartnerLandingPage: React.FC = () => {
       <div className="bg-zinc-900 text-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-6">
-            <p className="text-zinc-400 text-base mb-4">
-              © 2026 MenuLove Australia. All rights reserved.
-            </p>
             <div className="max-w-3xl mx-auto">
-              <p className="text-zinc-500 text-sm leading-relaxed">
+              <p className="text-zinc-500 text-sm leading-relaxed mb-4">
                 <span className="text-orange-500 font-bold">Beta Version:</span> MenuLove is currently in beta testing. 
                 We're working hard to deliver the best experience for Australian restaurants. 
                 Your feedback helps us improve and build the perfect platform for showcasing your culinary creations. 
@@ -552,8 +549,14 @@ const PartnerLandingPage: React.FC = () => {
             </div>
           </div>
           <div className="text-center pt-6 border-t border-zinc-800">
+            <p className="text-zinc-400 text-sm mb-2">
+              MenuLove - Video Menus & Smart Discovery
+            </p>
+            <p className="text-zinc-500 text-sm mb-1">
+              Made with <span className="text-red-500">❤️</span> in Australia | <a href="mailto:contact@menulove.com.au" className="text-orange-500 hover:text-orange-400 transition-colors">contact@menulove.com.au</a>
+            </p>
             <p className="text-zinc-500 text-sm">
-              Made with ❤️ in Australia | <a href="mailto:contact@menulove.com.au" className="text-orange-500 hover:text-orange-400 transition-colors">contact@menulove.com.au</a>
+              All rights reserved.
             </p>
           </div>
         </div>

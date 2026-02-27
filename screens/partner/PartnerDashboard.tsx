@@ -225,7 +225,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   }, [partnerData?.id]);
   
   // Trial is active only if user is on FREE trial (not paid subscription)
-  const isTrialActive = hasActiveSubscription && !hasPaidSubscription && subscriptionDaysLeft > 0 && subscriptionDaysLeft <= 14;
+  const isTrialActive = hasActiveSubscription && !hasPaidSubscription && subscriptionDaysLeft > 0 && subscriptionDaysLeft <= 30;
   const isTrialExpired = !hasActiveSubscription && subscriptionDaysLeft === 0;
   const maxVideos = hasActiveSubscription ? Infinity : 5;
 
@@ -688,15 +688,15 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     // === VIDEO UPLOAD ===
     if (!uploadFile) return;
 
-    // Validate file size (6MB technical limit, 5MB user-facing)
-    const maxSize = 6 * 1024 * 1024; // 6MB (margin for safety)
+    // Validate file size (10MB strict limit)
+    const maxSize = 10 * 1024 * 1024; // 10MB
     if (uploadFile.size > maxSize) {
       const sizeMB = (uploadFile.size / (1024 * 1024)).toFixed(1);
-      alert(`Video is too large (${sizeMB}MB). Maximum size is 5MB.\n\nTip: Compress your video to 720p quality.\nUse this free tool: https://www.freeconvert.com/video-compressor`);
+      alert(`Video is too large (${sizeMB}MB). Maximum size is 10MB.\n\nTip: Compress your video to 720p quality.\nUse this free tool: https://www.freeconvert.com/video-compressor`);
       return;
     }
 
-    // Validate video duration (10 seconds max)
+    // Validate video duration (30 seconds strict limit)
     const video = document.createElement('video');
     video.preload = 'metadata';
     
@@ -705,8 +705,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         window.URL.revokeObjectURL(video.src);
         const duration = video.duration;
         
-        if (duration > 16) {
-          alert(`Video is too long (${Math.round(duration)}s). Please upload a video of 15 seconds or less for best engagement.`);
+        if (duration > 30) {
+          alert(`Video is too long (${Math.round(duration)}s). Maximum duration is 30 seconds.\n\nPlease trim your video and try again.`);
           reject(new Error('Video too long'));
         } else {
           resolve();
@@ -1376,9 +1376,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               />
               <div>
                 <p className="text-sm font-semibold text-zinc-900">
-                  Welcome, {user.email?.split('@')[0] || 'Partner'}
+                  Welcome, {partnerData?.restaurant_name || user.email?.split('@')[0] || 'Partner'}
                 </p>
-                <p className="text-xs text-zinc-500">{partnerData?.restaurant_name || 'Partner Portal'}</p>
+                <p className="text-xs text-zinc-500">{user.email}</p>
               </div>
             </div>
 
@@ -2428,7 +2428,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                     >
                       <Upload size={32} className="text-zinc-400" />
                       <p className="text-sm font-medium text-zinc-600">Click to select video</p>
-                      <p className="text-xs text-zinc-400">MP4, MOV • Max 15 seconds • Max 5MB</p>
+                      <p className="text-xs text-zinc-400">MP4, MOV • Max 30 seconds • Max 10MB</p>
                     </button>
                   )}
                   <input
@@ -2978,6 +2978,21 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           </div>
         </div>
       )}
+
+      {/* Footer */}
+      <footer className="mt-12 py-8 border-t border-zinc-200 bg-white">
+        <div className="text-center">
+          <p className="text-zinc-500 text-sm mb-1">
+            MenuLove - Video Menus & Smart Discovery
+          </p>
+          <p className="text-zinc-400 text-sm mb-1">
+            Made with <span className="text-red-500">❤️</span> in Australia | <a href="mailto:contact@menulove.com.au" className="text-orange-500 hover:text-orange-600 transition-colors">contact@menulove.com.au</a>
+          </p>
+          <p className="text-zinc-400 text-sm">
+            All rights reserved.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 };

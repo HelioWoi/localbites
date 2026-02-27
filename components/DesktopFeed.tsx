@@ -232,8 +232,8 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
         {/* Hero Content */}
         <div className={`relative flex flex-col items-center justify-center h-[calc(100%-80px)] text-center px-8 ${showAutocomplete && searchQuery.trim() && suggestions.length > 0 ? 'z-50' : 'z-[5]'}`}>
           <h1 className="text-6xl xl:text-7xl font-extrabold text-white tracking-tight leading-[1.05] mb-6 max-w-4xl">
-            Discover Local
-            <span className="bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent"> Flavors</span>
+            Video Menu Platform
+            <span className="bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent"> with Smart Local Search</span>
           </h1>
           <p className="text-xl text-white/80 font-medium mb-4 max-w-2xl">
             Discover restaurants, cafes and bars near you, within a 5km radius.
@@ -834,7 +834,7 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
                 <span className="text-xl font-extrabold">MenuLove</span>
               </div>
               <p className="text-zinc-400 text-sm leading-relaxed">
-                Discover restaurants near you with video menus.
+                Video Menus & Smart Discovery
               </p>
             </div>
             <div>
@@ -842,6 +842,9 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
               <ul className="space-y-3 text-sm text-zinc-300">
                 <li><a href="/become-a-partner" className="hover:text-white transition-colors">For Restaurants</a></li>
                 <li><a href="/partner" className="hover:text-white transition-colors">Partner Portal</a></li>
+                <li><a href="/video-menu-platform" className="hover:text-white transition-colors">Video Menu Platform</a></li>
+                <li><a href="/why-video-menus-increase-orders" className="hover:text-white transition-colors">Why Video Menus</a></li>
+                <li><a href="/help" className="hover:text-white transition-colors">Help Center</a></li>
                 <li><a href="/contact" className="hover:text-white transition-colors">Contact Us</a></li>
               </ul>
             </div>
@@ -878,10 +881,13 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
             </div>
             <div className="text-center pt-6 border-t border-zinc-800 mt-6">
               <p className="text-zinc-400 text-sm mb-2">
-                © 2026 MenuLove Australia. All rights reserved.
+                MenuLove - Video Menus & Smart Discovery
+              </p>
+              <p className="text-zinc-500 text-sm mb-1">
+                Made with <span className="text-red-500">❤️</span> in Australia | <a href="mailto:contact@menulove.com.au" className="text-orange-500 hover:text-orange-400 transition-colors">contact@menulove.com.au</a>
               </p>
               <p className="text-zinc-500 text-sm">
-                Made with ❤️ in Australia | <a href="mailto:contact@menulove.com.au" className="text-orange-500 hover:text-orange-400 transition-colors">contact@menulove.com.au</a>
+                All rights reserved.
               </p>
             </div>
           </div>
