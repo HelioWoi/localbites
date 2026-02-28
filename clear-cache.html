@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Cache - MenuLove</title>
+</head>
+<body>
+    <h1>Clearing cache...</h1>
+    <script>
+        // Clear localStorage
+        localStorage.clear();
+        
+        // Clear sessionStorage
+        sessionStorage.clear();
+        
+        // Clear IndexedDB
+        if (window.indexedDB) {
+            indexedDB.databases().then(databases => {
+                databases.forEach(db => {
+                    indexedDB.deleteDatabase(db.name);
+                });
+            });
+        }
+        
+        alert('Cache cleared! Close this tab and reload the app.');
+    </script>
+</body>
+</html>

@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { isAllowedRegion, getBlockedRegionResponse } from "../_shared/geoFence.ts";
 
 const GOOGLE_API_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -12,7 +11,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 // Cache duration in hours - OPTIMIZED FOR COST REDUCTION
 const PLACES_CACHE_HOURS = 720; // 30 days - restaurants rarely change
 const LOCALITIES_CACHE_HOURS = 720; // 30 days - localities rarely change
-const STALE_THRESHOLD_HOURS = 168; // 7 days - after this, cache is stale but still usable
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -151,17 +149,6 @@ serve(async (req) => {
       throw new Error("Google Places API key not configured");
     }
 
-    // GEO-FENCE: Block requests outside Sunshine Coast and Brisbane
-    // This prevents API calls for regions we don't serve yet
-    if (lat && lng && action !== "getPhoto") {
-      const region = isAllowedRegion(lat, lng);
-      if (!region) {
-        console.warn(`[GeoFence] Blocked request outside allowed regions: lat=${lat}, lng=${lng}`);
-        return getBlockedRegionResponse(corsHeaders);
-      }
-      console.log(`[GeoFence] Request allowed in region: ${region}`);
-    }
-
     let result;
 
     switch (action) {
@@ -215,166 +202,221 @@ serve(async (req) => {
 
 async function searchNearbyRestaurants(lat: number, lng: number, radius: number, category: string = 'all') {
   // Determine search radii based on requested radius
+  // Default: 2km, 5km, 8km. Expanded: adds 10km, 15km
   const isExpanded = radius > 8000;
   const searchRadii = isExpanded ? [2000, 5000, 8000, 10000, 15000] : [2000, 5000, 8000];
   const maxRadius = searchRadii[searchRadii.length - 1];
   
   const cacheKey = `${getCacheKey(lat, lng, maxRadius)}_${category}_v2`;
-  const region = isAllowedRegion(lat, lng);
   
-  // CRITICAL: NEVER call external APIs in user request
-  // Always return cached data (even if old) and enqueue refresh if stale
+  // SMART CACHE: Check cache first with fallback logic
+  // - Fresh cache (< 7 days) with enough results → return immediately
+  // - Stale cache (7-30 days) with enough results → return but mark for refresh next time
+  // - Cache with too few results (< 10) → skip cache, call Google
+  // - Expired cache (> 30 days) or no cache → call Google
+  const STALE_THRESHOLD_HOURS = 168; // 7 days - after this, cache is "stale" but still usable
+  const MIN_CACHE_RESULTS = 10; // Minimum results to consider cache sufficient
   
   try {
     const { data: cached } = await supabase
       .from('api_cache')
-      .select('data, last_fetched_at, created_at')
+      .select('data, created_at')
       .eq('cache_key', cacheKey)
       .single();
     
-    if (cached && cached.data) {
-      const lastFetched = cached.last_fetched_at || cached.created_at;
-      const cacheAgeDays = (Date.now() - new Date(lastFetched).getTime()) / (1000 * 60 * 60 * 24);
-      const isStale = cacheAgeDays > 30;
+    if (cached) {
+      const cacheAgeHours = (Date.now() - new Date(cached.created_at).getTime()) / (1000 * 60 * 60);
+      const cacheResults = Array.isArray(cached.data) ? cached.data.length : 0;
       
-      console.log(`[Cache HIT] ${Array.isArray(cached.data) ? cached.data.length : 0} places, age: ${cacheAgeDays.toFixed(1)} days, stale: ${isStale}`);
-      
-      // Enqueue refresh if stale (non-blocking, idempotent)
-      if (isStale && region) {
-        supabase.rpc('enqueue_venue_refresh', {
-          p_cache_key: cacheKey,
-          p_lat: lat,
-          p_lng: lng,
-          p_region: region,
-        }).then(() => {
-          console.log(`[RefreshQueue] Enqueued ${cacheKey} (stale: ${cacheAgeDays.toFixed(1)} days)`);
-        }).catch(err => {
-          console.error(`[RefreshQueue] Failed to enqueue:`, err);
-        });
+      if (cacheAgeHours < PLACES_CACHE_HOURS && cacheResults >= MIN_CACHE_RESULTS) {
+        // Cache is valid and has enough results → return it
+        const freshness = cacheAgeHours < STALE_THRESHOLD_HOURS ? 'FRESH' : 'STALE (will refresh next miss)';
+        console.log(`[Cache HIT] ${freshness} - ${cacheResults} places, age: ${Math.round(cacheAgeHours)}h, key: ${cacheKey}`);
+        return cached.data;
+      } else if (cacheResults < MIN_CACHE_RESULTS) {
+        console.log(`[Cache SKIP] Only ${cacheResults} results (need ${MIN_CACHE_RESULTS}+) - calling Google for more`);
+        // Fall through to Google API
+      } else {
+        console.log(`[Cache EXPIRED] Age: ${Math.round(cacheAgeHours)}h > ${PLACES_CACHE_HOURS}h - refreshing`);
+        // Fall through to Google API
       }
-      
-      // Always return cached data immediately
-      return cached.data;
     }
   } catch (e) {
-    console.log(`[Cache MISS] No cache for ${cacheKey}`);
+    // Cache miss or table doesn't exist - continue to API call
+    console.log(`[Cache MISS] Fetching fresh data for ${cacheKey}`);
   }
 
-  // NO CACHE: Intelligent fallback - return partners + existing venues from database
-  console.log(`[Fallback] No cache for ${cacheKey} - searching database for partners + existing venues`);
+  // OPTIMIZATION #1: Search based on selected category
+  const allPlaces: any[] = [];
+  const seenIds = new Set<string>();
+
+  // Determine which type groups to search based on category
+  let typeGroups: string[][];
+  switch (category) {
+    case 'restaurants':
+      typeGroups = [["restaurant"]];
+      break;
+    case 'cafes':
+      typeGroups = [["cafe", "bakery"]];
+      break;
+    case 'bars':
+      typeGroups = [["bar", "night_club"]];
+      break;
+    case 'all':
+    default:
+      typeGroups = [["restaurant"], ["cafe", "bakery"], ["bar"]];
+      break;
+  }
+
+  const excludedTypes = [
+    'supermarket', 'grocery_store', 'convenience_store', 'gym', 
+    'fitness_center', 'gas_station', 'hotel', 'lodging', 
+    'shopping_mall', 'department_store', 'pharmacy', 'hospital',
+    'school', 'university', 'bank', 'atm', 'car_wash', 'car_repair'
+  ];
+
+  // Build search points: center + offset points for expanded search
+  // Each point searches with its own radius to cover more area
+  const searchPoints: { lat: number; lng: number; radius: number; label: string }[] = [];
   
-  // Enqueue refresh for background processing (non-blocking, idempotent)
-  if (region) {
-    supabase.rpc('enqueue_venue_refresh', {
-      p_cache_key: cacheKey,
-      p_lat: lat,
-      p_lng: lng,
-      p_region: region,
-    }).then(() => {
-      console.log(`[RefreshQueue] Enqueued ${cacheKey} (no cache)`);
-    }).catch(err => {
-      console.error(`[RefreshQueue] Failed to enqueue:`, err);
-    });
+  // Standard radii from center
+  for (const r of searchRadii) {
+    searchPoints.push({ lat, lng, radius: r, label: `center@${r}m` });
   }
   
-  // Fallback: Search database for any existing data
-  const fallbackData: any[] = [];
-  
-  try {
-    // 1. Get active partners from this region
-    const { data: partners } = await supabase
-      .from('partners')
-      .select('*')
-      .not('restaurant_name', 'is', null)
-      .not('latitude', 'is', null)
-      .not('longitude', 'is', null);
-    
-    if (partners && partners.length > 0) {
-      // Filter partners by region and active status
-      const now = new Date();
-      const activePartners = partners.filter(p => {
-        // Check if in allowed region
-        const partnerRegion = isAllowedRegion(p.latitude, p.longitude);
-        if (partnerRegion !== region) return false;
-        
-        // Check if active (trial or subscription)
-        const hasLifetime = p.lifetime_access === true;
-        const hasActiveSubscription = p.subscription_status === 'active' && 
-                                      p.subscription_end_date && 
-                                      new Date(p.subscription_end_date) > now;
-        const hasActiveTrial = p.trial_ends_at && new Date(p.trial_ends_at) > now;
-        
-        return hasLifetime || hasActiveSubscription || hasActiveTrial;
-      });
-      
-      console.log(`[Fallback] Found ${activePartners.length} active partners in ${region}`);
-      
-      // Transform partners to restaurant format
-      for (const p of activePartners) {
-        const distMeters = calculateDistanceMeters(lat, lng, p.latitude, p.longitude);
-        if (distMeters <= maxRadius) {
-          fallbackData.push({
-            id: p.id,
-            name: p.restaurant_name,
-            address: p.address || '',
-            phone: p.google_phone || p.phone || '',
-            website: p.google_website || p.website || '',
-            rating: p.google_rating || p.rating || 4.5,
-            totalReviews: p.google_total_reviews || p.total_reviews || 0,
-            priceLevel: '$$',
-            isOpen: true,
-            openingHours: p.google_opening_hours || [],
-            photoUrl: p.photo_url || '',
-            googleMapsUrl: p.google_maps_url || '',
-            cuisine: p.cuisine || 'Restaurant',
-            location: { lat: p.latitude, lng: p.longitude },
-            distanceMeters: Math.round(distMeters),
-            reviews: [],
-            isPartner: true,
-          });
-        }
-      }
+  // For expanded search: add 4 offset points (N/S/E/W at 7km) with 5km radius each
+  // This creates a grid that covers ~15km total area with minimal overlap
+  if (isExpanded) {
+    const offsetDist = 7000; // 7km offset
+    const gridRadius = 5000; // 5km search radius at each point
+    const directions: ('N' | 'S' | 'E' | 'W')[] = ['N', 'S', 'E', 'W'];
+    for (const dir of directions) {
+      const pt = offsetLatLng(lat, lng, offsetDist, dir);
+      searchPoints.push({ lat: pt.lat, lng: pt.lng, radius: gridRadius, label: `${dir}@${offsetDist}m` });
     }
-    
-    // 2. Get existing cached venues from nearby cache keys (within 1km)
-    const nearbyLat = Math.round(lat * 1000) / 1000;
-    const nearbyLng = Math.round(lng * 1000) / 1000;
-    const { data: nearbyCaches } = await supabase
-      .from('api_cache')
-      .select('data')
-      .like('cache_key', `places_${nearbyLat}_${nearbyLng}%`);
-    
-    if (nearbyCaches && nearbyCaches.length > 0) {
-      for (const cache of nearbyCaches) {
-        if (Array.isArray(cache.data)) {
-          for (const venue of cache.data) {
-            if (venue.location?.lat && venue.location?.lng) {
-              const distMeters = calculateDistanceMeters(lat, lng, venue.location.lat, venue.location.lng);
-              if (distMeters <= maxRadius) {
-                venue.distanceMeters = Math.round(distMeters);
-                fallbackData.push(venue);
-              }
+    console.log(`[Nearby] Expanded grid search: ${searchPoints.length} search points (center + 4 offset)`);
+  }
+  
+  console.log(`[Nearby] Searching ${searchPoints.length} points, ${typeGroups.length} type groups (expanded: ${isExpanded})`);
+
+  for (const includedTypes of typeGroups) {
+    for (const point of searchPoints) {
+      try {
+        const response = await fetch(
+          "https://places.googleapis.com/v1/places:searchNearby",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Goog-Api-Key": GOOGLE_API_KEY!,
+              "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.photos,places.location,places.types,places.googleMapsUri",
+            },
+            body: JSON.stringify({
+              includedTypes: includedTypes,
+              maxResultCount: 20,
+              locationRestriction: {
+                circle: {
+                  center: { latitude: point.lat, longitude: point.lng },
+                  radius: point.radius,
+                },
+              },
+              rankPreference: "DISTANCE",
+            }),
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          let newCount = 0;
+          for (const place of (data.places || [])) {
+            const placeTypes = place.types || [];
+            const isExcluded = placeTypes.some((t: string) => excludedTypes.includes(t));
+            
+            if (!seenIds.has(place.id) && !isExcluded) {
+              seenIds.add(place.id);
+              allPlaces.push(place);
+              newCount++;
             }
           }
+          console.log(`[Nearby] ${point.label}, types ${includedTypes.join(',')}: ${data.places?.length || 0} results, ${newCount} new`);
         }
+      } catch (error) {
+        console.error("Search error for types", includedTypes, "point", point.label, ":", error);
       }
-      console.log(`[Fallback] Found ${nearbyCaches.length} nearby cache entries`);
     }
-  } catch (error) {
-    console.error('[Fallback] Error fetching database data:', error);
   }
   
-  // Remove duplicates by ID
-  const uniqueData = Array.from(
-    new Map(fallbackData.map(item => [item.id, item])).values()
-  );
-  
-  // Sort by distance
-  uniqueData.sort((a, b) => (a.distanceMeters || 999999) - (b.distanceMeters || 999999));
-  
-  console.log(`[Fallback] Returning ${uniqueData.length} items from database (partners + cached venues)`);
-  
-  return uniqueData;
+  console.log(`[Nearby] Found ${allPlaces.length} total unique places for category "${category}"`);
+
+  // Transform places to response format with distance from user
+  const result = (allPlaces || []).map((place: any) => {
+    const openingHours = place.currentOpeningHours?.weekdayDescriptions || [];
+    const placeLat = place.location?.latitude;
+    const placeLng = place.location?.longitude;
+    const distMeters = (placeLat && placeLng) ? calculateDistanceMeters(lat, lng, placeLat, placeLng) : 999999;
+    return {
+      id: place.id,
+      name: place.displayName?.text || "Unknown",
+      address: place.formattedAddress || "",
+      phone: place.nationalPhoneNumber,
+      website: place.websiteUri,
+      rating: place.rating,
+      totalReviews: place.userRatingCount,
+      priceLevel: priceLevelToString(place.priceLevel),
+      isOpen: place.currentOpeningHours?.openNow ?? true, // Use Google API value, default to OPEN if unknown (less restrictive)
+      openingHours: openingHours,
+      photoUrl: place.photos?.[0]?.name
+        ? `${SUPABASE_URL}/functions/v1/google-places-photo?name=${encodeURIComponent(place.photos[0].name)}`
+        : undefined,
+      googleMapsUrl: place.googleMapsUri || `https://www.google.com/maps/place/?q=place_id:${place.id}`,
+      cuisine: extractCuisine(place.types),
+      location: {
+        lat: placeLat,
+        lng: placeLng,
+      },
+      distanceMeters: Math.round(distMeters),
+      reviews: [], // Reviews now fetched on demand via getPlaceDetails to save costs
+    };
+  });
+
+  // Sort by distance from user (closest first)
+  result.sort((a: any, b: any) => a.distanceMeters - b.distanceMeters);
+  console.log(`[Nearby] Sorted ${result.length} places by distance. Closest: ${result[0]?.name} (${result[0]?.distanceMeters}m), Farthest: ${result[result.length-1]?.name} (${result[result.length-1]?.distanceMeters}m)`);
+
+  // Filter out blocked places (owner requested removal)
+  try {
+    const { data: blockedData } = await supabase.from('blocked_places').select('google_place_id');
+    if (blockedData && blockedData.length > 0) {
+      const blockedIds = new Set(blockedData.map((b: any) => b.google_place_id));
+      const beforeCount = result.length;
+      const filtered = result.filter((r: any) => !blockedIds.has(r.id));
+      if (filtered.length < beforeCount) {
+        console.log(`[Nearby] Filtered out ${beforeCount - filtered.length} blocked places`);
+      }
+      result.length = 0;
+      result.push(...filtered);
+    }
+  } catch (e) {
+    console.error("[Nearby] Error checking blocked places:", e);
+  }
+
+  // OPTIMIZATION #2: Save to cache for future requests
+  if (result.length > 0) {
+    try {
+      await supabase
+        .from('api_cache')
+        .upsert({
+          cache_key: cacheKey,
+          data: result,
+          created_at: new Date().toISOString(),
+        }, { onConflict: 'cache_key' });
+      console.log(`[Cache SAVE] Cached ${result.length} places for ${cacheKey}`);
+    } catch (e) {
+      console.error("[Cache SAVE] Failed to cache:", e);
+    }
+  }
+
+  return result;
 }
 
 // Text Search API - search by query like "pizza", "sushi", "italian restaurant", etc.
@@ -384,130 +426,129 @@ async function textSearchRestaurants(lat: number, lng: number, radius: number, q
   }
 
   const cacheKey = `text_search_${query.toLowerCase().replace(/\s+/g, '_')}_${Math.round(lat * 1000) / 1000}_${Math.round(lng * 1000) / 1000}_v2`;
-  const region = isAllowedRegion(lat, lng);
   
-  // CRITICAL: NEVER call external APIs in user request
-  // Always return cached data (even if old) and enqueue refresh if stale
+  // Smart cache: check cache with fallback logic
+  const STALE_HOURS = 168; // 7 days
+  const MIN_RESULTS = 5; // Minimum for text search (more specific queries)
   
   try {
     const { data: cached } = await supabase
       .from('api_cache')
-      .select('data, last_fetched_at, created_at')
+      .select('data, created_at')
       .eq('cache_key', cacheKey)
       .single();
     
-    if (cached && cached.data) {
-      const lastFetched = cached.last_fetched_at || cached.created_at;
-      const cacheAgeDays = (Date.now() - new Date(lastFetched).getTime()) / (1000 * 60 * 60 * 24);
-      const isStale = cacheAgeDays > 30;
+    if (cached) {
+      const ageHours = (Date.now() - new Date(cached.created_at).getTime()) / (1000 * 60 * 60);
+      const count = Array.isArray(cached.data) ? cached.data.length : 0;
       
-      console.log(`[TextSearch HIT] ${Array.isArray(cached.data) ? cached.data.length : 0} results for "${query}", age: ${cacheAgeDays.toFixed(1)} days, stale: ${isStale}`);
-      
-      // Enqueue refresh if stale (non-blocking, idempotent)
-      if (isStale && region) {
-        supabase.rpc('enqueue_venue_refresh', {
-          p_cache_key: cacheKey,
-          p_lat: lat,
-          p_lng: lng,
-          p_region: region,
-        }).then(() => {
-          console.log(`[RefreshQueue] Enqueued ${cacheKey} (text search, stale: ${cacheAgeDays.toFixed(1)} days)`);
-        }).catch(err => {
-          console.error(`[RefreshQueue] Failed to enqueue:`, err);
-        });
+      if (ageHours < PLACES_CACHE_HOURS && count >= MIN_RESULTS) {
+        const freshness = ageHours < STALE_HOURS ? 'FRESH' : 'STALE';
+        console.log(`[Text Search Cache HIT] ${freshness} - ${count} results, age: ${Math.round(ageHours)}h for "${query}"`);
+        return cached.data;
+      } else if (count < MIN_RESULTS) {
+        console.log(`[Text Search Cache SKIP] Only ${count} results for "${query}" - calling Google`);
       }
-      
-      // Always return cached data immediately
-      return cached.data;
     }
   } catch (e) {
-    console.log(`[TextSearch MISS] No cache for "${query}"`);
+    console.log(`[Text Search Cache MISS] Fetching fresh data for "${query}"`);
   }
 
-  // NO CACHE: Intelligent fallback - return partners matching query
-  console.log(`[Fallback] No cache for text search "${query}" - searching database`);
-  
-  // Enqueue refresh for background processing (non-blocking, idempotent)
-  if (region) {
-    supabase.rpc('enqueue_venue_refresh', {
-      p_cache_key: cacheKey,
-      p_lat: lat,
-      p_lng: lng,
-      p_region: region,
-    }).then(() => {
-      console.log(`[RefreshQueue] Enqueued ${cacheKey} (text search, no cache)`);
-    }).catch(err => {
-      console.error(`[RefreshQueue] Failed to enqueue:`, err);
-    });
-  }
-  
-  // Fallback: Search partners matching query
-  const fallbackData: any[] = [];
-  
   try {
-    const { data: partners } = await supabase
-      .from('partners')
-      .select('*')
-      .not('restaurant_name', 'is', null)
-      .not('latitude', 'is', null)
-      .not('longitude', 'is', null);
+    const response = await fetch(
+      "https://places.googleapis.com/v1/places:searchText",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": GOOGLE_API_KEY!,
+          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.photos,places.location,places.types,places.googleMapsUri",
+        },
+        body: JSON.stringify({
+          textQuery: `${query} restaurant`,
+          locationBias: {
+            circle: {
+              center: { latitude: lat, longitude: lng },
+              radius: radius,
+            },
+          },
+          maxResultCount: 20,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Text Search] Error: ${errorText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    const places = data.places || [];
     
-    if (partners && partners.length > 0) {
-      const now = new Date();
-      const queryLower = query.toLowerCase();
-      
-      for (const p of partners) {
-        // Check if partner matches query (name or cuisine)
-        const nameMatch = p.restaurant_name?.toLowerCase().includes(queryLower);
-        const cuisineMatch = p.cuisine?.toLowerCase().includes(queryLower);
-        
-        if (!nameMatch && !cuisineMatch) continue;
-        
-        // Check if in allowed region
-        const partnerRegion = isAllowedRegion(p.latitude, p.longitude);
-        if (partnerRegion !== region) continue;
-        
-        // Check if active
-        const hasLifetime = p.lifetime_access === true;
-        const hasActiveSubscription = p.subscription_status === 'active' && 
-                                      p.subscription_end_date && 
-                                      new Date(p.subscription_end_date) > now;
-        const hasActiveTrial = p.trial_ends_at && new Date(p.trial_ends_at) > now;
-        
-        if (!hasLifetime && !hasActiveSubscription && !hasActiveTrial) continue;
-        
-        const distMeters = calculateDistanceMeters(lat, lng, p.latitude, p.longitude);
-        if (distMeters <= radius) {
-          fallbackData.push({
-            id: p.id,
-            name: p.restaurant_name,
-            address: p.address || '',
-            phone: p.google_phone || p.phone || '',
-            website: p.google_website || p.website || '',
-            rating: p.google_rating || p.rating || 4.5,
-            totalReviews: p.google_total_reviews || p.total_reviews || 0,
-            priceLevel: '$$',
-            isOpen: true,
-            openingHours: p.google_opening_hours || [],
-            photoUrl: p.photo_url || '',
-            googleMapsUrl: p.google_maps_url || '',
-            cuisine: p.cuisine || 'Restaurant',
-            location: { lat: p.latitude, lng: p.longitude },
-            distanceMeters: Math.round(distMeters),
-            reviews: [],
-            isPartner: true,
-          });
-        }
+    console.log(`[Text Search] Found ${places.length} results for "${query}"`);
+
+    const result = places.map((place: any) => {
+      const openingHours = place.currentOpeningHours?.weekdayDescriptions || [];
+      const placeLat = place.location?.latitude;
+      const placeLng = place.location?.longitude;
+      const distMeters = (placeLat && placeLng) ? calculateDistanceMeters(lat, lng, placeLat, placeLng) : 999999;
+      return {
+        id: place.id,
+        name: place.displayName?.text || "Unknown",
+        address: place.formattedAddress || "",
+        rating: place.rating,
+        totalReviews: place.userRatingCount,
+        priceLevel: priceLevelToString(place.priceLevel),
+        isOpen: place.currentOpeningHours?.openNow ?? true,
+        openingHours: openingHours,
+        photoUrl: place.photos?.[0]?.name
+          ? `${SUPABASE_URL}/functions/v1/google-places-photo?name=${encodeURIComponent(place.photos[0].name)}`
+          : undefined,
+        googleMapsUrl: place.googleMapsUri || `https://www.google.com/maps/place/?q=place_id:${place.id}`,
+        cuisine: extractCuisine(place.types),
+        location: {
+          lat: placeLat,
+          lng: placeLng,
+        },
+        distanceMeters: Math.round(distMeters),
+        reviews: [],
+      };
+    });
+
+    // Sort by distance from user (closest first)
+    result.sort((a: any, b: any) => a.distanceMeters - b.distanceMeters);
+
+    // Filter out places beyond the requested radius
+    const beforeFilter = result.length;
+    const filtered = result.filter((r: any) => r.distanceMeters <= radius);
+    if (filtered.length < beforeFilter) {
+      console.log(`[Text Search] Filtered ${beforeFilter - filtered.length} places beyond ${radius}m radius`);
+    }
+    result.length = 0;
+    result.push(...filtered);
+
+    // Save to cache
+    if (result.length > 0) {
+      try {
+        await supabase
+          .from('api_cache')
+          .upsert({
+            cache_key: cacheKey,
+            data: result,
+            created_at: new Date().toISOString(),
+          }, { onConflict: 'cache_key' });
+        console.log(`[Text Search Cache SAVE] Cached ${result.length} results for "${query}"`);
+      } catch (e) {
+        console.error("[Text Search Cache SAVE] Failed:", e);
       }
     }
+
+    return result;
   } catch (error) {
-    console.error('[Fallback] Error fetching partners:', error);
+    console.error("[Text Search] Error:", error);
+    return [];
   }
-  
-  fallbackData.sort((a, b) => (a.distanceMeters || 999999) - (b.distanceMeters || 999999));
-  console.log(`[Fallback] Returning ${fallbackData.length} partners matching "${query}"`);
-  
-  return fallbackData;
 }
 
 async function getPlaceDetails(placeId: string) {
