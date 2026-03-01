@@ -9,6 +9,7 @@ interface FullMenuModalProps {
   onClose: () => void;
   onToggleSave: () => void;
   onSelectItem: (itemId: string) => void;
+  isQRRoute?: boolean;
 }
 
 const FullMenuModal: React.FC<FullMenuModalProps> = ({
@@ -18,6 +19,7 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
   onClose,
   onToggleSave,
   onSelectItem,
+  isQRRoute = false,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -339,17 +341,19 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
                               </div>
                             )}
                             
-                            {/* Bookmark Button */}
-                            <button
-                              onClick={(e) => toggleSaveDish(dish.id, e)}
-                              className="p-2 hover:bg-zinc-100 rounded-lg transition-colors group"
-                              title={savedDishes.has(dish.id) ? 'Remove from Your Picks' : 'Save to Your Picks'}
-                            >
-                              <Bookmark
-                                size={20}
-                                className={savedDishes.has(dish.id) ? 'text-orange-500 fill-orange-500' : 'text-zinc-400 group-hover:text-orange-500'}
-                              />
-                            </button>
+                            {/* Bookmark Button - Hidden for QR routes */}
+                            {!isQRRoute && (
+                              <button
+                                onClick={(e) => toggleSaveDish(dish.id, e)}
+                                className="p-2 hover:bg-zinc-100 rounded-lg transition-colors group"
+                                title={savedDishes.has(dish.id) ? 'Remove from Your Picks' : 'Save to Your Picks'}
+                              >
+                                <Bookmark
+                                  size={20}
+                                  className={savedDishes.has(dish.id) ? 'text-orange-500 fill-orange-500' : 'text-zinc-400 group-hover:text-orange-500'}
+                                />
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}

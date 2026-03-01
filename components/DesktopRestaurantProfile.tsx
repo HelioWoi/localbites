@@ -12,6 +12,7 @@ interface DesktopRestaurantProfileProps {
   onToggleLike?: () => void;
   onOpenFullMenu?: () => void;
   onSelectVideo?: (videoId: string) => void;
+  isQRRoute?: boolean;
 }
 
 const CATEGORIES = ['All', 'Breakfast', 'Lunch', 'Dinner', 'Drinks', 'Desserts'];
@@ -25,6 +26,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
   onToggleLike,
   onOpenFullMenu,
   onSelectVideo,
+  isQRRoute = false,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showAllHours, setShowAllHours] = useState(false);
@@ -92,7 +94,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
   return (
     <div 
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-8"
-      onClick={onClose}
+      onClick={isQRRoute ? undefined : onClose}
     >
       <div 
         className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl"
@@ -101,12 +103,14 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
         {/* Header */}
         <div className="sticky top-0 bg-white z-10 px-6 py-4 flex items-center justify-between border-b border-zinc-100">
           <div className="flex items-center gap-3">
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-full hover:bg-zinc-100 flex items-center justify-center transition-colors"
-            >
-              <ChevronLeft size={20} className="text-zinc-700" />
-            </button>
+            {!isQRRoute && (
+              <button
+                onClick={onClose}
+                className="w-8 h-8 rounded-full hover:bg-zinc-100 flex items-center justify-center transition-colors"
+              >
+                <ChevronLeft size={20} className="text-zinc-700" />
+              </button>
+            )}
             <div>
               <h1 className="text-xl font-bold text-zinc-900">{restaurant.name}</h1>
               <div className="flex items-center gap-2 mt-0.5 text-xs text-zinc-500">
@@ -122,24 +126,28 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={onToggleLike}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                isLiked ? 'bg-red-50' : 'bg-zinc-100 hover:bg-zinc-200'
-              }`}
-              title="Like"
-            >
-              <Heart size={18} className={isLiked ? 'text-red-500 fill-red-500' : 'text-zinc-600'} />
-            </button>
-            <button
-              onClick={onToggleSave}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                isSaved ? 'bg-orange-500 hover:bg-orange-600' : 'bg-zinc-100 hover:bg-zinc-200'
-              }`}
-              title="Save"
-            >
-              <Bookmark size={18} className={isSaved ? 'text-white' : 'text-zinc-600'} />
-            </button>
+            {!isQRRoute && (
+              <>
+                <button
+                  onClick={onToggleLike}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                    isLiked ? 'bg-red-50' : 'bg-zinc-100 hover:bg-zinc-200'
+                  }`}
+                  title="Like"
+                >
+                  <Heart size={18} className={isLiked ? 'text-red-500 fill-red-500' : 'text-zinc-600'} />
+                </button>
+                <button
+                  onClick={onToggleSave}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                    isSaved ? 'bg-orange-500 hover:bg-orange-600' : 'bg-zinc-100 hover:bg-zinc-200'
+                  }`}
+                  title="Save"
+                >
+                  <Bookmark size={18} className={isSaved ? 'text-white' : 'text-zinc-600'} />
+                </button>
+              </>
+            )}
             <button
               onClick={handleShare}
               className="w-10 h-10 rounded-full bg-orange-500 hover:bg-orange-600 flex items-center justify-center transition-colors"
@@ -195,8 +203,8 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
               {restaurant.website && (
                 <div className="flex items-center gap-2 text-sm">
                   <Globe size={16} className="text-orange-500" />
-                  <a href={restaurant.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                    {restaurant.website.replace('https://', '').replace('http://', '')}
+                  <a href={restaurant.website.startsWith('http') ? restaurant.website : `https://${restaurant.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    {restaurant.website.replace('https://', '').replace('http://', '').replace('www.', '')}
                   </a>
                 </div>
               )}
@@ -521,6 +529,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
             setSelectedDishId(null);
             onSelectVideo?.(itemId);
           }}
+          isQRRoute={isQRRoute}
         />
       )}
     </div>

@@ -340,6 +340,15 @@ async function searchNearbyRestaurants(lat: number, lng: number, radius: number,
     case 'bars':
       typeGroups = [["bar", "night_club"]];
       break;
+    case 'pizza':
+      typeGroups = [["pizza_restaurant"]];
+      break;
+    case 'desserts':
+      typeGroups = [["ice_cream_shop", "dessert_shop", "bakery"]];
+      break;
+    case 'seafood':
+      typeGroups = [["seafood_restaurant"]];
+      break;
     case 'all':
     default:
       typeGroups = [["restaurant"], ["cafe", "bakery"], ["bar"]];

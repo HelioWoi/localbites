@@ -66,10 +66,10 @@ interface Restaurant {
   main_photo_url?: string;
 }
 
-type Tab = 'overview' | 'menu' | 'analytics' | 'subscription' | 'settings';
+type Tab = 'analytics' | 'menu' | 'subscription' | 'settings';
 
 const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) => {
-  const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [activeTab, setActiveTab] = useState<Tab>('analytics');
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [videos, setVideos] = useState<DishVideo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -1506,9 +1506,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <nav className="flex gap-1 overflow-x-auto no-scrollbar">
             {[
-              { id: 'overview', label: 'Overview', icon: BarChart3 },
-              { id: 'menu', label: 'Menu', icon: Menu },
               { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+              { id: 'menu', label: 'Menu', icon: Menu },
               { id: 'subscription', label: 'Subscription', icon: CreditCard },
               { id: 'settings', label: 'Settings', icon: Settings },
             ].map((tab) => (
@@ -1531,108 +1530,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
       {/* Content */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 pb-20 overflow-y-auto">
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-white rounded-xl p-4 border border-zinc-200">
-                <div className="flex items-center gap-2 text-zinc-500 mb-2">
-                  <Eye size={16} />
-                  <span className="text-xs font-medium">Views</span>
-                </div>
-                <p className="text-2xl font-bold text-zinc-900">{stats.views.toLocaleString()}</p>
-              </div>
-              <div className="bg-white rounded-xl p-4 border border-zinc-200">
-                <div className="flex items-center gap-2 text-zinc-500 mb-2">
-                  <Heart size={16} />
-                  <span className="text-xs font-medium">Saves</span>
-                </div>
-                <p className="text-2xl font-bold text-zinc-900">{stats.saves}</p>
-              </div>
-              <div className="bg-white rounded-xl p-4 border border-zinc-200">
-                <div className="flex items-center gap-2 text-zinc-500 mb-2">
-                  <MapPin size={16} />
-                  <span className="text-xs font-medium">Directions</span>
-                </div>
-                <p className="text-2xl font-bold text-zinc-900">{stats.clicks}</p>
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="bg-white rounded-xl border border-zinc-200 p-5">
-              <h3 className="text-sm font-semibold text-zinc-900 mb-4">Quick Actions</h3>
-              <div className="space-y-3">
-                <button
-                  onClick={() => setShowMenuImportModal(true)}
-                  className="flex items-center gap-3 p-4 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors w-full"
-                >
-                  <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                    <Upload size={18} className="text-white" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-sm font-semibold text-zinc-900">Import Menu</p>
-                    <p className="text-xs text-zinc-500">Upload CSV from Uber Eats, Square, etc.</p>
-                  </div>
-                </button>
-                <button
-                  onClick={() => { setActiveTab('menu'); setShowMenuUploadModal(true); }}
-                  className="flex items-center gap-3 p-4 bg-orange-50 hover:bg-orange-100 rounded-xl transition-colors w-full"
-                >
-                  <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
-                    <Video size={18} className="text-white" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-sm font-semibold text-zinc-900">Add Menu Video</p>
-                    <p className="text-xs text-zinc-500">{menuItems.filter(i => !i.deleted_at).length} items uploaded</p>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {/* Recent Videos */}
-            <div className="bg-white rounded-xl border border-zinc-200 p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-zinc-900">Your Videos</h3>
-                <button
-                  onClick={() => setActiveTab('menu')}
-                  className="text-xs text-orange-500 font-semibold flex items-center gap-1 hover:underline"
-                >
-                  View all <ChevronRight size={14} />
-                </button>
-              </div>
-              {menuItems.filter(i => !i.deleted_at).length > 0 ? (
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                  {menuItems.filter(i => !i.deleted_at).slice(0, 4).map((item) => (
-                    <div 
-                      key={item.id} 
-                      className="relative aspect-square bg-zinc-100 rounded-lg overflow-hidden cursor-pointer"
-                      onClick={() => setPreviewVideo(item.video_url)}
-                    >
-                      <video src={`${item.video_url}#t=0.5`} className="w-full h-full object-cover" muted preload="metadata" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-2">
-                        <p className="text-white text-xs font-medium truncate">{item.name}</p>
-                      </div>
-                      <div className="absolute top-2 left-2 w-6 h-6 bg-black/40 rounded-full flex items-center justify-center">
-                        <Play size={10} className="text-white" fill="currentColor" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Video size={32} className="text-zinc-300 mx-auto mb-2" />
-                  <p className="text-sm text-zinc-500">No videos yet</p>
-                  <button
-                    onClick={() => { setActiveTab('menu'); setShowMenuUploadModal(true); }}
-                    className="mt-3 text-sm text-orange-500 font-semibold hover:underline"
-                  >
-                    Add your first menu video
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+        {/* Analytics Tab */}
+        {activeTab === 'analytics' && partnerData && (
+          <RestaurantAnalytics restaurantId={partnerData.id} />
         )}
 
         {/* Menu Tab - QR Code Menu Items */}
@@ -2040,11 +1940,6 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               </div>
             )}
           </div>
-        )}
-
-        {/* Analytics Tab */}
-        {activeTab === 'analytics' && partnerData && (
-          <RestaurantAnalytics restaurantId={partnerData.id} />
         )}
 
         {/* Subscription Tab */}

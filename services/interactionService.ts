@@ -11,7 +11,7 @@ const getDeviceId = (): string => {
 };
 
 // Like a restaurant
-export const likeRestaurant = async (restaurantId: string): Promise<boolean> => {
+export const likeRestaurant = async (restaurantId: string, itemId?: string): Promise<boolean> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     const deviceId = getDeviceId();
@@ -28,6 +28,17 @@ export const likeRestaurant = async (restaurantId: string): Promise<boolean> => 
       console.error('Like error:', error);
       return false;
     }
+
+    // Track analytics event (fire and forget)
+    void supabase.from('events').insert({
+      event_type: 'like',
+      restaurant_id: restaurantId,
+      item_id: itemId || null,
+      user_id: user?.id || null,
+      device_id: user ? null : deviceId,
+      device: /mobile/i.test(navigator.userAgent) ? 'mobile' : /tablet/i.test(navigator.userAgent) ? 'tablet' : 'desktop',
+    });
+
     return true;
   } catch (error) {
     console.error('Like error:', error);
@@ -58,7 +69,7 @@ export const unlikeRestaurant = async (restaurantId: string): Promise<boolean> =
 };
 
 // Save a restaurant
-export const saveRestaurant = async (restaurantId: string): Promise<boolean> => {
+export const saveRestaurant = async (restaurantId: string, itemId?: string): Promise<boolean> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     const deviceId = getDeviceId();
@@ -75,6 +86,17 @@ export const saveRestaurant = async (restaurantId: string): Promise<boolean> => 
       console.error('Save error:', error);
       return false;
     }
+
+    // Track analytics event (fire and forget)
+    void supabase.from('events').insert({
+      event_type: 'save',
+      restaurant_id: restaurantId,
+      item_id: itemId || null,
+      user_id: user?.id || null,
+      device_id: user ? null : deviceId,
+      device: /mobile/i.test(navigator.userAgent) ? 'mobile' : /tablet/i.test(navigator.userAgent) ? 'tablet' : 'desktop',
+    });
+
     return true;
   } catch (error) {
     console.error('Save error:', error);

@@ -235,7 +235,6 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
                 google_rating: details.place.rating || null,
                 google_total_reviews: details.place.totalReviews || 0,
                 google_maps_url: details.place.googleMapsUrl || null,
-                google_reviews: details.reviews || [],
                 google_data_updated_at: new Date().toISOString()
               })
               .eq('id', p.id);
@@ -243,7 +242,7 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
             if (updateError) {
               console.error(`[PartnerRestaurants] Failed to save Google data for ${p.restaurant_name}:`, updateError);
             } else {
-              console.log(`[PartnerRestaurants] ✅ Saved Google data for ${p.restaurant_name} (opening hours, phone, website, rating, reviews)`);
+              console.log(`[PartnerRestaurants] ✅ Saved Google data for ${p.restaurant_name} (opening hours, phone, website, rating)`);
               
               // Update local object
               p.google_opening_hours = details.place.openingHours || [];
@@ -252,7 +251,6 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
               p.google_rating = details.place.rating || null;
               p.google_total_reviews = details.place.totalReviews || 0;
               p.google_maps_url = details.place.googleMapsUrl || null;
-              p.google_reviews = details.reviews || [];
             }
           }
           

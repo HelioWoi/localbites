@@ -15,6 +15,7 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug,
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
+  const isQRRoute = window.location.pathname.startsWith('/r/');
 
   // Desktop detection
   useEffect(() => {
@@ -170,6 +171,7 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug,
         onClose={() => window.location.href = '/'}
         isSaved={false}
         onToggleSave={() => {}}
+        isQRRoute={isQRRoute}
       />
     );
   }
