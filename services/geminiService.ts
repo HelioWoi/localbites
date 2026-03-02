@@ -148,7 +148,7 @@ export async function getNearbyRestaurants(
   }
 
   // 3. Merge results: Partners first, then Google (avoiding duplicates + blocklist)
-  const BLOCKED_RESTAURANTS = ['my restaurant', 'regent cafe mooloolaba'];
+  const BLOCKED_RESTAURANTS = ['my restaurant', 'regent cafe mooloolaba', 'scarlet harem sunshine coast only brothel'];
   console.log('[MenuLove] Merging results - Partners:', partnerRestaurants.length, 'Google:', googleRestaurants.length);
   const partnerNames = new Set(partnerRestaurants.map(r => r.name.toLowerCase()));
   const filteredGoogleRestaurants = googleRestaurants.filter(

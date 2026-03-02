@@ -629,7 +629,7 @@ async function textSearchRestaurants(lat: number, lng: number, radius: number, q
           "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.photos,places.location,places.types,places.googleMapsUri",
         },
         body: JSON.stringify({
-          textQuery: `${query} restaurant`,
+          textQuery: query,
           locationBias: {
             circle: {
               center: { latitude: lat, longitude: lng },

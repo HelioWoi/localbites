@@ -513,7 +513,6 @@ const App: React.FC = () => {
         // Single category search
         const textSearchCategories: Record<string, string> = { 
           desserts: 'ice cream acai dessert cookies', 
-          pizza: 'pizza', 
           seafood: 'seafood fish prawns oysters' 
         };
         data = textSearchCategories[selectedCategory]
