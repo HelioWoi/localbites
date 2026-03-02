@@ -2959,7 +2959,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             MenuLove - Video Menus & Smart Discovery
           </p>
           <p className="text-zinc-400 text-sm mb-1">
-            Made with <span className="text-red-500">❤️</span> in Australia | <a href="mailto:contact@menulove.com.au" className="text-orange-500 hover:text-orange-600 transition-colors">contact@menulove.com.au</a>
+            Built with <span className="text-orange-500">🧡</span> in Australia | <a href="mailto:contact@menulove.com.au" className="text-orange-500 hover:text-orange-600 transition-colors">contact@menulove.com.au</a>
           </p>
           <p className="text-zinc-400 text-sm">
             All rights reserved.
