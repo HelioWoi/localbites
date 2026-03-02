@@ -14,6 +14,7 @@ import MenuImportModal from '../../components/MenuImportModal';
 import { compressVideo, shouldCompressVideo } from '../../utils/videoCompression';
 import { QRCodeSVG } from 'qrcode.react';
 import { sanitizeFileName } from '../../utils/fileUtils';
+import ChatWidget from '../../components/chat/ChatWidget';
 
 interface PartnerDashboardProps {
   user: PartnerUser;
@@ -237,6 +238,22 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const isTrialActive = hasActiveSubscription && !hasPaidSubscription && subscriptionDaysLeft > 0 && subscriptionDaysLeft <= 30;
   const isTrialExpired = !!partnerData && !hasActiveSubscription && subscriptionDaysLeft === 0;
   const maxVideos = hasActiveSubscription ? Infinity : 5;
+
+  // Listen for chat navigation events
+  useEffect(() => {
+    const handleChatNavigate = (event: CustomEvent) => {
+      const { tab } = event.detail;
+      if (tab && ['analytics', 'menu', 'subscription', 'settings'].includes(tab)) {
+        setActiveTab(tab as Tab);
+      }
+    };
+
+    window.addEventListener('chat-navigate', handleChatNavigate as EventListener);
+    
+    return () => {
+      window.removeEventListener('chat-navigate', handleChatNavigate as EventListener);
+    };
+  }, []);
 
   useEffect(() => {
     console.log('PartnerDashboard mounted or user changed, loading data...');
@@ -2949,6 +2966,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           </p>
         </div>
       </footer>
+
+      {/* AI Chat Assistant */}
+      <ChatWidget />
     </div>
   );
 };
