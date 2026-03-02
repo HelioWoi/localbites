@@ -193,6 +193,13 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password.trim() || !restaurantName.trim() || !address.trim() || !postalCode.trim() || !phone.trim()) return;
+    
+    // Require ABN or ACN
+    if (!abn.trim()) {
+      setError(`Please enter your ${businessIdType}`);
+      return;
+    }
+    
     if (password.length < 6) {
       setError('Password must be at least 6 characters');
       return;
@@ -582,7 +589,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
 
                     <div>
                       <label className="block text-xs font-medium text-zinc-500 mb-2">
-                        {businessIdType}
+                        {businessIdType} <span className="text-red-500">*</span>
                       </label>
                       <div className="flex gap-2">
                         <div className="relative flex-1">
@@ -593,6 +600,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
                             onChange={(e) => handleABNChange(e.target.value)}
                             placeholder={businessIdType === 'ABN' ? '12 345 678 901' : '123 456 789'}
                             maxLength={businessIdType === 'ABN' ? 14 : 11}
+                            required
                             className={`w-full pl-12 pr-4 py-3 bg-zinc-50 border rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all ${
                               verificationResult?.isValid ? 'border-emerald-400 bg-emerald-50/50' : 
                               verificationResult && !verificationResult.isValid ? 'border-red-300 bg-red-50/50' : 

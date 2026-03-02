@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const ADMIN_EMAIL = 'heliocwoi@gmail.com'
+const ADMIN_EMAILS = ['heliocwoi@gmail.com', 'contact@menulove.com.au']
 
 serve(async (req) => {
   try {
@@ -19,7 +19,7 @@ serve(async (req) => {
     console.log(`Restaurant: ${partnerName}`)
     console.log(`Email: ${partnerEmail}`)
     console.log(`Time: ${createdAt}`)
-    console.log(`Sending notification to: ${ADMIN_EMAIL}`)
+    console.log(`Sending notification to: ${ADMIN_EMAILS.join(', ')}`)
 
     // For now, just log - Supabase doesn't have built-in email sending
     // You'll need to integrate with Resend or SendGrid for actual emails
@@ -30,7 +30,7 @@ serve(async (req) => {
         success: true, 
         message: 'Notification logged',
         partner: partnerName,
-        admin: ADMIN_EMAIL
+        admins: ADMIN_EMAILS
       }),
       { 
         headers: { 'Content-Type': 'application/json' },
