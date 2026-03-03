@@ -98,6 +98,11 @@ const MediaContainer: React.FC<MediaContainerProps> = ({
           playsInline
           preload="auto"
           onCanPlay={() => setIsLoaded(true)}
+          onLoadedData={() => setIsLoaded(true)}
+          onError={(e) => {
+            console.error('[MediaContainer] Video error:', videoUrl, e);
+            setIsLoaded(true); // Show even if error to prevent infinite spinner
+          }}
         />
       ) : photoUrl ? (
         <img
