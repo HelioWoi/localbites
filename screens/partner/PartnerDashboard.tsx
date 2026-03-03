@@ -15,6 +15,8 @@ import { compressVideo, shouldCompressVideo } from '../../utils/videoCompression
 import { QRCodeSVG } from 'qrcode.react';
 import { sanitizeFileName } from '../../utils/fileUtils';
 import ChatWidget from '../../components/chat/ChatWidget';
+import WelcomeBanner from '../../components/WelcomeBanner';
+import GuidedTour from '../../components/GuidedTour';
 
 interface PartnerDashboardProps {
   user: PartnerUser;
@@ -145,6 +147,10 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(false);
+  
+  // Welcome banner and guided tour state
+  const [showWelcomeBanner, setShowWelcomeBanner] = useState(false);
+  const [showGuidedTour, setShowGuidedTour] = useState(false);
 
   // Edit category state
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
@@ -260,6 +266,12 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     console.log('Current user:', user);
     loadData();
     
+    // Check if user is first-time visitor (show welcome banner)
+    const hasSeenWelcome = localStorage.getItem(`welcome_seen_${user.id}`);
+    if (!hasSeenWelcome) {
+      setShowWelcomeBanner(true);
+    }
+    
     // Check if should show password modal after welcome modal
     const shouldShowPasswordModal = sessionStorage.getItem('show_password_modal');
     if (shouldShowPasswordModal) {
@@ -267,7 +279,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       sessionStorage.removeItem('show_password_modal');
       setShowPasswordModal(true);
     }
-  }, [user]);
+  }, [user.id]);
 
   const loadData = async () => {
     console.log('loadData started');
@@ -282,6 +294,14 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       console.log('Partner loaded:', partner, partnerError);
 
       let currentPartner = partner;
+
+      // Check if email is confirmed
+      if (currentPartner && !currentPartner.email_confirmed) {
+        console.log('Email not confirmed, blocking dashboard access');
+        await supabase.auth.signOut();
+        window.location.href = '/partner/login?email_not_confirmed=true';
+        return;
+      }
 
       // Fallback: if not found by ID, try by email (handles ID mismatch after re-signup)
       if (!currentPartner && user.email) {
@@ -1221,6 +1241,21 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     }
   };
 
+  // Welcome banner and guided tour handlers
+  const handleStartTour = () => {
+    setShowWelcomeBanner(false);
+    setShowGuidedTour(true);
+  };
+
+  const handleDismissWelcome = () => {
+    setShowWelcomeBanner(false);
+    localStorage.setItem(`welcome_seen_${user.id}`, 'true');
+  };
+
+  const handleCompleteTour = () => {
+    localStorage.setItem(`welcome_seen_${user.id}`, 'true');
+  };
+
   const handleDeleteCategory = async (category: string) => {
     if (!partnerData) return;
     const categoryItems = menuItems.filter(i => i.category === category && !i.deleted_at);
@@ -1530,6 +1565,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             ].map((tab) => (
               <button
                 key={tab.id}
+                id={`tab-${tab.id}`}
                 onClick={() => setActiveTab(tab.id as Tab)}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === tab.id
@@ -1547,6 +1583,15 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
       {/* Content */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 pb-20 overflow-y-auto">
+        {/* Welcome Banner */}
+        {showWelcomeBanner && partnerData && (
+          <WelcomeBanner
+            restaurantName={partnerData.restaurant_name || 'Partner'}
+            onStartTour={handleStartTour}
+            onDismiss={handleDismissWelcome}
+          />
+        )}
+
         {/* Analytics Tab */}
         {activeTab === 'analytics' && partnerData && (
           <RestaurantAnalytics restaurantId={partnerData.id} />
@@ -1968,6 +2013,31 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         {activeTab === 'settings' && (
           <div className="space-y-6">
             <h2 className="text-lg font-bold text-zinc-900">Settings</h2>
+
+            {/* Guided Tour */}
+            <div className="bg-white rounded-xl border border-zinc-200 p-5">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-orange-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <BarChart3 size={24} className="text-orange-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-zinc-900 mb-1">Dashboard Tour</h3>
+                  <p className="text-xs text-zinc-600 mb-3">
+                    Need a refresher? Take the guided tour again to learn about all the features.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setShowWelcomeBanner(false);
+                      setShowGuidedTour(true);
+                    }}
+                    className="px-4 py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2"
+                  >
+                    <Play size={16} />
+                    Restart Tour
+                  </button>
+                </div>
+              </div>
+            </div>
 
             {/* Restaurant Info */}
             <div className="bg-white rounded-xl border border-zinc-200 p-5">
@@ -2969,6 +3039,13 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
       {/* AI Chat Assistant */}
       <ChatWidget />
+
+      {/* Guided Tour */}
+      <GuidedTour
+        isOpen={showGuidedTour}
+        onClose={() => setShowGuidedTour(false)}
+        onComplete={handleCompleteTour}
+      />
     </div>
   );
 };

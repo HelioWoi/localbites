@@ -53,6 +53,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
 
   // Track if user came from landing page
   const [isFromLandingPage, setIsFromLandingPage] = useState(false);
+  const [showEmailNotConfirmedWarning, setShowEmailNotConfirmedWarning] = useState(false);
   
   // Forgot password modal
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
@@ -64,7 +65,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
   // Listen for auth events
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[PartnerAuth] Auth event:', event);
+      console.log('[PartnerAuth] Auth event:', event, 'Current mode:', mode);
       
       if (event === 'PASSWORD_RECOVERY') {
         console.log('[PartnerAuth] Password recovery event detected - switching to reset mode');
@@ -75,6 +76,12 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
         console.log('[PartnerAuth] SIGNED_IN event - session:', session);
         console.log('[PartnerAuth] User metadata:', session.user.app_metadata);
         console.log('[PartnerAuth] AMR:', session.user.app_metadata?.amr);
+        
+        // Don't trigger onAuthSuccess if we're in signup or sent mode (email confirmation flow)
+        if (mode === 'signup' || mode === 'sent') {
+          console.log('[PartnerAuth] Ignoring SIGNED_IN during signup/sent mode');
+          return;
+        }
         
         // Check if this was a magic link login (OTP)
         const amr = session.user.app_metadata?.amr;
@@ -93,14 +100,21 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
     });
 
     return () => subscription.unsubscribe();
-  }, [onAuthSuccess]);
+  }, [onAuthSuccess, mode]);
 
   // Pre-fill form with data from landing page (Step 1)
   useEffect(() => {
-    // Don't override if this is a password recovery
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const type = hashParams.get('type');
-    if (type === 'recovery') {
+    // Check for email_not_confirmed parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('email_not_confirmed') === 'true') {
+      setShowEmailNotConfirmedWarning(true);
+      // Clean URL
+      window.history.replaceState({}, '', '/partner/login');
+    }
+
+    // If we're in recovery mode, don't do anything else
+    if (isRecovery) {
+      console.log('[PartnerAuth] In recovery mode, skipping pre-fill');
       return; // Don't pre-fill or change mode if recovering password
     }
 
@@ -209,6 +223,9 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
     setError('');
 
     try {
+      // Set flag to prevent PartnerPortal from loading during signup
+      sessionStorage.setItem('signup_in_progress', 'true');
+      
       // CRITICAL: Sign out any existing session before creating new account
       await supabase.auth.signOut();
       console.log('[Signup] Signed out any existing session');
@@ -238,6 +255,10 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
         promoCode: promoCode.trim() || null,
       }));
 
+      // Generate confirmation token
+      const confirmationToken = crypto.randomUUID();
+      const confirmationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
       // Create Supabase auth account
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
@@ -246,8 +267,8 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
 
       if (error) throw error;
       
-      // If email confirmation is disabled, user is automatically logged in
-      if (data.user && data.session) {
+      // Create partner record immediately with email_confirmed = false
+      if (data.user) {
         // Auto-geocode address to get lat/lng via Google Geocoding API
         let latitude: number | null = null;
         let longitude: number | null = null;
@@ -288,14 +309,25 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
           subscription_status: 'active',
           lifetime_access: hasLifetimeAccess,
           is_verified: false,
+          email_confirmed: false,
+          email_confirmation_token: confirmationToken,
+          email_confirmation_sent_at: new Date().toISOString(),
+          email_confirmation_expires_at: confirmationExpiresAt.toISOString(),
         };
         
-        console.log('[Signup] Creating partner with unique slug:', uniqueSlug);
+        console.log('[Signup] Creating/updating partner with unique slug:', uniqueSlug);
         
-        const { error: insertError } = await supabase.from('partners').insert(partnerData);
-        if (insertError) {
-          console.error('[Signup] Error creating partner:', insertError);
-          throw insertError;
+        // Use upsert to handle case where partner already exists
+        const { error: upsertError } = await supabase
+          .from('partners')
+          .upsert(partnerData, { 
+            onConflict: 'id',
+            ignoreDuplicates: false 
+          });
+          
+        if (upsertError) {
+          console.error('[Signup] Error creating/updating partner:', upsertError);
+          throw upsertError;
         }
 
         // Record promo code usage if valid
@@ -317,9 +349,30 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
           }
         }
 
-        onAuthSuccess();
-      } else {
-        // Email confirmation required
+        // Send confirmation email
+        try {
+          const { data: emailData, error: emailError } = await supabase.functions.invoke('send-confirmation-email', {
+            body: {
+              email: email.trim(),
+              restaurantName: restaurantName.trim(),
+              confirmationToken
+            }
+          });
+          
+          if (emailError) {
+            console.error('[Signup] Failed to send confirmation email:', emailError);
+            console.log('🔗 CONFIRMATION LINK (for testing):', `${window.location.origin}/confirm-email?token=${confirmationToken}`);
+          } else {
+            console.log('[Signup] Confirmation email sent successfully');
+          }
+        } catch (emailError) {
+          console.error('[Signup] Email sending error:', emailError);
+          console.log('🔗 CONFIRMATION LINK (for testing):', `${window.location.origin}/confirm-email?token=${confirmationToken}`);
+        }
+
+        // Sign out user and show confirmation message
+        await supabase.auth.signOut();
+        sessionStorage.removeItem('signup_in_progress');
         setMode('sent');
       }
     } catch (err: any) {
@@ -511,7 +564,15 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
           <p className="text-zinc-500 mb-2">
             We sent a confirmation link to
           </p>
-          <p className="font-semibold text-zinc-900 mb-8">{email}</p>
+          <p className="font-semibold text-zinc-900 mb-4">{email}</p>
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6">
+            <p className="text-sm text-orange-900 font-medium mb-2">
+              📧 Click the link in your email to confirm and start your 30-day free trial!
+            </p>
+            <p className="text-xs text-orange-700">
+              The link expires in 24 hours. Check your spam folder if you don't see it.
+            </p>
+          </div>
           <button
             onClick={() => { setMode('login'); setError(''); }}
             className="text-orange-500 font-semibold text-sm hover:underline"
@@ -565,6 +626,29 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
                   ? 'We\'ll send you a login link'
                   : 'Sign in to manage your restaurant'}
             </p>
+
+            {/* Email Not Confirmed Warning */}
+            {showEmailNotConfirmedWarning && mode === 'login' && (
+              <div className="mb-6 bg-orange-50 border border-orange-200 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle size={20} className="text-orange-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-orange-900 mb-1">
+                      Email confirmation required
+                    </p>
+                    <p className="text-xs text-orange-700">
+                      Please check your inbox and click the confirmation link to access your dashboard.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowEmailNotConfirmedWarning(false)}
+                    className="text-orange-400 hover:text-orange-600 ml-auto"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
 
             <form onSubmit={mode === 'signup' ? handleSignup : mode === 'magic' ? handleMagicLink : handleEmailLogin}>
               <div className="space-y-4">

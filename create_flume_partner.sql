@@ -21,7 +21,7 @@ INSERT INTO partners (
   '267 Bradman Ave, Maroochydore, Queensland 4558',
   '0488 777 794',
   'flume-by-the-river',
-  NOW() + INTERVAL '14 days',
+  NOW() + INTERVAL '30 days',
   'trial',
   NOW()
 );

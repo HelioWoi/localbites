@@ -34,6 +34,14 @@ const PartnerPortal: React.FC = () => {
         console.log('[PartnerPortal] Session:', session);
         console.log('[PartnerPortal] User metadata:', session.user.app_metadata);
         
+        // Don't load dashboard during signup flow - user will be signed out immediately
+        // This prevents the brief flash of dashboard before redirect to 'sent' page
+        const isSignupFlow = sessionStorage.getItem('signup_in_progress') === 'true';
+        if (isSignupFlow) {
+          console.log('[PartnerPortal] Ignoring SIGNED_IN during signup flow');
+          return;
+        }
+        
         // Check if this was a magic link login
         const amr = session.user.app_metadata?.amr;
         console.log('[PartnerPortal] AMR:', amr);

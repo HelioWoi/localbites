@@ -22,6 +22,7 @@ import RemovalRequestPage from './screens/RemovalRequestPage';
 import VideoMenuPlatformPage from './screens/VideoMenuPlatformPage';
 import WhyVideoMenusPage from './screens/WhyVideoMenusPage';
 import HelpPage from './screens/HelpPage';
+import EmailConfirmation from './screens/EmailConfirmation';
 import { getNearbyRestaurants, getRestaurantDetails, getRemainingSearches, searchRestaurantsByQuery } from './services/geminiService';
 import { TriageData } from './services/aiAssistant';
 import { likeRestaurant, unlikeRestaurant, saveRestaurant, unsaveRestaurant, getUserLikes, getUserSaves, getAllLikesCounts } from './services/interactionService';
@@ -56,7 +57,14 @@ const isWhyVideoMenusRoute = window.location.pathname === '/why-video-menus-incr
 // Check if we're on help page
 const isHelpRoute = window.location.pathname === '/help';
 
+// Check if we're on email confirmation page
+const isEmailConfirmationRoute = window.location.pathname === '/confirm-email';
+
 const App: React.FC = () => {
+  // Email Confirmation Route
+  if (isEmailConfirmationRoute) {
+    return <EmailConfirmation />;
+  }
   // Check if we're on a QR code restaurant route (/r/slug)
   const isQRCodeRoute = window.location.pathname.startsWith('/r/');
   const isQRMenuRoute = isQRCodeRoute && window.location.pathname.endsWith('/menu');
@@ -71,6 +79,7 @@ const App: React.FC = () => {
                                  !pathname.startsWith('/r/') && 
                                  !pathname.startsWith('/partner') && 
                                  !pathname.startsWith('/admin') &&
+                                 pathname !== '/confirm-email' &&
                                  pathParts.length === 1; // Only /:slug
   const isAppFeedMenuRoute = pathname !== '/' &&
                              !pathname.startsWith('/r/') &&

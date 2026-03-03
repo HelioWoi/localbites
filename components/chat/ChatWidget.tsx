@@ -29,6 +29,7 @@ const ChatWidget: React.FC = () => {
       {/* Floating Button */}
       {!isChatOpen && (
         <button
+          id="chat-widget-trigger"
           onClick={() => setIsChatOpen(true)}
           className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40 group"
           title="Open LoveBot"

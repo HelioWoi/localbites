@@ -7,6 +7,7 @@ import {
   ChevronLeft, ChevronRight
 } from 'lucide-react';
 import SuperAdminAnalytics from './SuperAdminAnalytics';
+import ConfirmationModal from '../../components/ConfirmationModal';
 import { getOnlineVisitors } from '../../services/eventsService';
 import { 
   isNotificationSupported, 
@@ -90,6 +91,10 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
   const [smsNotificationsEnabled, setSmsNotificationsEnabled] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [showPhoneInput, setShowPhoneInput] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [partnerToDelete, setPartnerToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [selectedPartners, setSelectedPartners] = useState<Set<string>>(new Set());
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
@@ -310,6 +315,26 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
     }).format(amount);
   };
 
+  // Handle select all partners
+  const handleSelectAll = () => {
+    if (selectedPartners.size === partners.length) {
+      setSelectedPartners(new Set());
+    } else {
+      setSelectedPartners(new Set(partners.map(p => p.id)));
+    }
+  };
+
+  // Handle individual partner selection
+  const handleSelectPartner = (partnerId: string) => {
+    const newSelected = new Set(selectedPartners);
+    if (newSelected.has(partnerId)) {
+      newSelected.delete(partnerId);
+    } else {
+      newSelected.add(partnerId);
+    }
+    setSelectedPartners(newSelected);
+  };
+
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
@@ -411,6 +436,114 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
     setActivityLog(mockActivity);
   };
 
+  // Confirm and delete partner
+  const confirmDeletePartner = async () => {
+    if (!partnerToDelete) return;
+    setShowDeleteModal(false);
+    await handleDeletePartner(partnerToDelete.id, partnerToDelete.name);
+    setPartnerToDelete(null);
+  };
+
+  // Confirm and bulk delete partners - Complete deletion using Edge Function
+  const confirmBulkDelete = async () => {
+    setShowBulkDeleteModal(false);
+    
+    let successCount = 0;
+    let failCount = 0;
+    
+    // Get current session for auth
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    for (const partnerId of selectedPartners) {
+      try {
+        const partner = partners.find(p => p.id === partnerId);
+        if (!partner) continue;
+
+        console.log(`[Admin] Bulk deleting partner: ${partner.restaurant_name}`);
+
+        // Call Edge Function for complete deletion with auth
+        const { data, error } = await supabase.functions.invoke('delete-partner', {
+          body: { partnerId },
+          headers: {
+            Authorization: `Bearer ${session?.access_token}`
+          }
+        });
+
+        if (error || data?.error) {
+          console.error(`Error deleting ${partner.restaurant_name}:`, error || data?.error);
+          failCount++;
+          continue;
+        }
+
+        console.log(`[Admin] Successfully deleted: ${partner.restaurant_name}`);
+        successCount++;
+      } catch (error) {
+        console.error('Error in bulk delete:', error);
+        failCount++;
+      }
+    }
+    
+    // Clear selection
+    setSelectedPartners(new Set());
+    
+    // Show result
+    if (failCount === 0) {
+      alert(`✅ Successfully deleted ${successCount} partner${successCount > 1 ? 's' : ''} completely!\n\nAll data, files, and auth accounts removed.`);
+    } else {
+      alert(`⚠️ Deleted ${successCount} partner${successCount > 1 ? 's' : ''}. Failed to delete ${failCount}.`);
+    }
+    
+    // Reload dashboard
+    loadDashboardData();
+  };
+
+  // Delete partner - Complete deletion including auth account and storage files
+  const handleDeletePartner = async (partnerId: string, restaurantName: string) => {
+    try {
+      console.log(`[Admin] Starting complete deletion for partner: ${partnerId}`);
+
+      // Get current session for auth
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Call Edge Function for complete deletion with auth
+      const { data, error } = await supabase.functions.invoke('delete-partner', {
+        body: { partnerId },
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
+        }
+      });
+
+      if (error) {
+        console.error('[Admin] Error calling delete-partner function:', error);
+        alert('Failed to delete partner. Please try again.');
+        return;
+      }
+
+      if (data?.error) {
+        console.error('[Admin] Delete function returned error:', data.error);
+        alert(`Failed to delete partner: ${data.error}`);
+        return;
+      }
+
+      // Success - show detailed results
+      const deleted = data?.deleted || {};
+      console.log('[Admin] Deletion results:', deleted);
+      
+      alert(
+        `✅ ${restaurantName} completely deleted!\n\n` +
+        `• Menu items: ${deleted.menuItems || 0}\n` +
+        `• Storage files: ${deleted.storageFiles ? 'Yes' : 'No'}\n` +
+        `• Partner record: ${deleted.partnerRecord ? 'Yes' : 'No'}\n` +
+        `• Auth account: ${deleted.authAccount ? 'Yes' : 'No'}`
+      );
+      
+      loadDashboardData();
+    } catch (error) {
+      console.error('[Admin] Error deleting partner:', error);
+      alert('Failed to delete partner. Please try again.');
+    }
+  };
+
   // Handle partner actions
   const handlePartnerAction = (partnerId: string, action: string) => {
     const partner = partners.find(p => p.id === partnerId);
@@ -436,6 +569,10 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
         break;
       case 'email':
         alert(`Email feature coming soon!\nWill send to: ${partner.email}`);
+        break;
+      case 'delete':
+        setPartnerToDelete({ id: partner.id, name: partner.restaurant_name });
+        setShowDeleteModal(true);
         break;
       case 'suspend':
         if (confirm(`Suspend ${partner.restaurant_name}?`)) {
@@ -1187,12 +1324,54 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                 </div>
               </div>
 
+              {/* Bulk Actions Toolbar */}
+              {selectedPartners.size > 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold text-orange-900">
+                        {selectedPartners.size} partner{selectedPartners.size > 1 ? 's' : ''} selected
+                      </span>
+                      <button
+                        onClick={() => setSelectedPartners(new Set())}
+                        className="text-xs text-orange-600 hover:text-orange-700 font-medium"
+                      >
+                        Clear selection
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => alert('Bulk email feature coming soon!')}
+                        className="px-4 py-2 bg-white hover:bg-zinc-50 text-zinc-900 text-sm font-medium rounded-lg border border-zinc-200 transition-colors"
+                      >
+                        Email Selected
+                      </button>
+                      <button
+                        onClick={() => setShowBulkDeleteModal(true)}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+                      >
+                        <Trash2 size={16} />
+                        Delete Selected
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Partners Table */}
               <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="bg-zinc-50 border-b border-zinc-200">
+                        <th className="py-3 px-4 w-12">
+                          <input
+                            type="checkbox"
+                            checked={selectedPartners.size === partners.length && partners.length > 0}
+                            onChange={handleSelectAll}
+                            className="w-4 h-4 text-orange-600 bg-zinc-100 border-zinc-300 rounded focus:ring-orange-500 focus:ring-2 cursor-pointer"
+                          />
+                        </th>
                         <th className="text-left py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Restaurant</th>
                         <th className="text-left py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Email</th>
                         <th className="text-center py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Status</th>
@@ -1204,7 +1383,17 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                     </thead>
                     <tbody>
                       {partners.map((partner) => (
-                        <tr key={partner.id} className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
+                        <tr key={partner.id} className={`border-b border-zinc-100 hover:bg-zinc-50 transition-colors ${
+                          selectedPartners.has(partner.id) ? 'bg-orange-50' : ''
+                        }`}>
+                          <td className="py-3 px-4">
+                            <input
+                              type="checkbox"
+                              checked={selectedPartners.has(partner.id)}
+                              onChange={() => handleSelectPartner(partner.id)}
+                              className="w-4 h-4 text-orange-600 bg-zinc-100 border-zinc-300 rounded focus:ring-orange-500 focus:ring-2 cursor-pointer"
+                            />
+                          </td>
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-3">
                               {partner.main_photo_url ? (
@@ -1258,6 +1447,12 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                                 className="px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 rounded transition-colors"
                               >
                                 Email
+                              </button>
+                              <button
+                                onClick={() => handlePartnerAction(partner.id, 'delete')}
+                                className="px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 rounded transition-colors"
+                              >
+                                Delete
                               </button>
                             </div>
                           </td>
@@ -1596,6 +1791,45 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setPartnerToDelete(null);
+        }}
+        onConfirm={confirmDeletePartner}
+        title={`Delete ${partnerToDelete?.name || 'Partner'}`}
+        message="⚠️ This will permanently delete:"
+        type="danger"
+        confirmText="Delete"
+        cancelText="Cancel"
+        details={[
+          'Partner account',
+          'All menu videos',
+          'All analytics data',
+          'This action CANNOT be undone!'
+        ]}
+      />
+
+      {/* Bulk Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showBulkDeleteModal}
+        onClose={() => setShowBulkDeleteModal(false)}
+        onConfirm={confirmBulkDelete}
+        title={`Delete ${selectedPartners.size} Partners`}
+        message="⚠️ This will permanently delete:"
+        type="danger"
+        confirmText="Delete All"
+        cancelText="Cancel"
+        details={[
+          `${selectedPartners.size} partner account${selectedPartners.size > 1 ? 's' : ''}`,
+          'All their menu videos',
+          'All their analytics data',
+          'This action CANNOT be undone!'
+        ]}
+      />
     </div>
   );
 };

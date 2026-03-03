@@ -210,22 +210,20 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
         video.load(); // triggers unload of buffered data
       } else if (index === activeVideoIndex) {
         // ACTIVE VIDEO: force load and play
-        if (!video.src || video.src === '') {
-          video.src = filteredItems[index]?.videoUrl || '';
+        const videoUrl = filteredItems[index]?.videoUrl || '';
+        if (video.src !== videoUrl) {
+          video.src = videoUrl;
           video.load();
         }
         video.muted = isMuted;
-        if (video.readyState < 3) {
-          video.load();
-        }
-        if (isPlaying) {
+        if (isPlaying && video.readyState >= 2) {
           video.play().catch(() => {});
         }
       } else {
         // ADJACENT (±1): preload but pause
-        if (!video.src || video.src === '') {
-          video.src = filteredItems[index]?.videoUrl || '';
-          video.preload = 'metadata';
+        const videoUrl = filteredItems[index]?.videoUrl || '';
+        if (video.src !== videoUrl) {
+          video.src = videoUrl;
           video.load();
         }
         video.pause();
@@ -450,11 +448,11 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
             )}
             <video
               ref={el => videoRefs.current[index] = el}
-              src={Math.abs(index - activeVideoIndex) <= 1 ? item.videoUrl : undefined}
               className="absolute inset-0 w-full h-full object-cover"
               loop
+              muted
               playsInline
-              preload={index === activeVideoIndex ? 'auto' : index === activeVideoIndex + 1 ? 'metadata' : 'none'}
+              preload="auto"
               onCanPlay={() => {
                 setVideoReady(prev => new Set(prev).add(index));
                 // Auto-play if this is the active video
