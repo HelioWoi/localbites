@@ -149,7 +149,8 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
     : restaurants;
 
   // Separate subscribed (with video) and non-subscribed
-  const allSubscribedRestaurants = filteredRestaurants.filter(r => r.isSubscribed);
+  // IMPORTANT: Partners should ALWAYS appear regardless of location/filters
+  const allSubscribedRestaurants = restaurants.filter(r => r.isSubscribed);
   
   // TEMPORARY LOGIC: Always show partner banners until we have 10+ partners
   // This helps showcase the platform to new cafes/restaurants
