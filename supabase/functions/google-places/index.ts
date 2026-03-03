@@ -636,6 +636,7 @@ async function textSearchRestaurants(lat: number, lng: number, radius: number, q
               radius: radius,
             },
           },
+          regionCode: "AU", // Restrict to Australia only
           maxResultCount: 20,
         }),
       }
