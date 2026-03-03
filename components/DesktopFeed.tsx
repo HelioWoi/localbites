@@ -1075,25 +1075,16 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({
       <div className={`relative overflow-hidden ${featured ? 'aspect-[16/10]' : 'aspect-[4/3]'}`}>
         {hasVideo ? (
           <>
-            {/* Thumbnail (shows when not hovered) */}
-            <img
-              src={restaurant.mainPhotoUrl}
-              alt={restaurant.name}
-              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
-                isHovered ? 'opacity-0' : 'opacity-100'
-              }`}
-            />
-            {/* Video (plays on hover) */}
+            {/* Video (always visible for partners) */}
             <video
               ref={videoRef}
               src={restaurant.dishes[0]?.videoUrl}
-              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
-                isHovered ? 'opacity-100' : 'opacity-0'
-              }`}
+              className="absolute inset-0 w-full h-full object-cover"
               muted
               loop
               playsInline
-              preload="none"
+              preload="metadata"
+              autoPlay
             />
             {/* Video badge */}
             <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-full z-10">
