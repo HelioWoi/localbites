@@ -25,11 +25,8 @@ serve(async (req) => {
       );
     }
 
-    // Use localhost in development, production URL in prod
-    const baseUrl = Deno.env.get('ENVIRONMENT') === 'production' 
-      ? 'https://menulove.com.au' 
-      : 'http://localhost:3001';
-    const confirmationUrl = `${baseUrl}/confirm-email?token=${confirmationToken}`;
+    // Always use production URL since Edge Function runs on Supabase (production)
+    const confirmationUrl = `https://menulove.com.au/confirm-email?token=${confirmationToken}`;
 
     const emailHtml = `
 <!DOCTYPE html>
