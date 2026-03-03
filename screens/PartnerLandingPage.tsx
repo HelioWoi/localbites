@@ -29,13 +29,13 @@ const PartnerLandingPage: React.FC = () => {
   const benefits = [
     {
       icon: Video,
-      title: "TikTok-Style Menu Videos",
-      description: "Showcase your dishes with engaging vertical videos that capture attention and drive orders"
+      title: "TikTok-Style Menu Videos + Instagram Bio Link",
+      description: "Showcase your dishes with engaging vertical videos that capture attention and drive orders. Share your special menu link on Instagram bio (like Linktree) to drive traffic directly to your video menu"
     },
     {
       icon: Search,
-      title: "Smart Discovery (5km Radius)",
-      description: "Customers find you automatically through intelligent location-based search - get discovered by hungry people nearby"
+      title: "Smart Discovery (Sunshine Coast)",
+      description: "Currently live in Sunshine Coast region - customers find you through intelligent 5km location search. Expanding to Gold Coast, Brisbane & more soon!"
     },
     {
       icon: Download,
@@ -44,8 +44,8 @@ const PartnerLandingPage: React.FC = () => {
     },
     {
       icon: QrCode,
-      title: "Smart QR Code System + Promo Banners",
-      description: "Customers scan and browse your menu instantly - add promotional banners to boost special offers and drive more orders"
+      title: "Smart QR Code + Shareable Link",
+      description: "Customers scan QR codes to browse your menu instantly. Get a shareable link for Instagram bio, social media & marketing. Add promotional banners to boost special offers"
     },
     {
       icon: BarChart3,
@@ -73,8 +73,8 @@ const PartnerLandingPage: React.FC = () => {
   ];
 
   const stats = [
-    { number: "50+", label: "Partner Restaurants" },
-    { number: "10K+", label: "Monthly Views" },
+    { number: "100%", label: "Video Menus" },
+    { number: "5km", label: "Smart Discovery" },
     { number: "Beta", label: "Early Access" },
     { number: "65%", label: "Decision Rate" }
   ];
@@ -109,15 +109,14 @@ const PartnerLandingPage: React.FC = () => {
               <span className="text-yellow-300">Viral Content</span>
             </h1>
             <p className="text-lg sm:text-xl text-white/90 mb-8 max-w-2xl mx-auto font-medium leading-relaxed">
-              Join MenuLove and showcase your dishes with TikTok-style videos. 
-              Get discovered by customers within 5km through smart location search.
+              Join Australian restaurants using TikTok-style video menus.
             </p>
             <div className="mb-8">
               <p className="text-yellow-300 text-xl font-black mb-2 animate-pulse">
                 🔥 Only 10 FREE Beta Spots Left
               </p>
               <p className="text-white/80 text-sm">
-                30-day trial • No credit card required • Sunshine Coast only
+                30-day trial • No credit card required • Smart location discovery
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -168,14 +167,17 @@ const PartnerLandingPage: React.FC = () => {
           </div>
 
           <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Image Side */}
+            {/* Demo Video Side */}
             <div className="relative rounded-3xl overflow-hidden shadow-2xl">
-              <img
-                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/img_coffeeshop.jpg"
-                alt="Coffee shop using MenuLove"
-                className="w-full h-[500px] object-cover object-left-center"
+              <video
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/video%20backstreet%20cafe.mp4"
+                className="w-full h-[500px] object-cover"
+                autoPlay
+                loop
+                muted
+                playsInline
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
             </div>
 
             {/* Steps Side */}
@@ -236,8 +238,51 @@ const PartnerLandingPage: React.FC = () => {
         </div>
       </section>
 
+      {/* Restaurant Showcase Section */}
+      <section className="py-20 bg-gradient-to-br from-zinc-50 to-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <h2 className="text-4xl sm:text-5xl font-black text-zinc-900 mb-6">
+                Video Menus for Australian Restaurants
+              </h2>
+              <p className="text-xl text-zinc-600 mb-8 leading-relaxed">
+                From cozy cafes to fine dining, MenuLove helps restaurants across Australia showcase their best dishes with engaging video content. Smart discovery currently live in Sunshine Coast, expanding soon.
+              </p>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                    <CheckCircle2 className="text-white" size={20} />
+                  </div>
+                  <span className="text-lg font-semibold text-zinc-900">No setup fees or hidden costs</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                    <CheckCircle2 className="text-white" size={20} />
+                  </div>
+                  <span className="text-lg font-semibold text-zinc-900">30-day free trial included</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                    <CheckCircle2 className="text-white" size={20} />
+                  </div>
+                  <span className="text-lg font-semibold text-zinc-900">Cancel anytime, no questions asked</span>
+                </div>
+              </div>
+            </div>
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+              <img
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/img_coffeeshop.jpg"
+                alt="Restaurant using MenuLove"
+                className="w-full h-[500px] object-cover object-left-center"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Signup Form Section */}
-      <div id="signup-form" className="bg-gradient-to-br from-zinc-50 to-white py-16">
+      <div id="signup-form" className="bg-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-start">
             {/* Left: Benefits */}
@@ -447,7 +492,7 @@ const PartnerLandingPage: React.FC = () => {
                 <p className="text-6xl font-black text-white mb-2">FREE</p>
                 <p className="text-yellow-300 text-2xl font-black animate-pulse">Only 10 Spots Left</p>
               </div>
-              <p className="text-white/80 text-sm mb-6">30-day trial • No credit card required • Sunshine Coast only</p>
+              <p className="text-white/80 text-sm mb-6">30-day trial • No credit card required • Smart location discovery</p>
               <ul className="text-left space-y-3 mb-8 text-white">
                 <li className="flex items-center gap-3">
                   <Star className="text-yellow-300 flex-shrink-0" size={22} fill="currentColor" />
@@ -510,7 +555,7 @@ const PartnerLandingPage: React.FC = () => {
             🔥 Only 10 FREE Beta Spots Left
           </p>
           <p className="text-white/80 text-sm mb-3">
-            30-day trial • No credit card required • Sunshine Coast only
+            30-day trial • No credit card required • Smart location discovery
           </p>
           <p className="mt-6 text-white/80">
             Questions? Email us at <a href="mailto:contact@menulove.com.au" className="underline font-bold hover:text-yellow-300 transition-colors">contact@menulove.com.au</a>
@@ -518,19 +563,96 @@ const PartnerLandingPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Logo Section */}
-      <div className="bg-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <img 
-              src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png" 
-              alt="MenuLove" 
-              className="w-12 h-12"
-            />
-            <span className="text-zinc-900 font-black text-3xl">MenuLove</span>
+      {/* Partner Logos Section */}
+      <div className="bg-white py-16 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10">
+            <p className="text-zinc-500 text-sm font-semibold uppercase tracking-wider mb-2">
+              Trusted by Local Restaurants
+            </p>
+            <h3 className="text-2xl font-black text-zinc-900">
+              Join Australian Restaurants Using Video Menus
+            </h3>
+            <p className="text-zinc-600 text-sm mt-2">
+              Smart Discovery currently in Sunshine Coast • Video menus available Australia-wide
+            </p>
           </div>
-          <p className="text-zinc-600 text-sm">
-            Transforming restaurant menus into viral content
+          
+          {/* Desktop: Static logos */}
+          <div className="hidden lg:block">
+            <div className="flex gap-12 items-center justify-center">
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/bkstreet.png" 
+                alt="Backstreet Cafe" 
+                className="h-16 w-auto grayscale hover:grayscale-0 transition-all duration-300 opacity-60 hover:opacity-100"
+              />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/brazzos.png" 
+                alt="Brazzos Smokehouse" 
+                className="h-16 w-auto grayscale hover:grayscale-0 transition-all duration-300 opacity-60 hover:opacity-100"
+              />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/decision.png" 
+                alt="Decision" 
+                className="h-16 w-auto grayscale hover:grayscale-0 transition-all duration-300 opacity-60 hover:opacity-100"
+              />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/flume.png" 
+                alt="Flume by the River" 
+                className="h-16 w-auto grayscale hover:grayscale-0 transition-all duration-300 opacity-60 hover:opacity-100"
+              />
+            </div>
+          </div>
+
+          {/* Mobile: Infinite slider */}
+          <div className="lg:hidden relative overflow-hidden">
+            <div className="flex gap-8 items-center animate-infinite-scroll">
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/bkstreet.png" 
+                alt="Backstreet Cafe" 
+                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
+              />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/brazzos.png" 
+                alt="Brazzos Smokehouse" 
+                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
+              />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/decision.png" 
+                alt="Decision" 
+                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
+              />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/flume.png" 
+                alt="Flume by the River" 
+                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
+              />
+              {/* Duplicate for infinite effect */}
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/bkstreet.png" 
+                alt="Backstreet Cafe" 
+                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
+              />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/brazzos.png" 
+                alt="Brazzos Smokehouse" 
+                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
+              />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/decision.png" 
+                alt="Decision" 
+                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
+              />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/flume.png" 
+                alt="Flume by the River" 
+                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
+              />
+            </div>
+          </div>
+          
+          <p className="text-center text-zinc-500 text-sm mt-8">
+            And many more joining soon...
           </p>
         </div>
       </div>
@@ -538,6 +660,16 @@ const PartnerLandingPage: React.FC = () => {
       {/* Footer */}
       <div className="bg-zinc-900 text-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* MenuLove Logo */}
+          <div className="flex items-center justify-center gap-3 mb-8">
+            <img 
+              src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png" 
+              alt="MenuLove" 
+              className="w-10 h-10"
+            />
+            <span className="text-white font-black text-2xl">MenuLove</span>
+          </div>
+
           <div className="text-center mb-6">
             <div className="max-w-3xl mx-auto">
               <p className="text-zinc-500 text-sm leading-relaxed mb-4">

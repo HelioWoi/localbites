@@ -156,24 +156,24 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
           </div>
 
           {/* Title */}
-          <div className="text-center mb-6">
-            <h1 className="text-4xl font-extrabold text-white mb-3 tracking-tight leading-tight">
+          <div className="text-center mb-6 px-4">
+            <h1 className="text-3xl font-extrabold text-white mb-2 tracking-tight leading-tight">
               Discover <span className="text-orange-500">Local Flavors</span>
             </h1>
-            <p className="text-white/80 text-base leading-relaxed">
-              Discover restaurants, cafes and bars near you,<br/>within a 5km radius.
+            <p className="text-white/70 text-sm leading-relaxed max-w-[280px] mx-auto">
+              Restaurants, cafes and bars within 5km
             </p>
           </div>
 
           {/* Partner CTA */}
-          <div className="text-center mb-7">
+          <div className="text-center mb-7 px-4">
             <a
               href="/become-a-partner"
-              className="inline-flex items-center gap-2 text-white/80 text-sm font-medium hover:text-white transition-colors group"
+              className="inline-flex items-center gap-1.5 text-white/70 text-xs font-medium hover:text-white transition-colors group max-w-[260px] mx-auto"
             >
-              <Crown size={16} className="text-orange-400" />
-              <span>Own a restaurant? Join as a partner and showcase your menu with video</span>
-              <ChevronDown size={16} className="text-orange-400 rotate-[-90deg]" />
+              <Crown size={14} className="text-orange-400 flex-shrink-0" />
+              <span className="leading-tight">Own a restaurant? Join as partner</span>
+              <ChevronDown size={14} className="text-orange-400 rotate-[-90deg] flex-shrink-0" />
             </a>
           </div>
 
@@ -242,17 +242,17 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
           </form>
 
           {/* Stats */}
-          <div className="flex items-center justify-center gap-4 mb-7 text-white/70 text-xs">
+          <div className="flex items-center justify-center gap-3 mb-7 text-white/60 text-[11px]">
             <button
               onClick={onSkip}
-              className="flex items-center gap-1.5 hover:text-white transition-colors active:scale-95"
+              className="flex items-center gap-1 hover:text-white transition-colors active:scale-95"
             >
-              <div className="w-2 h-2 bg-green-400 rounded-full" />
-              <span>6 restaurants nearby</span>
+              <div className="w-1.5 h-1.5 bg-green-400 rounded-full" />
+              <span>6 nearby</span>
             </button>
-            <div className="flex items-center gap-1.5">
-              <Video size={14} className="text-orange-400" />
-              <span>1 with video menus</span>
+            <div className="flex items-center gap-1">
+              <Video size={12} className="text-orange-400" />
+              <span>1 with video</span>
             </div>
           </div>
 
