@@ -152,12 +152,21 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
   // IMPORTANT: Partners should ALWAYS appear regardless of location/filters
   const allSubscribedRestaurants = restaurants.filter(r => r.isSubscribed);
   
+  // Apply search query filter to partners
+  const searchFilteredPartners = searchQuery.trim()
+    ? allSubscribedRestaurants.filter(r => {
+        const queryWords = searchQuery.toLowerCase().trim().split(/\s+/);
+        const combined = `${r.name.toLowerCase()} ${r.cuisine.toLowerCase()}`;
+        return queryWords.every(qw => combined.includes(qw));
+      })
+    : allSubscribedRestaurants;
+  
   // TEMPORARY LOGIC: Always show partner banners until we have 10+ partners
   // This helps showcase the platform to new cafes/restaurants
   // TODO: When we have 10+ partners, revert to standard filtering (5km radius, open now, etc)
-  const subscribedRestaurants = allSubscribedRestaurants.length < 10
-    ? allSubscribedRestaurants // Show all partners regardless of filters
-    : allSubscribedRestaurants.filter(r => {
+  const subscribedRestaurants = searchFilteredPartners.length < 10
+    ? searchFilteredPartners // Show all partners regardless of filters
+    : searchFilteredPartners.filter(r => {
         // Apply "Open Now" filter only when we have 10+ partners
         if (showOpenOnly) {
           return calculateIsOpenNow(r);
