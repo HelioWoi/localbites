@@ -12,7 +12,8 @@ export type EventType =
   | 'save'
   | 'share'
   | 'qr_scan'
-  | 'directions_click';
+  | 'directions_click'
+  | 'order_button_click';
 
 interface TrackEventParams {
   eventType: EventType;

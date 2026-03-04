@@ -318,6 +318,8 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
       instagramUrl: p.instagram_url || '',
       facebookUrl: p.facebook_url || '',
       tiktokUrl: p.tiktok_url || '',
+      ordering_url: p.ordering_url || '',
+      enable_ordering_button: p.enable_ordering_button || false,
       isSubscribed: true,
       isOpen: true,
       isPartner: true,
@@ -341,6 +343,7 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
           price: item.price,
           category: item.category,
           isFeatured: item.is_featured || false,
+          dish_order_url: item.dish_order_url || '',
         })),
       reviews: (p.google_reviews || []).map((r: any, i: number) => ({
         id: `review-${i}`,

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Restaurant, Dish, Review } from '../types';
-import { ChevronLeft, Globe, MapPin, Navigation, Bookmark, PlayCircle, Camera, X, Crown, Play, Pause, Volume2, VolumeX, Star, ChevronRight, ChevronUp, ExternalLink, Home, Search, MessageSquare, Filter, Clock, Heart, Trash2, Phone, Sparkles, UtensilsCrossed, Video, Share2 } from 'lucide-react';
+import { ChevronLeft, Globe, MapPin, Navigation, Bookmark, PlayCircle, Camera, X, Crown, Play, Pause, Volume2, VolumeX, Star, ChevronRight, ChevronUp, ExternalLink, Home, Search, MessageSquare, Filter, Clock, Heart, Trash2, Phone, Sparkles, UtensilsCrossed, Video, Share2, ShoppingBag } from 'lucide-react';
 import BannerSlider from '../components/BannerSlider';
 import { getPlaceDetails, textSearchRestaurants } from '../services/googlePlacesProxy';
 import { trackEvent } from '../services/eventsService';
@@ -239,6 +239,22 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
     // Dispatch event for same-tab sync
     window.dispatchEvent(new Event('savedDishesChanged'));
     console.log('[RestaurantProfile] Event dispatched');
+  };
+
+  // Order Now - redirect to ordering system
+  const handleOrderNow = (dish: Dish) => {
+    const orderUrl = dish.dish_order_url || restaurant.ordering_url;
+    if (!orderUrl) return;
+
+    // Track order button click
+    trackEvent({
+      restaurantId: restaurant.id,
+      eventType: 'order_button_click',
+      eventValue: dish.id,
+    });
+
+    // Open ordering URL in new tab
+    window.open(orderUrl, '_blank', 'noopener,noreferrer');
   };
 
   // Combine restaurant reviews with Google reviews
@@ -660,8 +676,22 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-2.5">
                     <p className="text-white font-semibold text-xs">{dish.name}</p>
                   </div>
-                  <div className="absolute top-2 right-2 w-7 h-7 bg-black/30 backdrop-blur-sm rounded-full flex items-center justify-center">
-                    <PlayCircle size={14} className="text-white" fill="currentColor" />
+                  <div className="absolute top-2 right-2 flex gap-1">
+                    <div className="w-7 h-7 bg-black/30 backdrop-blur-sm rounded-full flex items-center justify-center">
+                      <PlayCircle size={14} className="text-white" fill="currentColor" />
+                    </div>
+                    {restaurant.enable_ordering_button && (dish.dish_order_url || restaurant.ordering_url) && (
+                      <div
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleOrderNow(dish);
+                        }}
+                        className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center cursor-pointer hover:bg-orange-600 transition-colors"
+                      >
+                        <ShoppingBag size={14} className="text-white" />
+                      </div>
+                    )}
                   </div>
                 </button>
               ))}

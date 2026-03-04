@@ -13,6 +13,7 @@ export interface PartnerSummary {
   likes: number;
   saves: number;
   shares: number;
+  order_clicks: number;
   directions_clicks: number;
   qr_scans: number;
   mobile_percentage: number;

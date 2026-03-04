@@ -80,6 +80,8 @@ const RestaurantMenuLoader: React.FC<RestaurantMenuLoaderProps> = ({ slug }) => 
           coverPhotoUrl: partnerData.cover_photo_url,
           googleMapsUrl: partnerData.google_maps_url,
           website: partnerData.website,
+          ordering_url: partnerData.ordering_url,
+          enable_ordering_button: partnerData.enable_ordering_button,
           openingHours: partnerData.google_opening_hours || [],
           menuItems: videoItems.map(item => ({
             id: item.id,
@@ -88,6 +90,7 @@ const RestaurantMenuLoader: React.FC<RestaurantMenuLoaderProps> = ({ slug }) => 
             category: item.category,
             videoUrl: item.video_url,
             price: item.price,
+            dish_order_url: item.dish_order_url,
           })),
           categories,
         });

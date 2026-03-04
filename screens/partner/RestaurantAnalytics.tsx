@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import {
   Eye, Video, Heart, Bookmark, Share2, Navigation, QrCode, TrendingUp, 
-  Sparkles, Clock, Smartphone, Monitor, Tablet, Loader2, AlertCircle, Download
+  Sparkles, Clock, Smartphone, Monitor, Tablet, Loader2, AlertCircle, Download, X, ShoppingBag
 } from 'lucide-react';
 import {
   getPartnerSummary,
@@ -30,6 +30,7 @@ interface RestaurantAnalyticsProps {
 }
 
 type DatePeriod = 'today' | '7days' | '30days';
+type MetricType = 'video_plays' | 'likes' | 'saves' | 'shares' | 'order_clicks' | null;
 
 const RestaurantAnalytics: React.FC<RestaurantAnalyticsProps> = ({ restaurantId }) => {
   const [period, setPeriod] = useState<DatePeriod>('7days');
@@ -40,6 +41,8 @@ const RestaurantAnalytics: React.FC<RestaurantAnalyticsProps> = ({ restaurantId 
   const [topItems, setTopItems] = useState<TopItem[]>([]);
   const [peakHours, setPeakHours] = useState<PeakHour[]>([]);
   const [insights, setInsights] = useState<Insight[]>([]);
+  
+  const [selectedMetric, setSelectedMetric] = useState<MetricType>(null);
 
   useEffect(() => {
     loadAnalytics();
@@ -71,6 +74,7 @@ const RestaurantAnalytics: React.FC<RestaurantAnalyticsProps> = ({ restaurantId 
       csv += `Likes,${summary.likes}\n`;
       csv += `Saves,${summary.saves}\n`;
       csv += `Shares,${summary.shares}\n`;
+      csv += `Order Clicks,${summary.order_clicks}\n`;
       csv += `Directions Clicks,${summary.directions_clicks}\n`;
       csv += `QR Scans,${summary.qr_scans}\n\n`;
       csv += `Top Performing Items\n`;
@@ -111,6 +115,7 @@ const RestaurantAnalytics: React.FC<RestaurantAnalyticsProps> = ({ restaurantId 
       html += `<tr><td>Likes</td><td>${summary.likes}</td></tr>`;
       html += `<tr><td>Saves</td><td>${summary.saves}</td></tr>`;
       html += `<tr><td>Shares</td><td>${summary.shares}</td></tr>`;
+      html += `<tr><td>Order Clicks</td><td>${summary.order_clicks}</td></tr>`;
       html += `<tr><td>Directions Clicks</td><td>${summary.directions_clicks}</td></tr>`;
       html += `<tr><td>QR Scans</td><td>${summary.qr_scans}</td></tr>`;
       html += `</table>`;
@@ -167,6 +172,7 @@ const RestaurantAnalytics: React.FC<RestaurantAnalyticsProps> = ({ restaurantId 
                 <tr><td>Likes</td><td>${summary.likes}</td></tr>
                 <tr><td>Saves</td><td>${summary.saves}</td></tr>
                 <tr><td>Shares</td><td>${summary.shares}</td></tr>
+                <tr><td>Order Clicks</td><td>${summary.order_clicks}</td></tr>
                 <tr><td>Directions Clicks</td><td>${summary.directions_clicks}</td></tr>
                 <tr><td>QR Scans</td><td>${summary.qr_scans}</td></tr>
               </table>
@@ -339,63 +345,38 @@ const RestaurantAnalytics: React.FC<RestaurantAnalyticsProps> = ({ restaurantId 
                 </p>
               </div>
             </div>
-            <div className="bg-white rounded-xl p-4 sm:p-6 border border-zinc-200 group relative">
-              <div className="flex items-center gap-2 text-zinc-500 mb-2">
+            <button 
+              onClick={() => setSelectedMetric('saves')}
+              className="bg-white rounded-xl p-4 sm:p-6 border border-zinc-200 group relative hover:border-orange-300 hover:shadow-md transition-all cursor-pointer text-left w-full"
+            >
+              <div className="flex items-center gap-2 text-zinc-500 mb-2 group-hover:text-orange-600 transition-colors">
                 <Bookmark size={18} />
                 <span className="text-xs font-medium">Saves</span>
               </div>
               <p className="text-2xl sm:text-3xl font-bold text-zinc-900">{(summary?.saves || 0).toLocaleString()}</p>
-              <div className="absolute inset-0 bg-white rounded-xl p-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none flex flex-col justify-center overflow-y-auto shadow-lg border border-zinc-200">
-                <p className="text-xs text-zinc-900 font-semibold mb-2">Most Saved Videos</p>
-                {topItems.filter(item => item.saves > 0).slice(0, 3).length > 0 ? (
-                  <ul className="text-xs text-zinc-700 space-y-1">
-                    {topItems.filter(item => item.saves > 0).slice(0, 3).map((item, idx) => (
-                      <li key={idx}>• {item.item_name} ({item.saves} saves)</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-xs text-zinc-600">No videos saved yet</p>
-                )}
+              <div className="absolute inset-0 bg-white rounded-xl p-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none flex items-center justify-center shadow-lg border border-zinc-200">
+                <p className="text-xs text-zinc-700 text-center leading-relaxed">
+                  Click to see which videos were saved
+                </p>
               </div>
-            </div>
-            <div className="bg-white rounded-xl p-4 sm:p-6 border border-zinc-200 group relative">
-              <div className="flex items-center gap-2 text-zinc-500 mb-2">
+            </button>
+            <button 
+              onClick={() => setSelectedMetric('likes')}
+              className="bg-white rounded-xl p-4 sm:p-6 border border-zinc-200 group relative hover:border-orange-300 hover:shadow-md transition-all cursor-pointer text-left w-full"
+            >
+              <div className="flex items-center gap-2 text-zinc-500 mb-2 group-hover:text-orange-600 transition-colors">
                 <Heart size={18} />
                 <span className="text-xs font-medium">Likes</span>
               </div>
               <p className="text-2xl sm:text-3xl font-bold text-zinc-900">{(summary?.likes || 0).toLocaleString()}</p>
-              <div className="absolute inset-0 bg-white rounded-xl p-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none flex flex-col justify-center overflow-y-auto shadow-lg border border-zinc-200">
-                <p className="text-xs text-zinc-900 font-semibold mb-2">Most Liked Videos</p>
-                {topItems.filter(item => item.likes > 0).slice(0, 3).length > 0 ? (
-                  <ul className="text-xs text-zinc-700 space-y-1">
-                    {topItems.filter(item => item.likes > 0).slice(0, 3).map((item, idx) => (
-                      <li key={idx}>• {item.item_name} ({item.likes} likes)</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-xs text-zinc-600">No videos liked yet</p>
-                )}
+              <div className="absolute inset-0 bg-white rounded-xl p-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none flex items-center justify-center shadow-lg border border-zinc-200">
+                <p className="text-xs text-zinc-700 text-center leading-relaxed">
+                  Click to see which videos were liked
+                </p>
               </div>
-            </div>
+            </button>
           </div>
 
-          {/* Insights Box */}
-          {insights.length > 0 && (
-            <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl border-2 border-orange-200 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles size={20} className="text-orange-600" />
-                <h3 className="text-lg font-bold text-zinc-900">This Week Highlights</h3>
-              </div>
-              <ul className="space-y-2">
-                {insights.map((insight, index) => (
-                  <li key={index} className="text-sm text-zinc-700 flex items-start gap-2">
-                    <span className="text-orange-500 mt-1 font-bold">•</span>
-                    <span>{insight.insight_text}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
 
           {/* Summary Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -429,20 +410,41 @@ const RestaurantAnalytics: React.FC<RestaurantAnalyticsProps> = ({ restaurantId 
               </div>
             </div>
 
-            <div className="bg-white rounded-xl border border-zinc-200 p-4 sm:p-6 group relative">
+            <button 
+              onClick={() => setSelectedMetric('video_plays')}
+              className="bg-white rounded-xl border border-zinc-200 p-4 sm:p-6 group relative hover:border-orange-300 hover:shadow-md transition-all cursor-pointer text-left w-full"
+            >
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-zinc-100 rounded-lg flex items-center justify-center">
-                  <Video size={20} className="text-zinc-600" />
+                <div className="w-10 h-10 bg-zinc-100 rounded-lg flex items-center justify-center group-hover:bg-orange-100 transition-colors">
+                  <Video size={20} className="text-zinc-600 group-hover:text-orange-600 transition-colors" />
                 </div>
               </div>
               <p className="text-2xl sm:text-3xl font-bold text-zinc-900">{summary?.video_plays || 0}</p>
               <p className="text-xs sm:text-sm text-zinc-500 mt-1">Video Plays</p>
               <div className="absolute inset-0 bg-white rounded-xl p-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none flex items-center justify-center shadow-lg border border-zinc-200">
                 <p className="text-xs text-zinc-700 text-center leading-relaxed">
-                  Number of times customers started watching your dish videos
+                  Click to see which videos were played
                 </p>
               </div>
-            </div>
+            </button>
+
+            <button 
+              onClick={() => setSelectedMetric('order_clicks')}
+              className="bg-white rounded-xl border border-zinc-200 p-4 sm:p-6 group relative hover:border-orange-300 hover:shadow-md transition-all cursor-pointer text-left w-full"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center group-hover:bg-orange-200 transition-colors">
+                  <ShoppingBag size={20} className="text-orange-600" />
+                </div>
+              </div>
+              <p className="text-2xl sm:text-3xl font-bold text-zinc-900">{summary?.order_clicks || 0}</p>
+              <p className="text-xs sm:text-sm text-zinc-500 mt-1">Order Clicks</p>
+              <div className="absolute inset-0 bg-white rounded-xl p-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none flex items-center justify-center shadow-lg border border-zinc-200">
+                <p className="text-xs text-zinc-700 text-center leading-relaxed">
+                  Click to see which items received order clicks
+                </p>
+              </div>
+            </button>
 
             <div className="bg-white rounded-xl border border-zinc-200 p-4 sm:p-6 group relative">
               <div className="flex items-center gap-3 mb-3">
@@ -527,22 +529,22 @@ const RestaurantAnalytics: React.FC<RestaurantAnalyticsProps> = ({ restaurantId 
                 {funnel.map((step, index) => (
                   <div key={index} className="relative">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-zinc-700">{step.step}</span>
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="text-sm font-medium text-zinc-700 whitespace-nowrap">{step.step}</span>
                         {step.step === 'Item Views' && (
-                          <span className="text-xs text-zinc-400">(clicked on dishes)</span>
+                          <span className="text-xs text-zinc-400 whitespace-nowrap">(clicked on dishes)</span>
                         )}
                         {step.step === 'Video Plays' && (
-                          <span className="text-xs text-zinc-400">(watched videos)</span>
+                          <span className="text-xs text-zinc-400 whitespace-nowrap">(watched videos)</span>
                         )}
                         {step.step === 'Directions' && (
-                          <span className="text-xs text-zinc-400">(clicked get directions)</span>
+                          <span className="text-xs text-zinc-400 whitespace-nowrap">(clicked get directions)</span>
                         )}
                         {step.step === 'QR Scans' && (
-                          <span className="text-xs text-zinc-400">(scanned QR code)</span>
+                          <span className="text-xs text-zinc-400 whitespace-nowrap">(scanned QR code)</span>
                         )}
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-shrink-0">
                         <span className="text-sm font-bold text-zinc-900">{step.count}</span>
                         <span className="text-xs text-zinc-500 w-12 text-right">{step.conversion_rate}%</span>
                       </div>
@@ -550,7 +552,7 @@ const RestaurantAnalytics: React.FC<RestaurantAnalyticsProps> = ({ restaurantId 
                     <div className="w-full bg-zinc-100 rounded-full h-3">
                       <div 
                         className="bg-gradient-to-r from-orange-500 to-orange-400 h-3 rounded-full transition-all duration-500"
-                        style={{ width: `${step.conversion_rate}%` }}
+                        style={{ width: `${Math.min(step.conversion_rate, 100)}%` }}
                       />
                     </div>
                   </div>
@@ -635,6 +637,24 @@ const RestaurantAnalytics: React.FC<RestaurantAnalyticsProps> = ({ restaurantId 
               </div>
             )}
           </div>
+
+          {/* This Week Highlights */}
+          {insights.length > 0 && (
+            <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl border-2 border-orange-200 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles size={20} className="text-orange-600" />
+                <h3 className="text-lg font-bold text-zinc-900">This Week Highlights</h3>
+              </div>
+              <ul className="space-y-2">
+                {insights.map((insight, index) => (
+                  <li key={index} className="text-sm text-zinc-700 flex items-start gap-2">
+                    <span className="text-orange-500 mt-1 font-bold">•</span>
+                    <span>{insight.insight_text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Peak Hours Chart */}
           {peakHours.length > 0 && (
@@ -739,6 +759,111 @@ const RestaurantAnalytics: React.FC<RestaurantAnalyticsProps> = ({ restaurantId 
             </div>
           )}
         </>
+      )}
+
+      {/* Metric Detail Modal */}
+      {selectedMetric && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedMetric(null)}>
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-6 border-b border-zinc-200">
+              <div>
+                <h3 className="text-xl font-bold text-zinc-900">
+                  {selectedMetric === 'video_plays' && 'Video Plays'}
+                  {selectedMetric === 'likes' && 'Likes'}
+                  {selectedMetric === 'saves' && 'Saves'}
+                  {selectedMetric === 'shares' && 'Shares'}
+                  {selectedMetric === 'order_clicks' && 'Order Clicks'}
+                </h3>
+                <p className="text-sm text-zinc-500 mt-1">
+                  Items ranked by {selectedMetric === 'video_plays' ? 'plays' : selectedMetric === 'order_clicks' ? 'clicks' : selectedMetric}
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedMetric(null)}
+                className="w-10 h-10 rounded-full hover:bg-zinc-100 flex items-center justify-center transition-colors"
+              >
+                <X size={20} className="text-zinc-600" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
+              {topItems.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {topItems
+                    .sort((a, b) => {
+                      if (selectedMetric === 'video_plays') return b.video_plays - a.video_plays;
+                      if (selectedMetric === 'likes') return b.likes - a.likes;
+                      if (selectedMetric === 'saves') return b.saves - a.saves;
+                      if (selectedMetric === 'shares') return b.shares - a.shares;
+                      if (selectedMetric === 'order_clicks') return b.shares - a.shares; // Using shares as proxy for now
+                      return 0;
+                    })
+                    .filter(item => {
+                      if (selectedMetric === 'video_plays') return item.video_plays > 0;
+                      if (selectedMetric === 'likes') return item.likes > 0;
+                      if (selectedMetric === 'saves') return item.saves > 0;
+                      if (selectedMetric === 'shares') return item.shares > 0;
+                      if (selectedMetric === 'order_clicks') return item.shares > 0; // Using shares as proxy for now
+                      return false;
+                    })
+                    .map((item, index) => (
+                      <div key={item.item_id} className="group relative">
+                        <div className="aspect-[9/16] bg-zinc-100 rounded-xl overflow-hidden relative">
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                          <div className="absolute top-2 left-2 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
+                            <span className="text-xs font-bold text-white">{index + 1}</span>
+                          </div>
+                          <div className="absolute bottom-0 left-0 right-0 p-3">
+                            <p className="text-white text-sm font-semibold line-clamp-2 mb-1">{item.item_name}</p>
+                            <div className="flex items-center gap-2">
+                              {selectedMetric === 'video_plays' && (
+                                <>
+                                  <Video size={14} className="text-white" />
+                                  <span className="text-white text-xs font-bold">{item.video_plays}</span>
+                                </>
+                              )}
+                              {selectedMetric === 'likes' && (
+                                <>
+                                  <Heart size={14} className="text-white" />
+                                  <span className="text-white text-xs font-bold">{item.likes}</span>
+                                </>
+                              )}
+                              {selectedMetric === 'saves' && (
+                                <>
+                                  <Bookmark size={14} className="text-white" />
+                                  <span className="text-white text-xs font-bold">{item.saves}</span>
+                                </>
+                              )}
+                              {selectedMetric === 'shares' && (
+                                <>
+                                  <Share2 size={14} className="text-white" />
+                                  <span className="text-white text-xs font-bold">{item.shares}</span>
+                                </>
+                              )}
+                              {selectedMetric === 'order_clicks' && (
+                                <>
+                                  <ShoppingBag size={14} className="text-white" />
+                                  <span className="text-white text-xs font-bold">{item.shares}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <TrendingUp size={48} className="text-zinc-300 mx-auto mb-4" />
+                  <p className="text-sm font-medium text-zinc-900 mb-2">No data yet</p>
+                  <p className="text-xs text-zinc-500 max-w-md mx-auto">
+                    When customers interact with your menu items, you'll see the details here.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

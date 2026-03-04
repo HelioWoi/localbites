@@ -51,6 +51,8 @@ const FullMenuLoader: React.FC<FullMenuLoaderProps> = ({ slug }) => {
           name: partnerData.restaurant_name || 'Restaurant',
           slug: partnerData.slug,
           cuisine: partnerData.cuisine || 'Restaurant',
+          ordering_url: partnerData.ordering_url,
+          enable_ordering_button: partnerData.enable_ordering_button,
           openingHours: partnerData.google_opening_hours || [],
           categories,
           menuItems: (menuItems || []).map(item => ({
@@ -61,6 +63,7 @@ const FullMenuLoader: React.FC<FullMenuLoaderProps> = ({ slug }) => {
             price: item.price || 0,
             videoUrl: item.video_url,
             photoUrl: item.photo_url || null,
+            dish_order_url: item.dish_order_url,
           })),
         });
         setLoading(false);

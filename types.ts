@@ -27,6 +27,8 @@ export interface Restaurant {
   instagramUrl?: string;
   facebookUrl?: string;
   tiktokUrl?: string;
+  ordering_url?: string;
+  enable_ordering_button?: boolean;
   dishes: Dish[];
   isSubscribed: boolean; // true = has video content, false = Google photos only
   mainPhotoUrl: string;
@@ -51,6 +53,7 @@ export interface Dish {
   price?: number;
   category?: string;
   isFeatured?: boolean;
+  dish_order_url?: string;
 }
 
 export interface UserLocation {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, ChevronDown, ChevronUp, Video, Image as ImageIcon, Bookmark, Share2, Utensils, Coffee, Wine, IceCream, Pizza, Fish } from 'lucide-react';
+import { X, Search, ChevronDown, ChevronUp, Video, Image as ImageIcon, Bookmark, Share2, Utensils, Coffee, Wine, IceCream, Pizza, Fish, ShoppingBag } from 'lucide-react';
 import { Restaurant, Dish } from '../types';
+import { trackEvent } from '../services/eventsService';
 
 interface FullMenuModalProps {
   restaurant: Restaurant;
@@ -29,6 +30,21 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
   const [showSavedOnly, setShowSavedOnly] = useState(false);
+
+  // Handle Order Now
+  const handleOrderNow = (dish: Dish, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const orderUrl = dish.dish_order_url || restaurant.ordering_url;
+    if (!orderUrl) return;
+
+    trackEvent({
+      restaurantId: restaurant.id,
+      eventType: 'order_button_click',
+      eventValue: dish.id,
+    });
+
+    window.open(orderUrl, '_blank', 'noopener,noreferrer');
+  };
   const [enlargedPhoto, setEnlargedPhoto] = useState<{ url: string; name: string } | null>(null);
 
   // Toggle saved dish
@@ -333,12 +349,23 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
                             )}
                           </div>
 
-                          {/* Price & Bookmark */}
+                          {/* Price & Actions */}
                           <div className="flex items-center gap-3 flex-shrink-0">
                             {dish.price && (
                               <div className="text-lg font-bold text-orange-500">
                                 ${dish.price}
                               </div>
+                            )}
+                            
+                            {/* Order Now Button */}
+                            {restaurant.enable_ordering_button && (dish.dish_order_url || restaurant.ordering_url) && (
+                              <button
+                                onClick={(e) => handleOrderNow(dish, e)}
+                                className="p-2 bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors"
+                                title="Order Now"
+                              >
+                                <ShoppingBag size={20} className="text-white" />
+                              </button>
                             )}
                             
                             {/* Bookmark Button - Hidden for QR routes */}

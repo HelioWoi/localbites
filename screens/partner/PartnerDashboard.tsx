@@ -44,6 +44,7 @@ interface MenuItem {
   sort_order: number;
   is_active: boolean;
   is_featured?: boolean;
+  dish_order_url?: string;
 }
 
 interface PartnerData {
@@ -59,6 +60,8 @@ interface PartnerData {
   instagram_url?: string;
   facebook_url?: string;
   tiktok_url?: string;
+  ordering_url?: string;
+  enable_ordering_button?: boolean;
 }
 
 interface Restaurant {
@@ -102,6 +105,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const [menuItemCategory, setMenuItemCategory] = useState('');
   const [menuItemDescription, setMenuItemDescription] = useState('');
   const [menuItemPrice, setMenuItemPrice] = useState('');
+  const [menuItemOrderingUrl, setMenuItemOrderingUrl] = useState('');
   const [newCategory, setNewCategory] = useState('');
   
   // Upload state
@@ -132,7 +136,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     website: '',
     instagramUrl: '',
     facebookUrl: '',
-    tiktokUrl: ''
+    tiktokUrl: '',
+    orderingUrl: '',
+    enableOrderingButton: false
   });
   
   // Photo upload state
@@ -413,7 +419,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           website: currentPartner.website || '',
           instagramUrl: currentPartner.instagram_url || '',
           facebookUrl: currentPartner.facebook_url || '',
-          tiktokUrl: currentPartner.tiktok_url || ''
+          tiktokUrl: currentPartner.tiktok_url || '',
+          orderingUrl: currentPartner.ordering_url || '',
+          enableOrderingButton: currentPartner.enable_ordering_button || false
         });
 
         // Load banner images
@@ -495,7 +503,12 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         cuisine: data.cuisine, 
         address: data.address,
         phone: '',
-        website: ''
+        website: '',
+        instagramUrl: '',
+        facebookUrl: '',
+        tiktokUrl: '',
+        orderingUrl: '',
+        enableOrderingButton: false
       });
 
       // Mark onboarding as completed
@@ -568,6 +581,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           instagram_url: restaurantForm.instagramUrl,
           facebook_url: restaurantForm.facebookUrl,
           tiktok_url: restaurantForm.tiktokUrl,
+          ordering_url: restaurantForm.orderingUrl,
+          enable_ordering_button: restaurantForm.enableOrderingButton,
           slug: slug,
           ...googleData
         })
@@ -589,6 +604,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         instagram_url: restaurantForm.instagramUrl,
         facebook_url: restaurantForm.facebookUrl,
         tiktok_url: restaurantForm.tiktokUrl,
+        ordering_url: restaurantForm.orderingUrl,
+        enable_ordering_button: restaurantForm.enableOrderingButton,
         slug,
         ...googleData
       });
@@ -713,6 +730,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           price: menuItemPrice ? parseFloat(menuItemPrice) : null,
           photo_url: null,
           video_url: '',
+          dish_order_url: menuItemOrderingUrl.trim() || null,
           sort_order: menuItems.filter(i => i.category === finalCategory).length,
         });
 
@@ -760,6 +778,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           price: menuItemPrice ? parseFloat(menuItemPrice) : null,
           photo_url: publicUrl,
           video_url: '',
+          dish_order_url: menuItemOrderingUrl.trim() || null,
           sort_order: menuItems.filter(i => i.category === finalCategory).length,
         });
         setUploadProgress(100);
@@ -883,6 +902,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         description: menuItemDescription.trim() || null,
         price: menuItemPrice ? parseFloat(menuItemPrice) : null,
         video_url: publicUrl,
+        dish_order_url: menuItemOrderingUrl.trim() || null,
         sort_order: menuItems.filter(i => i.category === finalCategory).length,
       };
       
@@ -1026,6 +1046,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         price: parsedPrice,
         photo_url: photoUrl,
         video_url: videoUrl,
+        dish_order_url: menuItemOrderingUrl.trim() || null,
       };
 
       const currentUser = (await supabase.auth.getUser()).data.user;
@@ -1183,6 +1204,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     setMenuItemCategory('');
     setMenuItemDescription('');
     setMenuItemPrice('');
+    setMenuItemOrderingUrl('');
     setNewCategory('');
     setUploadProgress(0);
     setEditingMenuItem(null);
@@ -1645,6 +1667,79 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               </div>
             </div>
 
+            {/* Online Ordering Section */}
+            <div className="bg-white rounded-xl border border-zinc-200 p-5">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-orange-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <ExternalLink size={24} className="text-orange-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-base font-bold text-zinc-900 mb-1">
+                    Online Ordering <span className="text-orange-500 text-sm font-normal">(Premium)</span>
+                  </h3>
+                  <p className="text-sm text-zinc-600 mb-4">
+                    Redirect customers to your existing ordering system (Square, Mr Yum, etc). The "Order Now" button will appear on your menu.
+                  </p>
+                  
+                  <div className="space-y-4">
+                    {/* Checkbox first - controls visibility of other fields */}
+                    <div>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={restaurantForm.enableOrderingButton}
+                          onChange={(e) => setRestaurantForm({ ...restaurantForm, enableOrderingButton: e.target.checked })}
+                          className="w-4 h-4 text-orange-500 border-zinc-300 rounded focus:ring-orange-500"
+                        />
+                        <span className="text-sm font-medium text-zinc-700">
+                          Show "Order Now" button on menu
+                        </span>
+                      </label>
+                      <p className="text-xs text-zinc-500 mt-1.5 ml-6">
+                        Customers will see an "Order Now" button that opens your ordering system
+                      </p>
+                    </div>
+
+                    {/* Only show URL input, Pro Tip, and Save button when checkbox is checked */}
+                    {restaurantForm.enableOrderingButton && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-700 mb-2">
+                            Ordering System URL <span className="text-zinc-400 font-normal">(optional)</span>
+                          </label>
+                          <input
+                            type="url"
+                            value={restaurantForm.orderingUrl}
+                            onChange={(e) => setRestaurantForm({ ...restaurantForm, orderingUrl: e.target.value })}
+                            placeholder="https://order.square.site/yourrestaurant"
+                            className="w-full px-3 py-2.5 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          />
+                          <p className="text-xs text-zinc-500 mt-1.5">
+                            Works with Square, Mr Yum, Shopify, or any ordering platform
+                          </p>
+                        </div>
+
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <p className="text-xs text-blue-900 font-medium mb-1">💡 Pro Tip: Direct Checkout Links</p>
+                          <p className="text-xs text-blue-700">
+                            Want a direct checkout link for a specific dish? Add the URL in the dish description when uploading/editing menu items below.
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={handleSaveRestaurant}
+                          className="w-full py-2.5 bg-orange-500 text-white font-semibold rounded-lg flex items-center justify-center gap-2 hover:bg-orange-600 transition-colors"
+                        >
+                          <Save size={18} />
+                          Save Ordering Settings
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Promo Banner Images (QR Code Only) */}
             <div className="bg-white rounded-xl border border-zinc-200 p-5">
               <div className="flex items-start gap-4">
@@ -1864,6 +1959,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                             const priceValue = item.price?.toString() || '';
                             console.log('Setting menuItemPrice to:', priceValue);
                             setMenuItemPrice(priceValue);
+                            setMenuItemOrderingUrl(item.dish_order_url || '');
                             setShowMenuUploadModal(true);
                           }}
                           className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center shadow-md hover:bg-orange-600 transition-colors"
@@ -2211,6 +2307,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                     </div>
                   </div>
                 </div>
+
               </div>
 
               {/* Save Button */}
@@ -2640,6 +2737,23 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                     className="w-full px-4 py-3 pl-8 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
                   />
                 </div>
+              </div>
+
+              {/* Ordering URL (optional) */}
+              <div>
+                <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                  Order Link <span className="text-zinc-400">(optional)</span>
+                </label>
+                <input
+                  type="url"
+                  value={menuItemOrderingUrl}
+                  onChange={(e) => setMenuItemOrderingUrl(e.target.value)}
+                  placeholder="https://order.square.site/dish-123"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+                <p className="text-xs text-zinc-400 mt-1">
+                  Direct link to order this specific dish. Leave empty to use restaurant's general ordering URL.
+                </p>
               </div>
 
               {/* Progress */}

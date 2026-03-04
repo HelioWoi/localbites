@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, Play, Search, Bookmark, X } from 'lucide-react';
+import { ChevronLeft, Play, Search, Bookmark, X, ShoppingBag } from 'lucide-react';
+import { trackEvent } from '../services/eventsService';
 
 // Component to generate a thumbnail from a video
 const VideoThumbnail: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
@@ -58,6 +59,7 @@ interface MenuItem {
   price: number;
   videoUrl?: string;
   photoUrl?: string;
+  dish_order_url?: string;
 }
 
 interface FullMenuPageProps {
@@ -68,6 +70,8 @@ interface FullMenuPageProps {
     cuisine: string;
     categories: string[];
     menuItems: MenuItem[];
+    ordering_url?: string;
+    enable_ordering_button?: boolean;
   };
 }
 
@@ -87,6 +91,20 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
       localStorage.setItem(`saved_dishes_${restaurant.id}`, JSON.stringify([...next]));
       return next;
     });
+  };
+
+  const handleOrderNow = (item: MenuItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const orderUrl = item.dish_order_url || restaurant.ordering_url;
+    if (!orderUrl) return;
+
+    trackEvent({
+      restaurantId: restaurant.id,
+      eventType: 'order_button_click',
+      eventValue: item.id,
+    });
+
+    window.open(orderUrl, '_blank', 'noopener,noreferrer');
   };
 
   const filteredItems = restaurant.menuItems.filter(item => {
@@ -121,6 +139,13 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
 
   const handleItemClick = (item: MenuItem) => {
+    // Track item view
+    trackEvent({
+      restaurantId: restaurant.id,
+      eventType: 'item_view',
+      eventValue: item.id,
+    });
+
     if (item.videoUrl) {
       const pathname = window.location.pathname;
       const isAppFeedRoute = !pathname.startsWith('/r/');
@@ -245,23 +270,33 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
                     )}
                   </div>
 
-                  {/* Price & Save */}
+                  {/* Price & Actions */}
                   <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                     {item.price > 0 && (
                       <span className="text-sm font-bold text-zinc-900">
                         ${item.price.toFixed(2)}
                       </span>
                     )}
-                    <button
-                      onClick={(e) => toggleSave(item.id, e)}
-                      className="p-1.5 rounded-full hover:bg-zinc-100 transition-colors"
-                    >
-                      <Bookmark 
-                        size={18} 
-                        className={savedItems.has(item.id) ? 'text-orange-500' : 'text-zinc-300'}
-                        fill={savedItems.has(item.id) ? 'currentColor' : 'none'}
-                      />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {restaurant.enable_ordering_button && (item.dish_order_url || restaurant.ordering_url) && (
+                        <button
+                          onClick={(e) => handleOrderNow(item, e)}
+                          className="p-1.5 rounded-full bg-orange-500 hover:bg-orange-600 transition-colors"
+                        >
+                          <ShoppingBag size={18} className="text-white" />
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => toggleSave(item.id, e)}
+                        className="p-1.5 rounded-full hover:bg-zinc-100 transition-colors"
+                      >
+                        <Bookmark 
+                          size={18} 
+                          className={savedItems.has(item.id) ? 'text-orange-500' : 'text-zinc-300'}
+                          fill={savedItems.has(item.id) ? 'currentColor' : 'none'}
+                        />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}

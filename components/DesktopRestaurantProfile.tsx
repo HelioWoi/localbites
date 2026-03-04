@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { ChevronLeft, Heart, Bookmark, Share2, Phone, MapPin, Star, Clock, Video, ChevronRight, Instagram, Facebook, Globe } from 'lucide-react';
+import { ChevronLeft, Heart, Bookmark, Share2, Phone, MapPin, Star, Clock, Video, ChevronRight, Instagram, Facebook, Globe, ShoppingBag } from 'lucide-react';
 import { Restaurant } from '../types';
 import FullMenuModal from './FullMenuModal';
+import { trackEvent } from '../services/eventsService';
 
 interface DesktopRestaurantProfileProps {
   restaurant: Restaurant;
@@ -38,6 +39,21 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
     const saved = localStorage.getItem(`saved_dishes_${restaurant.id}`);
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
+
+  // Handle Order Now
+  const handleOrderNow = (dish: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const orderUrl = dish.dish_order_url || restaurant.ordering_url;
+    if (!orderUrl) return;
+
+    trackEvent({
+      restaurantId: restaurant.id,
+      eventType: 'order_button_click',
+      eventValue: dish.id,
+    });
+
+    window.open(orderUrl, '_blank', 'noopener,noreferrer');
+  };
 
   // Sync with localStorage changes (when FullMenuModal saves/removes dishes)
   React.useEffect(() => {
@@ -489,6 +505,18 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
                         />
                       </div>
                     </button>
+
+                    {/* Order Now button */}
+                    {restaurant.enable_ordering_button && (dish.dish_order_url || restaurant.ordering_url) && (
+                      <button
+                        onClick={(e) => handleOrderNow(dish, e)}
+                        className="flex flex-col items-center gap-1"
+                      >
+                        <div className="w-9 h-9 rounded-full bg-orange-500 flex items-center justify-center hover:bg-orange-600 transition-colors">
+                          <ShoppingBag size={16} className="text-white" />
+                        </div>
+                      </button>
+                    )}
 
                     {/* Share button */}
                     <button

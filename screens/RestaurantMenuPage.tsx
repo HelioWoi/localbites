@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Volume2, VolumeX, ChevronUp, Star, MapPin, Globe, Navigation, Heart, Bookmark, X, ChevronLeft, MessageSquare, Home, Search, Sparkles, Filter, Clock, Send, Video, UtensilsCrossed } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, ChevronUp, Star, MapPin, Globe, Navigation, Heart, Bookmark, X, ChevronLeft, MessageSquare, Home, Search, Sparkles, Filter, Clock, Send, Video, UtensilsCrossed, ShoppingBag } from 'lucide-react';
 import { trackEvent } from '../services/eventsService';
 
 interface MenuItem {
@@ -9,6 +9,7 @@ interface MenuItem {
   category: string;
   videoUrl: string;
   price?: number;
+  dish_order_url?: string;
 }
 
 interface RestaurantData {
@@ -23,6 +24,8 @@ interface RestaurantData {
   coverPhotoUrl?: string;
   googleMapsUrl?: string;
   website?: string;
+  ordering_url?: string;
+  enable_ordering_button?: boolean;
   menuItems: MenuItem[];
   categories: string[];
 }
@@ -94,6 +97,22 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     loadLikesCounts();
   }, [restaurant.id, restaurant.menuItems]);
   
+  // Order Now - redirect to ordering system
+  const handleOrderNow = (item: MenuItem) => {
+    const orderUrl = item.dish_order_url || restaurant.ordering_url;
+    if (!orderUrl) return;
+
+    // Track order button click
+    trackEvent({
+      restaurantId: restaurant.id,
+      eventType: 'order_button_click',
+      eventValue: item.id,
+    });
+
+    // Open ordering URL in new tab
+    window.open(orderUrl, '_blank', 'noopener,noreferrer');
+  };
+
   // Share dish
   const shareDish = async (item: MenuItem) => {
     const shareUrl = `${window.location.origin}/${restaurant.slug}/menu?dish=${item.id}`;
@@ -546,6 +565,19 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                 </div>
                 <span className="text-white text-[10px] font-medium">Share</span>
               </button>
+              
+              {/* Order Now button - only show if ordering is enabled and URL exists */}
+              {restaurant.enable_ordering_button && (item.dish_order_url || restaurant.ordering_url) && (
+                <button 
+                  onClick={() => handleOrderNow(item)}
+                  className="flex flex-col items-center gap-1"
+                >
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center bg-orange-500">
+                    <ShoppingBag size={24} className="text-white" />
+                  </div>
+                  <span className="text-white text-[10px] font-medium">Order</span>
+                </button>
+              )}
               
               {/* Mute button */}
               <button 
