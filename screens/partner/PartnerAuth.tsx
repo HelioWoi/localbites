@@ -269,19 +269,36 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
       
       // Create partner record immediately with email_confirmed = false
       if (data.user) {
-        // Auto-geocode address to get lat/lng via Google Geocoding API
+        // Auto-geocode address to get lat/lng via Google Places API
         let latitude: number | null = null;
         let longitude: number | null = null;
+        let googlePlaceId: string | null = null;
+        let googleMapsUrl: string | null = null;
+        
         try {
-          const { data: geoData } = await supabase.functions.invoke('google-places', {
-            body: { action: 'geocode', query: `${address.trim()}, ${postalCode.trim()}, Australia` }
-          });
-          if (geoData?.lat && geoData?.lng) {
-            latitude = geoData.lat;
-            longitude = geoData.lng;
+          const { textSearchRestaurants } = await import('../../services/googlePlacesProxy');
+          // Use Sunshine Coast center as search origin
+          const results = await textSearchRestaurants(
+            -26.6833,
+            153.0667,
+            50000, // 50km radius
+            `${restaurantName.trim()} ${address.trim()}`
+          );
+          
+          if (results.length > 0) {
+            const place = results[0];
+            latitude = place.location.lat;
+            longitude = place.location.lng;
+            googlePlaceId = place.id;
+            googleMapsUrl = place.googleMapsUrl;
+            console.log('[Auto-geocoding] ✓ Signup - Found coordinates:', {
+              name: restaurantName.trim(),
+              lat: latitude,
+              lng: longitude
+            });
           }
         } catch (geoErr) {
-          console.warn('[Geocode] Failed, continuing without coordinates:', geoErr);
+          console.warn('[Auto-geocoding] ✗ Signup - Failed, continuing without coordinates:', geoErr);
         }
 
         // Create partner record with all business info
@@ -303,6 +320,8 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
           website: website.trim() || null,
           latitude,
           longitude,
+          google_place_id: googlePlaceId,
+          google_maps_url: googleMapsUrl,
           slug: uniqueSlug,
           plan: hasLifetimeAccess ? 'lifetime' : 'trial',
           trial_ends_at: hasLifetimeAccess ? null : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),

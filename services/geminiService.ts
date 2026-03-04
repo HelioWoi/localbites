@@ -89,6 +89,9 @@ export async function getNearbyRestaurants(
       console.log('[MenuLove] Loading partner restaurants from Supabase (NO API COST)');
       partnerRestaurants = await getPartnerRestaurants(location.lat, location.lng);
       console.log('[MenuLove] Found', partnerRestaurants.length, 'partner restaurants');
+      partnerRestaurants.forEach(p => {
+        console.log(`[MenuLove] Partner: ${p.name}, isSubscribed: ${p.isSubscribed} (${typeof p.isSubscribed}), dishes: ${p.dishes?.length || 0}`);
+      });
     }
   } catch (error) {
     console.error('[MenuLove] Supabase error:', error);
@@ -235,12 +238,16 @@ export async function searchRestaurantsByQuery(
         partnerRestaurants = allPartners.filter(r => {
           const nameMatch = r.name.toLowerCase().includes(queryLower);
           const cuisineMatch = r.cuisine.toLowerCase().includes(queryLower);
-          if (nameMatch || cuisineMatch) {
-            console.log('[MenuLove] Partner match:', r.name, '- isSubscribed:', r.isSubscribed);
-          }
           return nameMatch || cuisineMatch;
         });
-        console.log('[MenuLove] Found', partnerRestaurants.length, 'matching partners');
+        
+        // IMPORTANT: In text search, always show partners as Video Menu (isSubscribed=true)
+        // even if they were demoted due to distance in getPartnerRestaurants
+        partnerRestaurants.forEach(r => {
+          r.isSubscribed = true;
+          console.log('[MenuLove] Partner match:', r.name, '- forced isSubscribed to true, dishes:', r.dishes?.length, 'firstVideo:', r.dishes?.[0]?.videoUrl?.substring(0, 50));
+        });
+        console.log('[MenuLove] Found', partnerRestaurants.length, 'matching partners (all set to isSubscribed=true for search)');
       }
     } catch (error) {
       console.error('[MenuLove] Partner search error:', error);
@@ -282,11 +289,12 @@ export async function searchRestaurantsByQuery(
 
     // 3. Merge: Partners first (always), then Google only if no partners
     const merged = [...partnerRestaurants, ...googleRestaurants];
-    console.log('[MenuLove] Merged restaurants:', merged.map(r => `${r.name} (partner: ${r.isSubscribed})`));
+    console.log('[MenuLove] BEFORE enrichment:', merged.filter(r => r.name.toLowerCase().includes('decision')).map(r => ({ name: r.name, isSubscribed: r.isSubscribed })));
 
     // Enrich with filter data
     const enriched = merged.map(r => enrichRestaurantWithFilters(r));
     
+    console.log('[MenuLove] AFTER enrichment:', enriched.filter(r => r.name.toLowerCase().includes('decision')).map(r => ({ name: r.name, isSubscribed: r.isSubscribed })));
     console.log('[MenuLove] Text search returned', enriched.length, 'restaurants (', partnerRestaurants.length, 'partners +', googleRestaurants.length, 'Google) for:', query);
     return enriched;
   } catch (error) {

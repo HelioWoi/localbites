@@ -543,15 +543,19 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '');
 
-      // Auto-fetch Google Place ID if not already set
+      // Auto-fetch Google Place ID and coordinates if address is provided
       let googleData: any = {};
-      if (!partnerData.google_place_id && restaurantForm.address) {
+      if (restaurantForm.address) {
         try {
           const { textSearchRestaurants } = await import('../../services/googlePlacesProxy');
+          // Use existing coords if available, otherwise use Sunshine Coast center
+          const searchLat = partnerData.latitude || -26.6833;
+          const searchLng = partnerData.longitude || 153.0667;
+          
           const results = await textSearchRestaurants(
-            partnerData.latitude || 0,
-            partnerData.longitude || 0,
-            5000,
+            searchLat,
+            searchLng,
+            50000, // 50km radius to find the place
             `${restaurantForm.name} ${restaurantForm.address}`
           );
           
@@ -561,12 +565,18 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               google_place_id: place.id,
               google_maps_url: place.googleMapsUrl,
               rating: place.rating,
-              total_reviews: place.totalReviews
+              total_reviews: place.totalReviews,
+              latitude: place.location.lat,
+              longitude: place.location.lng
             };
-            console.log('[Auto-fetch] Found Google Place ID:', place.id);
+            console.log('[Auto-geocoding] ✓ Found coordinates:', {
+              name: restaurantForm.name,
+              lat: place.location.lat,
+              lng: place.location.lng
+            });
           }
         } catch (err) {
-          console.log('[Auto-fetch] Could not fetch Google Place ID:', err);
+          console.log('[Auto-geocoding] ✗ Could not fetch coordinates:', err);
         }
       }
 

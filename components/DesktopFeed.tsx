@@ -110,8 +110,9 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
             body: {
               action: 'autocomplete',
               query: value.trim(),
-              lat: userLocation?.lat,
-              lng: userLocation?.lng,
+              lat: userLocation?.lat || -26.6833,
+              lng: userLocation?.lng || 153.0667,
+              region: 'sunshine-coast', // Restrict to Sunshine Coast only
             }
           });
           
@@ -148,9 +149,12 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
       })
     : restaurants;
 
-  // Separate subscribed (with video) and non-subscribed
-  // IMPORTANT: Partners should ALWAYS appear regardless of location/filters
-  const allSubscribedRestaurants = restaurants.filter(r => r.isSubscribed);
+  // Separate partners for Home vs Search
+  // Home (no search): Show only isHomeEligible (within 5km radius)
+  // Search (with query): Show all isSubscribed partners regardless of distance
+  const allSubscribedRestaurants = searchQuery.trim()
+    ? restaurants.filter(r => r.isSubscribed) // Search: all partners
+    : restaurants.filter(r => (r as any).isHomeEligible); // Home: only within 5km
   
   // Apply search query filter to partners
   const searchFilteredPartners = searchQuery.trim()
@@ -161,18 +165,28 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
       })
     : allSubscribedRestaurants;
   
-  // TEMPORARY LOGIC: Always show partner banners until we have 10+ partners
-  // This helps showcase the platform to new cafes/restaurants
-  // TODO: When we have 10+ partners, revert to standard filtering (5km radius, open now, etc)
+  // Apply "Open Now" filter if needed (only when we have 10+ partners)
   const subscribedRestaurants = searchFilteredPartners.length < 10
-    ? searchFilteredPartners // Show all partners regardless of filters
+    ? searchFilteredPartners
     : searchFilteredPartners.filter(r => {
-        // Apply "Open Now" filter only when we have 10+ partners
         if (showOpenOnly) {
           return calculateIsOpenNow(r);
         }
         return true;
       });
+  
+  console.log('[DesktopFeed] Video Menus Debug:', {
+    totalRestaurants: restaurants.length,
+    allSubscribed: allSubscribedRestaurants.length,
+    searchFiltered: searchFilteredPartners.length,
+    finalSubscribed: subscribedRestaurants.length,
+    subscribedNames: subscribedRestaurants.map(r => ({
+      name: r.name,
+      isSubscribed: r.isSubscribed,
+      isSubscribedType: typeof r.isSubscribed,
+      dishesCount: r.dishes?.length || 0
+    }))
+  });
   
   const otherRestaurants = filteredRestaurants.filter(r => !r.isSubscribed);
   const displayedOtherRestaurants = otherRestaurants.slice(0, itemsToShow);
@@ -521,7 +535,11 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
             </div>
           ) : (
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-6">
-              {(subscribedRestaurants.length > 0 ? displayedOtherRestaurants : filteredRestaurants.slice(0, itemsToShow)).map(res => (
+              {/* When searching, show ALL results including partners. Otherwise, show only non-partners if Video Menus section exists */}
+              {(searchQuery.trim() 
+                ? filteredRestaurants.slice(0, itemsToShow)
+                : subscribedRestaurants.length > 0 ? displayedOtherRestaurants : filteredRestaurants.slice(0, itemsToShow)
+              ).map(res => (
                 <RestaurantCard
                   key={res.id}
                   restaurant={res}
@@ -1070,7 +1088,23 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({
   videoRef,
   featured = false,
 }) => {
-  const hasVideo = restaurant.isSubscribed && restaurant.dishes[0]?.videoUrl;
+  // Find first dish with valid video URL (filter out corrupted "hasVideo" string)
+  const firstValidVideo = restaurant.dishes?.find(d => d.videoUrl && d.videoUrl.startsWith('http'));
+  const hasVideo = Boolean(restaurant.isSubscribed) && Boolean(firstValidVideo?.videoUrl);
+  
+  // VALIDATION LOGS: Compare Flume vs Decisions Cafe
+  if (restaurant.name.toLowerCase().includes('flume') || restaurant.name.toLowerCase().includes('decision') || restaurant.name.toLowerCase().includes('backstreet')) {
+    console.log(`[CARD VALIDATION] ${restaurant.name}:`, {
+      id: restaurant.id,
+      distanceKm: (restaurant as any).distanceKm,
+      isSubscribed: restaurant.isSubscribed,
+      isHomeEligible: (restaurant as any).isHomeEligible,
+      dishesCount: restaurant.dishes?.length || 0,
+      firstValidVideoUrl: firstValidVideo?.videoUrl?.substring(0, 60),
+      hasVideo,
+      mainPhotoUrl: restaurant.mainPhotoUrl?.substring(0, 60)
+    });
+  }
 
   return (
     <div
@@ -1088,7 +1122,7 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({
             {/* Video (always visible for partners) */}
             <video
               ref={videoRef}
-              src={restaurant.dishes[0]?.videoUrl}
+              src={firstValidVideo?.videoUrl}
               className="absolute inset-0 w-full h-full object-cover"
               muted
               loop

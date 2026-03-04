@@ -108,16 +108,17 @@ export async function getRestaurantById(id: string): Promise<Restaurant | null> 
 
 // Check if Supabase has data
 export async function hasSupabaseData(): Promise<boolean> {
+  console.log('[hasSupabaseData] Checking if Supabase has partner data...');
   const { count, error } = await supabase
     .from('partners')
     .select('*', { count: 'exact', head: true });
 
   if (error) {
-    console.error('Error checking Supabase data:', error);
+    console.error('[hasSupabaseData] Error:', error);
     return false;
   }
 
-  console.log('[hasSupabaseData] Partners count:', count);
+  console.log('[hasSupabaseData] Partners count:', count, '- returning:', (count || 0) > 0);
   return (count || 0) > 0;
 }
 
@@ -297,11 +298,7 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
 
     console.log(`[Priority] ${p.restaurant_name}: isPremium=${isPremium}, distance=${distanceKm.toFixed(2)}km, score=${priorityScore.toFixed(0)}`);
 
-    return {
-      partner: p,
-      distanceKm,
-      isPremium,
-      priorityScore,
+    const restaurant: any = {
       id: p.id,
       name: p.restaurant_name,
       cuisine: p.cuisine || 'Various',
@@ -333,18 +330,23 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
           // Then by sort_order
           return (a.sort_order || 0) - (b.sort_order || 0);
         })
-        .map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          description: item.description || '',
-          thumbnailUrl: item.photo_url || item.video_url || '',
-          videoUrl: item.video_url || '',
-          photoUrl: item.photo_url || '',
-          price: item.price,
-          category: item.category,
-          isFeatured: item.is_featured || false,
-          dish_order_url: item.dish_order_url || '',
-        })),
+        .map((item: any) => {
+          // Sanitize invalid videoUrl (e.g., string 'hasVideo' instead of actual URL)
+          const sanitizedVideoUrl = item.video_url && item.video_url.startsWith('http') ? item.video_url : '';
+          
+          return {
+            id: item.id,
+            name: item.name,
+            description: item.description || '',
+            thumbnailUrl: item.photo_url || sanitizedVideoUrl || '',
+            videoUrl: sanitizedVideoUrl,
+            photoUrl: item.photo_url || '',
+            price: item.price,
+            category: item.category,
+            isFeatured: item.is_featured || false,
+            dish_order_url: item.dish_order_url || '',
+          };
+        }),
       reviews: (p.google_reviews || []).map((r: any, i: number) => ({
         id: `review-${i}`,
         authorName: r.authorName || 'Anonymous',
@@ -356,6 +358,14 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
       })),
       reviewSnippets: [],
     };
+    
+    // Add auxiliary properties for filtering/sorting (not part of Restaurant interface)
+    (restaurant as any).distanceKm = distanceKm;
+    (restaurant as any).isPremium = isPremium;
+    (restaurant as any).priorityScore = priorityScore;
+    (restaurant as any).partner = p;
+    
+    return restaurant;
   });
 
   // Filter partners by distance from user
@@ -382,13 +392,22 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
     return true;
   });
 
-  // Adjust priority: partners beyond PREMIUM_RADIUS_KM lose the premium boost
+  // Add isHomeEligible flag: partners within 5km radius are eligible for Home feed
+  // IMPORTANT: isSubscribed = business truth (subscription status)
+  //            isHomeEligible = UX rule (distance-based display on Home)
   distanceFiltered.forEach(r => {
-    if (userLat && userLng && r.partner.latitude && r.partner.longitude && r.distanceKm > PREMIUM_RADIUS_KM) {
-      // Remove premium boost — will be mixed with Google results instead of pinned to top
-      r.priorityScore = (MAX_RADIUS_KM - Math.min(r.distanceKm, MAX_RADIUS_KM)) * 10;
-      r.isSubscribed = false; // Treat as regular so geminiService sort doesn't pin to top
-      console.log(`[PartnerRadius] ${r.name} DEMOTED - ${r.distanceKm.toFixed(1)}km > ${PREMIUM_RADIUS_KM}km, mixed with results`);
+    const distanceKm = (r as any).distanceKm;
+    const isWithinHomeRadius = distanceKm <= PREMIUM_RADIUS_KM;
+    
+    // Add isHomeEligible property (UX rule)
+    (r as any).isHomeEligible = r.isSubscribed && isWithinHomeRadius;
+    
+    // Adjust priority score for partners beyond premium radius (for sorting only)
+    if (!isWithinHomeRadius) {
+      (r as any).priorityScore = (MAX_RADIUS_KM - Math.min(distanceKm, MAX_RADIUS_KM)) * 10;
+      console.log(`[PartnerRadius] ${r.name} - ${distanceKm.toFixed(1)}km > ${PREMIUM_RADIUS_KM}km, isHomeEligible=false (but isSubscribed stays true)`);
+    } else {
+      console.log(`[PartnerRadius] ${r.name} - ${distanceKm.toFixed(1)}km ≤ ${PREMIUM_RADIUS_KM}km, isHomeEligible=true`);
     }
   });
 
@@ -398,7 +417,7 @@ export async function getPartnerRestaurants(userLat?: number, userLng?: number):
   
   console.log('[PartnerRestaurants] Sorted by priority:');
   sorted.slice(0, 5).forEach((r, idx) => {
-    console.log(`  ${idx + 1}. ${r.name} - Premium: ${r.isPremium}, Distance: ${r.distanceKm.toFixed(2)}km, Score: ${r.priorityScore.toFixed(0)}`);
+    console.log(`  ${idx + 1}. ${r.name} - Premium: ${r.isPremium}, Distance: ${r.distanceKm.toFixed(2)}km, Score: ${r.priorityScore.toFixed(0)}, isSubscribed: ${r.isSubscribed} (${typeof r.isSubscribed})`);
   });
 
   return sorted;
