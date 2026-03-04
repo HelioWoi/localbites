@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ArrowRight, BarChart3, Menu, CreditCard, Settings, MessageCircle } from 'lucide-react';
+import { X, ArrowRight, BarChart3, Menu, CreditCard, Settings, MessageCircle, ShoppingBag, Eye } from 'lucide-react';
 
 interface TourStep {
   id: string;
@@ -21,7 +21,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: 'analytics',
     title: 'Analytics Dashboard',
-    description: 'Track your restaurant\'s performance with real-time analytics. See views, engagement, and customer insights.',
+    description: 'Track your restaurant\'s performance with real-time analytics. See video plays, order clicks, likes, saves, and view counts for each dish.',
     icon: <BarChart3 size={24} className="text-orange-500" />,
     targetId: 'tab-analytics',
     position: 'bottom'
@@ -29,7 +29,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: 'menu',
     title: 'Menu Management',
-    description: 'Upload and manage your video menu items. Add descriptions, prices, and organize by categories.',
+    description: 'Upload and manage your video menu items. Add descriptions, prices, categories, and "Order Now" buttons that link to your Square/Stripe checkout.',
     icon: <Menu size={24} className="text-orange-500" />,
     targetId: 'tab-menu',
     position: 'bottom'
@@ -45,7 +45,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: 'settings',
     title: 'Restaurant Settings',
-    description: 'Update your restaurant profile, contact information, opening hours, and social media links.',
+    description: 'Update your restaurant profile, contact information, opening hours, social media links, and enable Order Now buttons for your menu.',
     icon: <Settings size={24} className="text-orange-500" />,
     targetId: 'tab-settings',
     position: 'bottom'

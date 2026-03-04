@@ -159,6 +159,35 @@ export const getPartnerInsights = async (
   }
 };
 
+// Get view counts for menu items (for public display)
+export const getMenuItemViewCounts = async (
+  itemIds: string[]
+): Promise<Map<string, number>> => {
+  try {
+    if (itemIds.length === 0) return new Map();
+
+    const { data, error } = await supabase
+      .from('events')
+      .select('item_id')
+      .in('item_id', itemIds)
+      .in('event_type', ['item_view', 'video_play']);
+
+    if (error) throw error;
+
+    // Count views per item
+    const viewCounts = new Map<string, number>();
+    data?.forEach((event: any) => {
+      const count = viewCounts.get(event.item_id) || 0;
+      viewCounts.set(event.item_id, count + 1);
+    });
+
+    return viewCounts;
+  } catch (error) {
+    console.error('[PartnerAnalytics] Error fetching item view counts:', error);
+    return new Map();
+  }
+};
+
 // Helper: Get date range for period
 export const getDateRange = (period: 'today' | '7days' | '30days' | 'custom', customStart?: Date, customEnd?: Date) => {
   const end = new Date();

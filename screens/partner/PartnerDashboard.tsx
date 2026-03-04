@@ -1668,7 +1668,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             </div>
 
             {/* Online Ordering Section */}
-            <div className="bg-white rounded-xl border border-zinc-200 p-5">
+            <div id="tour-online-ordering" className="bg-white rounded-xl border border-zinc-200 p-5">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-orange-50 rounded-xl flex items-center justify-center flex-shrink-0">
                   <ExternalLink size={24} className="text-orange-500" />

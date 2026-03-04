@@ -161,7 +161,7 @@ const FilterSelectionScreen: React.FC<FilterSelectionScreenProps> = ({ onSelect,
               Discover <span className="text-orange-500">Local Flavors</span>
             </h1>
             <p className="text-white/70 text-sm leading-relaxed max-w-[280px] mx-auto">
-              Restaurants, cafes and bars within 5km
+              Sunshine Coast restaurants, cafes & bars within 5km • Beta
             </p>
           </div>
 

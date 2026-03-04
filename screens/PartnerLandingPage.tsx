@@ -33,6 +33,21 @@ const PartnerLandingPage: React.FC = () => {
       description: "Showcase your dishes with engaging vertical videos that capture attention and drive orders. Share your special menu link on Instagram bio (like Linktree) to drive traffic directly to your video menu"
     },
     {
+      icon: BarChart3,
+      title: "Advanced Analytics Dashboard",
+      description: "Track video plays, order clicks, likes, saves, and shares in real-time. See peak hours, top dishes, and customer engagement with detailed metrics. Export reports in CSV, Excel, or PDF"
+    },
+    {
+      icon: QrCode,
+      title: "QR Code + Direct Checkout Integration",
+      description: "Customers scan QR codes to browse your menu instantly. Integrate with Square, Stripe, or any checkout platform - add 'Order Now' buttons that link directly to your existing ordering system. No commission fees!"
+    },
+    {
+      icon: TrendingUp,
+      title: "Public View Counter & Social Proof",
+      description: "Show view counts on your dishes to build trust and social proof. Customers see how popular each dish is, driving more orders to your best sellers"
+    },
+    {
       icon: Search,
       title: "Smart Discovery (Sunshine Coast)",
       description: "Currently live in Sunshine Coast region - customers find you through intelligent 5km location search. Expanding to Gold Coast, Brisbane & more soon!"
@@ -41,30 +56,18 @@ const PartnerLandingPage: React.FC = () => {
       icon: Download,
       title: "Import from Uber & Platforms",
       description: "Import your existing menu from Uber Eats, DoorDash, and other platforms in seconds - no manual entry needed"
-    },
-    {
-      icon: QrCode,
-      title: "Smart QR Code + Shareable Link",
-      description: "Customers scan QR codes to browse your menu instantly. Get a shareable link for Instagram bio, social media & marketing. Add promotional banners to boost special offers"
-    },
-    {
-      icon: BarChart3,
-      title: "Real-Time Analytics",
-      description: "Track views, engagement, and customer behavior to optimize your menu"
-    },
-    {
-      icon: Zap,
-      title: "Instant Menu Updates",
-      description: "Update dishes, prices, and availability in real-time from your dashboard"
     }
   ];
 
   const features = [
     "Upload unlimited menu videos",
     "Import menu from Uber Eats & platforms",
-    "Smart 5km radius discovery",
-    "Custom QR codes for each location",
+    "Square/Stripe checkout integration",
+    "Order Now buttons (no commission!)",
+    "Public view counter & social proof",
     "Advanced analytics dashboard",
+    "Real-time metrics & reports",
+    "Custom QR codes for each location",
     "Customer engagement tracking",
     "Featured dish promotions",
     "Category management",

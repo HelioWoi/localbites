@@ -395,7 +395,7 @@ const RestaurantAnalytics: React.FC<RestaurantAnalyticsProps> = ({ restaurantId 
               </div>
             </div>
 
-            <div className="bg-white rounded-xl border border-zinc-200 p-4 sm:p-6 group relative">
+            <div id="tour-view-counter" className="bg-white rounded-xl border border-zinc-200 p-4 sm:p-6 group relative">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 bg-zinc-100 rounded-lg flex items-center justify-center">
                   <Eye size={20} className="text-zinc-600" />
