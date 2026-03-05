@@ -30,39 +30,39 @@ const PartnerLandingPage: React.FC = () => {
     {
       icon: Video,
       title: "TikTok-Style Menu Videos + Instagram Bio Link",
-      description: "Showcase your dishes with engaging vertical videos that capture attention and drive orders. Share your special menu link on Instagram bio (like Linktree) to drive traffic directly to your video menu"
+      description: "Showcase your dishes with engaging vertical videos that capture attention and drive orders. Share your special menu link on Instagram bio (like Linktree) to drive traffic directly to your video menu."
     },
     {
       icon: BarChart3,
       title: "Advanced Analytics Dashboard",
-      description: "Track video plays, order clicks, likes, saves, and shares in real-time. See peak hours, top dishes, and customer engagement with detailed metrics. Export reports in CSV, Excel, or PDF"
+      description: "Track video plays, order clicks, likes, saves, and shares in real-time. See peak hours, top dishes, and customer engagement with detailed metrics. Export reports in CSV, Excel, or PDF."
     },
     {
       icon: QrCode,
-      title: "QR Code + Direct Checkout Integration",
-      description: "Customers scan QR codes to browse your menu instantly. Integrate with Square, Stripe, or any checkout platform - add 'Order Now' buttons that link directly to your existing ordering system. No commission fees!"
+      title: "QR Code + Direct Checkout",
+      description: "Customers scan QR codes to browse your menu instantly. Connect your existing checkout (Square, Stripe, Bopple and more). Add 'Order Now' buttons that link directly to your existing ordering system. No commission fees!"
     },
     {
       icon: TrendingUp,
       title: "Public View Counter & Social Proof",
-      description: "Show view counts on your dishes to build trust and social proof. Customers see how popular each dish is, driving more orders to your best sellers"
+      description: "Show view counts on your dishes to build trust and social proof. Customers see how popular each dish is, driving more orders to your best sellers."
     },
     {
-      icon: Search,
-      title: "Smart Discovery (Sunshine Coast)",
-      description: "Currently live in Sunshine Coast region - customers find you through intelligent 5km location search. Expanding to Gold Coast, Brisbane & more soon!"
+      icon: QrCode,
+      title: "QR Code & Shareable Menu Link",
+      description: "Generate a custom QR code for your tables and a shareable link for your Instagram bio. Customers browse your video menu instantly, anywhere, anytime."
     },
     {
       icon: Download,
       title: "Import from Uber & Platforms",
-      description: "Import your existing menu from Uber Eats, DoorDash, and other platforms in seconds - no manual entry needed"
+      description: "Import your existing menu from Uber Eats, DoorDash, and other platforms in seconds. No manual entry needed."
     }
   ];
 
   const features = [
     "Upload unlimited menu videos",
     "Import menu from Uber Eats & platforms",
-    "Square/Stripe checkout integration",
+    "Connect your existing checkout (Square, Stripe, Bopple and more)",
     "Order Now buttons (no commission!)",
     "Public view counter & social proof",
     "Advanced analytics dashboard",
@@ -77,7 +77,7 @@ const PartnerLandingPage: React.FC = () => {
 
   const stats = [
     { number: "100%", label: "Video Menus" },
-    { number: "5km", label: "Smart Discovery" },
+    { number: "#1", label: "Video Menu Platform" },
     { number: "Beta", label: "Early Access" },
     { number: "65%", label: "Decision Rate" }
   ];
@@ -86,12 +86,18 @@ const PartnerLandingPage: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-white">
       {/* Hero Section */}
       <div className="relative overflow-hidden">
-        <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: 'url(https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/page-become-partner.jpg)' }}
-        />
+        {/* Background Video */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+        >
+          <source src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/hero_desktop.mp4" type="video/mp4" />
+        </video>
         <div className="absolute inset-0 bg-black/60" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 pb-32">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32 pb-48">
           {/* Logo */}
           <a 
             href="https://menulove.com.au" 
@@ -104,22 +110,34 @@ const PartnerLandingPage: React.FC = () => {
             />
             <span className="text-white font-black text-xl sm:text-2xl">MenuLove</span>
           </a>
+
+          {/* Partner Access Button */}
+          <a 
+            href="/partner" 
+            className="absolute top-6 right-4 sm:right-6 lg:right-8 text-white text-sm font-semibold hover:text-yellow-300 transition-colors"
+          >
+            Partner Access
+          </a>
           
           <div className="text-center">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6 leading-tight">
-              Turn Your Menu Into
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black mb-6 leading-tight">
+              <span className="text-white">The </span>
+              <span className="bg-gradient-to-r from-orange-400 via-orange-500 to-red-500 text-transparent bg-clip-text">TikTok-Style</span>
               <br />
-              <span className="text-yellow-300">Viral Content</span>
+              <span className="text-white">Video Menu </span>
+              <span className="bg-gradient-to-r from-orange-400 via-orange-500 to-red-500 text-transparent bg-clip-text">for Restaurants</span>
             </h1>
             <p className="text-lg sm:text-xl text-white/90 mb-8 max-w-2xl mx-auto font-medium leading-relaxed">
-              Join Australian restaurants using TikTok-style video menus.
+              Let customers watch your dishes before they order.
+              <br />
+              Simple QR code. Short videos. More orders.
             </p>
             <div className="mb-8">
               <p className="text-yellow-300 text-xl font-black mb-2 animate-pulse">
                 🔥 Only 10 FREE Beta Spots Left
               </p>
               <p className="text-white/80 text-sm">
-                30-day trial • No credit card required • Smart location discovery
+                30 day trial • No credit card required • No commission fees
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -131,7 +149,7 @@ const PartnerLandingPage: React.FC = () => {
                 <ArrowRight className="group-hover:translate-x-1 transition-transform" size={24} />
               </button>
               <a
-                href="https://menulove.com.au"
+                href="/live-examples"
                 className="px-8 py-4 bg-white/10 backdrop-blur-sm text-white font-bold text-lg rounded-2xl hover:bg-white/20 transition-all border-2 border-white/30"
               >
                 See Live Example
@@ -165,7 +183,7 @@ const PartnerLandingPage: React.FC = () => {
               How MenuLove Works
             </h2>
             <p className="text-xl text-zinc-600 max-w-2xl mx-auto">
-              Transform your restaurant's menu into engaging video content in 3 simple steps
+              The TikTok-style video menu platform built for cafés and restaurants that want to stand out.
             </p>
           </div>
 
@@ -205,10 +223,10 @@ const PartnerLandingPage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-2xl font-bold text-zinc-900 mb-2">
-                    Get Discovered Locally
+                    Share It Everywhere
                   </h3>
                   <p className="text-zinc-600 leading-relaxed">
-                    Customers within 5km find you through our location-based search. Your videos appear in their feed like TikTok.
+                    Place your QR code on tables, receipts, and windows. Share your menu link on Instagram, WhatsApp, or Google. Customers experience your menu before they even walk in.
                   </p>
                 </div>
               </div>
@@ -247,10 +265,10 @@ const PartnerLandingPage: React.FC = () => {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
               <h2 className="text-4xl sm:text-5xl font-black text-zinc-900 mb-6">
-                Video Menus for Australian Restaurants
+                The Video Menu Built for Australian Hospitality
               </h2>
               <p className="text-xl text-zinc-600 mb-8 leading-relaxed">
-                From cozy cafes to fine dining, MenuLove helps restaurants across Australia showcase their best dishes with engaging video content. Smart discovery currently live in Sunshine Coast, expanding soon.
+                From busy cafés to fine dining, MenuLove gives every Australian restaurant a premium video menu experience. No app download required, works on any device, scanned in seconds.
               </p>
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
@@ -308,8 +326,8 @@ const PartnerLandingPage: React.FC = () => {
                     <Search className="text-white" size={24} />
                   </div>
                   <div>
-                    <h3 className="font-black text-lg text-zinc-900 mb-1">5km Smart Discovery</h3>
-                    <p className="text-zinc-600">Customers find you automatically through location search</p>
+                    <h3 className="font-black text-lg text-zinc-900 mb-1">QR Code & Bio Link</h3>
+                    <p className="text-zinc-600">Scan at the table or share your menu link anywhere online</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
@@ -473,7 +491,7 @@ const PartnerLandingPage: React.FC = () => {
                 All Features Included
               </h2>
               <p className="text-lg text-zinc-300 mb-8 leading-relaxed">
-                Get access to our complete platform with no hidden fees or limitations
+                Get access to our complete platform with no hidden fees or limitations.
               </p>
               <div className="grid sm:grid-cols-2 gap-4">
                 {features.map((feature, index) => (
@@ -495,7 +513,7 @@ const PartnerLandingPage: React.FC = () => {
                 <p className="text-6xl font-black text-white mb-2">FREE</p>
                 <p className="text-yellow-300 text-2xl font-black animate-pulse">Only 10 Spots Left</p>
               </div>
-              <p className="text-white/80 text-sm mb-6">30-day trial • No credit card required • Smart location discovery</p>
+              <p className="text-white/80 text-sm mb-6">30 day trial. No credit card required. No commission fees.</p>
               <ul className="text-left space-y-3 mb-8 text-white">
                 <li className="flex items-center gap-3">
                   <Star className="text-yellow-300 flex-shrink-0" size={22} fill="currentColor" />
@@ -507,7 +525,7 @@ const PartnerLandingPage: React.FC = () => {
                 </li>
                 <li className="flex items-center gap-3">
                   <Star className="text-yellow-300 flex-shrink-0" size={20} fill="currentColor" />
-                  <span className="font-semibold">5km smart discovery</span>
+                  <span className="font-semibold">QR Code &amp; shareable menu link</span>
                 </li>
                 <li className="flex items-center gap-3">
                   <Star className="text-yellow-300 flex-shrink-0" size={20} fill="currentColor" />
@@ -532,6 +550,121 @@ const PartnerLandingPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Food Truck Section */}
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl sm:text-5xl font-black text-zinc-900 mb-4">
+              Perfect for Food Trucks & Market Stalls
+            </h2>
+            <p className="text-xl text-zinc-600 max-w-3xl mx-auto leading-relaxed">
+              Showcase your menu at festivals, markets, and events across Australia. Let customers browse your offerings before they reach your window with a simple QR code scan.
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-8 mb-12">
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+              <img
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/foodd%20truck.jpg"
+                alt="Food truck at outdoor event"
+                className="w-full h-[400px] object-cover"
+              />
+            </div>
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+              <img
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/food%20truck%204.jpg"
+                alt="Food market vendor"
+                className="w-full h-[400px] object-cover"
+              />
+            </div>
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+              <img
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/qr-code%20market.png"
+                alt="QR code at market stall"
+                className="w-full h-[400px] object-cover"
+              />
+            </div>
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+              <img
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/foodd%20truck%202.B.jpg"
+                alt="Food truck festival"
+                className="w-full h-[400px] object-cover"
+              />
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <QrCode className="text-white" size={32} />
+              </div>
+              <h3 className="text-xl font-black text-zinc-900 mb-2">Display Your QR Code</h3>
+              <p className="text-zinc-600">
+                Print your QR code on your truck, tent, or signage. Customers scan and see your full video menu instantly.
+              </p>
+            </div>
+            <div className="text-center">
+              <div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Video className="text-white" size={32} />
+              </div>
+              <h3 className="text-xl font-black text-zinc-900 mb-2">Show Your Best Dishes</h3>
+              <p className="text-zinc-600">
+                Video menus help customers decide faster, reducing queue times and increasing order values at busy events.
+              </p>
+            </div>
+            <div className="text-center">
+              <div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <MapPin className="text-white" size={32} />
+              </div>
+              <h3 className="text-xl font-black text-zinc-900 mb-2">Update Your Location</h3>
+              <p className="text-zinc-600">
+                Moving to a new market or festival? Update your location in real-time so customers always know where to find you.
+              </p>
+            </div>
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Sparkles className="text-white" size={32} />
+              </div>
+              <h3 className="text-xl font-black text-zinc-900 mb-2">Event QR Code (White Label)</h3>
+              <p className="text-zinc-600">
+                One QR code for all vendors at your event. Custom branding, multiple menus, premium solution. Contact us for pricing.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Dashboard Screenshots Section */}
+      <section className="py-20 bg-gradient-to-br from-zinc-50 to-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl sm:text-5xl font-black text-zinc-900 mb-4">
+              Powerful Dashboard, Simple to Use
+            </h2>
+            <p className="text-xl text-zinc-600 max-w-2xl mx-auto">
+              Manage your menu, track analytics, and grow your business from one clean dashboard.
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-8">
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-zinc-200">
+              <img
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/dashboard%201%20(1).png"
+                alt="MenuLove Dashboard Analytics"
+                className="w-full h-auto"
+              />
+            </div>
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-zinc-200">
+              <img
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/dashboard%202%20(1).png"
+                alt="MenuLove Menu Management"
+                className="w-full h-auto"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <div className="relative bg-gradient-to-br from-orange-500 to-amber-500 py-20 overflow-hidden">
         <div 
@@ -545,7 +678,7 @@ const PartnerLandingPage: React.FC = () => {
             Ready to Grow Your Restaurant?
           </h2>
           <p className="text-lg text-white/90 mb-10 max-w-2xl mx-auto leading-relaxed">
-            Be among the first restaurants to revolutionize how customers discover your menu through engaging video content and smart location-based discovery
+            Be among the first restaurants in Australia to revolutionize how customers experience your menu through engaging video content, QR codes, and your own shareable link.
           </p>
           <button
             onClick={scrollToForm}
@@ -558,7 +691,7 @@ const PartnerLandingPage: React.FC = () => {
             🔥 Only 10 FREE Beta Spots Left
           </p>
           <p className="text-white/80 text-sm mb-3">
-            30-day trial • No credit card required • Smart location discovery
+            30 day trial. No credit card required. No commission fees.
           </p>
           <p className="mt-6 text-white/80">
             Questions? Email us at <a href="mailto:contact@menulove.com.au" className="underline font-bold hover:text-yellow-300 transition-colors">contact@menulove.com.au</a>
@@ -577,7 +710,7 @@ const PartnerLandingPage: React.FC = () => {
               Join Australian Restaurants Using Video Menus
             </h3>
             <p className="text-zinc-600 text-sm mt-2">
-              Smart Discovery currently in Sunshine Coast • Video menus available Australia-wide
+              Video menus available Australia-wide for restaurants, cafés, and food trucks.
             </p>
           </div>
           
@@ -661,31 +794,97 @@ const PartnerLandingPage: React.FC = () => {
       </div>
 
       {/* Footer */}
-      <div className="bg-zinc-900 text-white py-12">
+      <footer className="bg-zinc-900 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* MenuLove Logo */}
-          <div className="flex items-center justify-center gap-3 mb-8">
-            <img 
-              src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png" 
-              alt="MenuLove" 
-              className="w-10 h-10"
-            />
-            <span className="text-white font-black text-2xl">MenuLove</span>
+          {/* Top Section - Logo + Links */}
+          <div className="grid md:grid-cols-4 gap-12 mb-12">
+            {/* Logo & Tagline */}
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <img 
+                  src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png" 
+                  alt="MenuLove" 
+                  className="w-10 h-10"
+                />
+                <span className="text-white font-black text-2xl">MenuLove</span>
+              </div>
+              <p className="text-zinc-400 text-sm">
+                Video Menus & Smart Ordering
+              </p>
+            </div>
+
+            {/* Platform Links */}
+            <div>
+              <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Platform</h3>
+              <ul className="space-y-3">
+                <li>
+                  <a href="/become-a-partner" className="text-zinc-400 hover:text-orange-500 transition-colors text-sm">
+                    For Restaurants
+                  </a>
+                </li>
+                <li>
+                  <a href="/partner" className="text-zinc-400 hover:text-orange-500 transition-colors text-sm">
+                    Partner Portal
+                  </a>
+                </li>
+                <li>
+                  <a href="mailto:contact@menulove.com.au" className="text-zinc-400 hover:text-orange-500 transition-colors text-sm">
+                    Contact Us
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Legal Links */}
+            <div>
+              <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Legal</h3>
+              <ul className="space-y-3">
+                <li>
+                  <a href="/privacy-policy" className="text-zinc-400 hover:text-orange-500 transition-colors text-sm">
+                    Privacy Policy
+                  </a>
+                </li>
+                <li>
+                  <a href="/terms-of-service" className="text-zinc-400 hover:text-orange-500 transition-colors text-sm">
+                    Terms of Service
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Mobile Access QR */}
+            <div>
+              <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Mobile Access</h3>
+              <p className="text-zinc-400 text-sm mb-4">Best experience on mobile</p>
+              <div className="bg-white p-3 rounded-xl inline-block">
+                <img 
+                  src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=https://menulove.com.au" 
+                  alt="QR Code for MenuLove" 
+                  className="w-24 h-24"
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="text-center mb-6">
-            <div className="max-w-3xl mx-auto">
-              <p className="text-zinc-500 text-sm leading-relaxed mb-4">
+          {/* Beta Message */}
+          <div className="border-t border-zinc-800 pt-8 mb-8">
+            <div className="max-w-3xl mx-auto text-center">
+              <p className="text-zinc-500 text-sm leading-relaxed">
                 <span className="text-orange-500 font-bold">Beta Version:</span> MenuLove is currently in beta testing. 
                 We're working hard to deliver the best experience for Australian restaurants. 
                 Your feedback helps us improve and build the perfect platform for showcasing your culinary creations. 
                 Join us in revolutionizing how restaurants connect with customers through video menus.
               </p>
+              <p className="text-zinc-500 text-sm mt-4">
+                If you have any questions, feel free to <a href="mailto:contact@menulove.com.au" className="text-orange-500 hover:text-orange-400 transition-colors font-semibold">contact us here</a>.
+              </p>
             </div>
           </div>
+
+          {/* Bottom Section */}
           <div className="text-center pt-6 border-t border-zinc-800">
             <p className="text-zinc-400 text-sm mb-2">
-              MenuLove - Video Menus & Smart Discovery
+              MenuLove - Video Menus & Smart Ordering
             </p>
             <p className="text-zinc-500 text-sm mb-1">
               Built with <span className="text-orange-500">🧡</span> in Australia | <a href="mailto:contact@menulove.com.au" className="text-orange-500 hover:text-orange-400 transition-colors">contact@menulove.com.au</a>
@@ -695,7 +894,7 @@ const PartnerLandingPage: React.FC = () => {
             </p>
           </div>
         </div>
-      </div>
+      </footer>
     </div>
   );
 };

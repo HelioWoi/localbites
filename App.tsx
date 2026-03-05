@@ -8,6 +8,8 @@ import RestaurantProfile from './screens/RestaurantProfile';
 import AdminDashboard from './screens/AdminDashboard';
 import PartnerPortal from './screens/partner/PartnerPortal';
 import PartnerLandingPage from './screens/PartnerLandingPage';
+import LiveExamplesPage from './screens/LiveExamplesPage';
+import DemoRestaurantLoader from './components/DemoRestaurantLoader';
 import SuperAdminPortal from './screens/admin/SuperAdminPortal';
 import RestaurantMenuLoader from './components/RestaurantMenuLoader';
 import RestaurantProfileLoader from './components/RestaurantProfileLoader';
@@ -36,8 +38,8 @@ import { trackEvent } from './services/eventsService';
 // Check if we're on the admin route
 const isAdminRoute = window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin');
 
-// Check if we're on the partner landing page
-const isPartnerLandingRoute = window.location.pathname === '/become-a-partner';
+// Check if we're on the partner landing page (root / OR /become-a-partner)
+const isPartnerLandingRoute = window.location.pathname === '/become-a-partner' || window.location.pathname === '/';
 
 // Check if we're on the partner route
 const isPartnerRoute = window.location.pathname === '/partner' || window.location.pathname.startsWith('/partner');
@@ -60,7 +62,26 @@ const isHelpRoute = window.location.pathname === '/help';
 // Check if we're on email confirmation page
 const isEmailConfirmationRoute = window.location.pathname === '/confirm-email';
 
+// Check if we're on live examples page
+const isLiveExamplesRoute = window.location.pathname === '/live-examples';
+
+// Check if we're on demo route (/demo/:slug)
+const isDemoRoute = window.location.pathname.startsWith('/demo/');
+
 const App: React.FC = () => {
+  // Demo Route - for live examples (doesn't affect /r/ routes in production)
+  if (isDemoRoute) {
+    const demoSlug = window.location.pathname.split('/')[2];
+    if (demoSlug) {
+      return <DemoRestaurantLoader slug={demoSlug} />;
+    }
+  }
+
+  // Live Examples Route
+  if (isLiveExamplesRoute) {
+    return <LiveExamplesPage />;
+  }
+
   // Email Confirmation Route
   if (isEmailConfirmationRoute) {
     return <EmailConfirmation />;

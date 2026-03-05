@@ -15,6 +15,9 @@ interface RestaurantProfileProps {
   onNavigateToPartner?: () => void;
   onOpenAI?: () => void;
   onRequestRemoval?: (name: string, id: string) => void;
+  isStandalone?: boolean;
+  onOpenSearch?: () => void;
+  onOpenFilter?: () => void;
 }
 
 // Helper to get/set saved dishes from localStorage
@@ -698,11 +701,9 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         
         {/* Header buttons */}
         <div className="absolute top-14 left-6 right-6 flex justify-between">
-          {!isStandalone && (
-            <button onClick={onBack} className="p-3 bg-black/20 backdrop-blur-md rounded-full text-white active:scale-90 transition-transform">
-              <ChevronLeft size={24}/>
-            </button>
-          )}
+          <button onClick={onBack} className="p-3 bg-black/20 backdrop-blur-md rounded-full text-white active:scale-90 transition-transform">
+            <ChevronLeft size={24}/>
+          </button>
           {!isStandalone && (
             <div className="flex gap-3">
               {restaurant.isSubscribed && (

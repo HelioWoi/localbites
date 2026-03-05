@@ -5,17 +5,15 @@ import RestaurantProfile from '../screens/RestaurantProfile';
 import DesktopRestaurantProfile from './DesktopRestaurantProfile';
 import { Loader2 } from 'lucide-react';
 
-interface RestaurantProfileLoaderProps {
+interface DemoRestaurantLoaderProps {
   slug: string;
-  isAppFeed?: boolean;
 }
 
-const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug, isAppFeed = false }) => {
+const DemoRestaurantLoader: React.FC<DemoRestaurantLoaderProps> = ({ slug }) => {
   const [restaurant, setRestaurant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
-  const isQRRoute = window.location.pathname.startsWith('/r/');
 
   // Desktop detection
   useEffect(() => {
@@ -41,10 +39,6 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug,
           setLoading(false);
           return;
         }
-
-        console.log('[RestaurantProfileLoader] Partner data:', partnerData);
-        console.log('[RestaurantProfileLoader] Photo URL:', partnerData.photo_url);
-        console.log('[RestaurantProfileLoader] Banner images:', partnerData.banner_images);
 
         // Fetch menu items for this restaurant (not deleted)
         const { data: menuItems, error: menuError } = await supabase
@@ -77,7 +71,7 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug,
               googleTotalReviews = results[0].totalReviews || 0;
             }
           } catch (e) {
-            console.error('[ProfileLoader] Google rating fetch error:', e);
+            console.error('[DemoLoader] Google rating fetch error:', e);
           }
         }
 
@@ -144,7 +138,7 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug,
     return (
       <div className="h-screen w-screen bg-black flex flex-col items-center justify-center">
         <Loader2 className="w-12 h-12 animate-spin text-orange-500 mb-4" />
-        <p className="text-white/60 text-sm">Loading restaurant...</p>
+        <p className="text-white/60 text-sm">Loading demo...</p>
       </div>
     );
   }
@@ -156,18 +150,18 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug,
           <span className="text-4xl">🍽️</span>
         </div>
         <h1 className="text-white text-2xl font-bold mb-2">Restaurant Not Found</h1>
-        <p className="text-white/60 mb-8">This restaurant may be invalid or no longer active.</p>
+        <p className="text-white/60 mb-8">This demo may be invalid or no longer active.</p>
         <a 
           href="/"
           className="px-6 py-3 bg-orange-500 text-white font-bold rounded-xl"
         >
-          Discover Restaurants
+          Back to Home
         </a>
       </div>
     );
   }
 
-  // Render desktop or mobile version based on screen size
+  // Render desktop or mobile version - ALWAYS show back button for demo
   if (isDesktop) {
     return (
       <DesktopRestaurantProfile 
@@ -175,7 +169,7 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug,
         onClose={() => window.location.href = '/'}
         isSaved={false}
         onToggleSave={() => {}}
-        isQRRoute={isQRRoute}
+        isQRRoute={false}
       />
     );
   }
@@ -188,9 +182,9 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug,
       onToggleSave={() => {}}
       openReviews={false}
       onNavigateToPartner={() => {}}
-      isStandalone={isQRRoute}
+      isStandalone={true}
     />
   );
 };
 
-export default RestaurantProfileLoader;
+export default DemoRestaurantLoader;
