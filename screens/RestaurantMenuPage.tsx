@@ -140,8 +140,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
       eventValue: item.id,
     });
 
-    // Open ordering URL in new tab
-    window.open(orderUrl, '_blank', 'noopener,noreferrer');
+    // Open ordering URL in same page
+    window.location.href = orderUrl;
   };
 
   // Share dish

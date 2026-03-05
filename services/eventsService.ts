@@ -58,6 +58,29 @@ const getLocationCity = async (): Promise<string | null> => {
   }
 };
 
+// Check if debug mode is enabled
+const isDebugMode = (): boolean => {
+  return new URLSearchParams(window.location.search).get('debugAnalytics') === '1';
+};
+
+// Debug logger
+const debugLog = (message: string, data?: any) => {
+  if (isDebugMode()) {
+    console.log(`[Analytics Debug] ${message}`, data || '');
+    
+    // Store in localStorage for audit
+    try {
+      const logs = JSON.parse(localStorage.getItem('analytics_debug_log') || '[]');
+      logs.push({ timestamp: new Date().toISOString(), message, data });
+      // Keep last 50 events
+      if (logs.length > 50) logs.shift();
+      localStorage.setItem('analytics_debug_log', JSON.stringify(logs));
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+  }
+};
+
 // Track event
 export const trackEvent = async ({
   eventType,
@@ -73,7 +96,7 @@ export const trackEvent = async ({
     const device = getDeviceType();
     const locationCity = await getLocationCity();
 
-    const { error } = await supabase.from('events').insert({
+    const eventData = {
       restaurant_id: restaurantId || null,
       user_session_id: finalSessionId,
       event_type: eventType,
@@ -83,12 +106,20 @@ export const trackEvent = async ({
       device,
       location_city: locationCity,
       referrer: referrer || null,
-    });
+    };
+
+    debugLog(`📊 Event fired: ${eventType}`, { restaurantId, itemId, eventValue, device });
+
+    const { error } = await supabase.from('events').insert(eventData);
 
     if (error) {
+      debugLog(`❌ Event failed: ${eventType}`, error);
       console.error('[Events] Error tracking event:', error);
+    } else {
+      debugLog(`✅ Event saved: ${eventType}`);
     }
   } catch (error) {
+    debugLog(`❌ Event exception: ${eventType}`, error);
     console.error('[Events] Error tracking event:', error);
   }
 };
@@ -406,6 +437,25 @@ export const getRestaurantMetrics = async (restaurantId: string, days: number = 
       qrScans: 0,
       directionsClicks: 0,
     };
+  }
+};
+
+// Get raw event count for debugging
+export const getRawEventCount = async (days: number = 7): Promise<number> => {
+  try {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const { count, error } = await supabase
+      .from('events')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', startDate.toISOString());
+
+    if (error) throw error;
+    return count || 0;
+  } catch (error) {
+    console.error('[Events] Error fetching raw event count:', error);
+    return 0;
   }
 };
 

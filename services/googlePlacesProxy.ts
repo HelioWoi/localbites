@@ -136,6 +136,7 @@ export async function getPlaceDetails(placeId: string): Promise<{
   place: PlaceResult;
   reviews: PlaceReview[];
   photos: string[];
+  openingHours?: string[];
 } | null> {
   try {
     console.log('[GooglePlaces] Getting details for:', placeId);

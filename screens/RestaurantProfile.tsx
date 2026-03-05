@@ -111,50 +111,147 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
     const loadGoogleReviews = async () => {
       // Google Place IDs start with "ChIJ" or "places/"
       const isGoogleRestaurant = restaurant.id.startsWith('places/') || restaurant.id.startsWith('ChIJ');
-      const needsReviews = !restaurant.reviews || restaurant.reviews.length === 0;
+      const hasReviews = restaurant.reviews && restaurant.reviews.length > 0;
+      const hasValidRating = restaurant.totalReviews && restaurant.totalReviews > 0;
+      const needsReviews = !hasReviews || !hasValidRating;
       
-      console.log('[RestaurantProfile] Restaurant ID:', restaurant.id);
+      console.log('[RestaurantProfile] ===== PARTNER LOOKUP START =====');
+      console.log('[RestaurantProfile] Partner ID:', restaurant.id);
+      console.log('[RestaurantProfile] Partner Name:', restaurant.name);
+      console.log('[RestaurantProfile] Stored google_place_id:', (restaurant as any).google_place_id || 'NONE');
       console.log('[RestaurantProfile] Is Google restaurant:', isGoogleRestaurant);
+      console.log('[RestaurantProfile] Has reviews:', hasReviews, 'Has valid rating:', hasValidRating);
       console.log('[RestaurantProfile] Needs reviews:', needsReviews);
       
       if (!needsReviews) return;
       
       setLoadingReviews(true);
       try {
-        let placeId = isGoogleRestaurant ? restaurant.id : null;
+        let placeId = isGoogleRestaurant ? restaurant.id : (restaurant as any).google_place_id || null;
         
-        // For partner restaurants, find Google Place ID by name search
+        // For partner restaurants, resolve Google Place ID if not already stored
         if (!placeId && restaurant.name) {
-          console.log('[RestaurantProfile] Partner restaurant - searching Google for:', restaurant.name);
-          const searchQuery = restaurant.address 
-            ? `${restaurant.name} ${restaurant.address}` 
-            : restaurant.name;
-          const searchResults = await textSearchRestaurants(0, 0, 50000, searchQuery);
-          if (searchResults.length > 0) {
-            placeId = searchResults[0].id;
-            console.log('[RestaurantProfile] Found Google Place ID:', placeId);
-            // Also update rating/totalReviews from Google
-            if (searchResults[0].rating) {
-              restaurant.rating = searchResults[0].rating;
-              restaurant.totalReviews = searchResults[0].totalReviews || 0;
-              // Save to DB so feed shows real values
-              const { supabase } = await import('../lib/supabase');
-              await supabase
-                .from('partners')
-                .update({ 
-                  rating: searchResults[0].rating, 
-                  total_reviews: searchResults[0].totalReviews || 0 
-                })
-                .eq('id', restaurant.id);
-              console.log('[RestaurantProfile] Saved Google rating to DB:', searchResults[0].rating, searchResults[0].totalReviews);
+          console.log('[RestaurantProfile] No stored place_id - running resolver');
+          console.log('[RestaurantProfile] Partner location:', restaurant.latitude, restaurant.longitude);
+          
+          // Build search variations with smart name handling
+          const baseName = restaurant.name.replace(/\s*-\s*Sunshine Coast$/i, '').trim();
+          const searchVariations = [
+            baseName, // Clean name without location suffix
+            `${baseName} Sunshine Coast`, // Name + location
+            `${baseName} cafe`, // Name + cafe
+            restaurant.name, // Original name as-is
+            restaurant.address ? `${baseName} ${restaurant.address}` : null, // Name + full address
+          ].filter(Boolean);
+          
+          console.log('[RestaurantProfile] Search variations:', searchVariations);
+          
+          let allCandidates: any[] = [];
+          
+          // Collect all candidates from all variations
+          for (const query of searchVariations) {
+            console.log('[RestaurantProfile] Trying search:', query);
+            const results = await textSearchRestaurants(
+              restaurant.latitude || 0, 
+              restaurant.longitude || 0, 
+              50000, // 50km radius
+              query!
+            );
+            if (results.length > 0) {
+              console.log('[RestaurantProfile] Found', results.length, 'results with query:', query);
+              allCandidates.push(...results);
             }
           }
+          
+          // Remove duplicates by place ID
+          const uniqueCandidates = Array.from(
+            new Map(allCandidates.map(c => [c.id, c])).values()
+          );
+          
+          console.log('[RestaurantProfile] Total unique candidates:', uniqueCandidates.length);
+          
+          if (uniqueCandidates.length > 0) {
+            // Select best candidate by distance to partner location
+            const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+              const R = 6371; // Earth radius in km
+              const dLat = (lat2 - lat1) * Math.PI / 180;
+              const dLng = (lng2 - lng1) * Math.PI / 180;
+              const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLng / 2) * Math.sin(dLng / 2);
+              const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+              return R * c;
+            };
+            
+            const candidatesWithDistance = uniqueCandidates.map(c => ({
+              ...c,
+              distanceKm: calculateDistance(
+                restaurant.latitude || 0,
+                restaurant.longitude || 0,
+                c.latitude || 0,
+                c.longitude || 0
+              )
+            }));
+            
+            // Sort by distance (closest first)
+            candidatesWithDistance.sort((a, b) => a.distanceKm - b.distanceKm);
+            
+            const bestCandidate = candidatesWithDistance[0];
+            placeId = bestCandidate.id;
+            
+            console.log('[RestaurantProfile] Best candidate selected:');
+            console.log('  - Place ID:', placeId);
+            console.log('  - Name:', bestCandidate.name);
+            console.log('  - Distance:', bestCandidate.distanceKm.toFixed(2), 'km');
+            console.log('  - Rating:', bestCandidate.rating);
+            console.log('  - Total reviews:', bestCandidate.totalReviews);
+            
+            // Update local state
+            restaurant.rating = bestCandidate.rating || restaurant.rating;
+            restaurant.totalReviews = bestCandidate.totalReviews || 0;
+            
+            // Save to DB for future lookups (persistent cache)
+            const { supabase } = await import('../lib/supabase');
+            const { error } = await supabase
+              .from('partners')
+              .update({ 
+                rating: bestCandidate.rating || restaurant.rating, 
+                total_reviews: bestCandidate.totalReviews || 0,
+                google_place_id: placeId
+              })
+              .eq('id', restaurant.id);
+            
+            if (error) {
+              console.error('[RestaurantProfile] Error saving place_id to DB:', error);
+            } else {
+              console.log('[RestaurantProfile] ✓ Saved place_id to DB for future use');
+            }
+          } else {
+            console.log('[RestaurantProfile] ✗ No candidates found - tried all variations');
+            console.log('[RestaurantProfile] This partner needs manual Place ID configuration');
+          }
+        } else if (placeId) {
+          console.log('[RestaurantProfile] Using stored place_id:', placeId);
         }
         
         if (placeId) {
           console.log('[RestaurantProfile] Fetching reviews for:', placeId);
           const details = await getPlaceDetails(placeId);
           console.log('[RestaurantProfile] Got details:', details);
+          
+          // Save opening hours to DB if available
+          if (details?.openingHours && details.openingHours.length > 0 && !isGoogleRestaurant) {
+            console.log('[RestaurantProfile] Saving opening hours to DB:', details.openingHours);
+            const { supabase } = await import('../lib/supabase');
+            await supabase
+              .from('partners')
+              .update({ 
+                opening_hours: details.openingHours
+              })
+              .eq('id', restaurant.id);
+            // Update local state
+            restaurant.openingHours = details.openingHours;
+          }
           
           if (details?.reviews && details.reviews.length > 0) {
             console.log('[RestaurantProfile] Setting', details.reviews.length, 'reviews');
@@ -285,8 +382,8 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
       eventValue: dish.id,
     });
 
-    // Open ordering URL in new tab
-    window.open(orderUrl, '_blank', 'noopener,noreferrer');
+    // Open ordering URL in same page
+    window.location.href = orderUrl;
   };
 
   // Combine restaurant reviews with Google reviews
@@ -813,28 +910,26 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         )}
 
         {/* Quick action buttons - Compact */}
-        {!isStandalone && (
-          <div className="flex gap-2">
-            <a 
-              href={restaurant.googleMapsUrl} 
-              target="_blank" 
-              onClick={() => {
-                trackEvent({ 
-                  eventType: 'directions_click',
-                  restaurantId: restaurant.id 
-                });
-              }}
-              className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white font-semibold py-3 rounded-xl text-sm active:scale-95 transition-all"
-            >
-              <Navigation size={14} fill="currentColor" /> Directions
+        <div className="flex gap-2">
+          <a 
+            href={restaurant.googleMapsUrl} 
+            target="_blank" 
+            onClick={() => {
+              trackEvent({ 
+                eventType: 'directions_click',
+                restaurantId: restaurant.id 
+              });
+            }}
+            className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white font-semibold py-3 rounded-xl text-sm active:scale-95 transition-all"
+          >
+            <Navigation size={14} fill="currentColor" /> Directions
+          </a>
+          {restaurant.website && (
+            <a href={restaurant.website} target="_blank" className="flex-1 flex items-center justify-center gap-2 bg-zinc-100 text-zinc-700 font-semibold py-3 rounded-xl text-sm active:scale-95 transition-all">
+              <Globe size={14} /> Website
             </a>
-            {restaurant.website && (
-              <a href={restaurant.website} target="_blank" className="flex-1 flex items-center justify-center gap-2 bg-zinc-100 text-zinc-700 font-semibold py-3 rounded-xl text-sm active:scale-95 transition-all">
-                <Globe size={14} /> Website
-              </a>
-            )}
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Share button */}
         <button
@@ -904,16 +999,10 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
           </section>
         )}
 
-        {/* Payment info for QR code OR Disclaimer for app */}
+        {/* Disclaimer for app */}
         <div className="py-4 px-2 space-y-3">
           {isStandalone ? (
             <>
-              <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 text-center">
-                <p className="text-sm font-semibold text-zinc-900 mb-1">Payment</p>
-                <p className="text-xs text-zinc-600 leading-relaxed">
-                  Save your favorite dishes and show at the counter for payment.
-                </p>
-              </div>
               <div className="flex flex-col items-center gap-1 pt-2">
                 <span className="text-[9px] text-zinc-400">Powered by</span>
                 <span className="text-sm font-bold text-zinc-700">MenuLove</span>

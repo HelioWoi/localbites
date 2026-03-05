@@ -104,7 +104,7 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
       eventValue: item.id,
     });
 
-    window.open(orderUrl, '_blank', 'noopener,noreferrer');
+    window.location.href = orderUrl;
   };
 
   const filteredItems = restaurant.menuItems.filter(item => {
@@ -408,6 +408,18 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
                   <Bookmark size={16} fill={savedItems.has(selectedItem.id) ? 'currentColor' : 'none'} />
                   {savedItems.has(selectedItem.id) ? 'Saved' : 'Save'}
                 </button>
+                
+                {/* Order Button */}
+                {restaurant.enable_ordering_button && (selectedItem.dish_order_url || restaurant.ordering_url) && (
+                  <button
+                    onClick={(e) => { handleOrderNow(selectedItem, e); }}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold text-sm transition-colors"
+                  >
+                    <ShoppingBag size={16} />
+                    Order
+                  </button>
+                )}
+                
                 {selectedItem.videoUrl && (
                   <button
                     onClick={() => { 

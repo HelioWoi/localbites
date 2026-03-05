@@ -83,7 +83,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
       eventValue: dish.id,
     });
 
-    window.open(orderUrl, '_blank', 'noopener,noreferrer');
+    window.location.href = orderUrl;
   };
 
   // Sync with localStorage changes (when FullMenuModal saves/removes dishes)

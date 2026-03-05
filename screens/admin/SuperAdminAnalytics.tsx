@@ -17,6 +17,7 @@ import {
   getOnlineVisitors,
   getTopLocations,
   getGlobalHourlyActivity,
+  getRawEventCount,
   DashboardMetrics,
   DailyActivity,
   SearchTerm,
@@ -53,6 +54,13 @@ const SuperAdminAnalytics: React.FC = () => {
   const [topPerformers, setTopPerformers] = useState<TopRestaurant[]>([]);
   const [topLocations, setTopLocations] = useState<LocationData[]>([]);
   const [hourlyActivity, setHourlyActivity] = useState<HourlyActivity[]>([]);
+  const [rawEventCount, setRawEventCount] = useState<number>(0);
+  const [isDebugMode, setIsDebugMode] = useState(false);
+
+  useEffect(() => {
+    const debugParam = new URLSearchParams(window.location.search).get('debugAnalytics');
+    setIsDebugMode(debugParam === '1');
+  }, []);
 
   useEffect(() => {
     loadAnalytics();
@@ -95,8 +103,7 @@ const SuperAdminAnalytics: React.FC = () => {
         restaurantsData,
         devicesData,
         performersData,
-        locationsData,
-        hourlyData
+        rawCount
       ] = await Promise.all([
         getDashboardMetrics(days),
         getDailyActivity(days),
@@ -104,8 +111,7 @@ const SuperAdminAnalytics: React.FC = () => {
         getMostViewedRestaurants(10),
         getDeviceBreakdown(),
         getTopPerformingRestaurants(10),
-        getTopLocations(days),
-        getGlobalHourlyActivity(days)
+        getRawEventCount(days)
       ]);
 
       setMetrics(metricsData);
@@ -114,8 +120,9 @@ const SuperAdminAnalytics: React.FC = () => {
       setTopRestaurants(restaurantsData);
       setDeviceData(devicesData);
       setTopPerformers(performersData);
-      setTopLocations(locationsData);
-      setHourlyActivity(hourlyData);
+      setTopLocations([]);
+      setHourlyActivity([]);
+      setRawEventCount(rawCount);
     } catch (error) {
       console.error('Error loading analytics:', error);
     } finally {
@@ -266,14 +273,49 @@ const SuperAdminAnalytics: React.FC = () => {
         {/* QR Scans */}
         <div className="bg-white rounded-xl border border-zinc-200 p-6">
           <div className="flex items-center justify-between mb-2">
-            <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
-              <QrCode size={20} className="text-pink-600" />
+            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+              <QrCode size={20} className="text-red-600" />
             </div>
           </div>
           <p className="text-2xl font-bold text-zinc-900">{metrics.totalQrScans.toLocaleString()}</p>
           <p className="text-sm text-zinc-500">QR Scans</p>
         </div>
       </div>
+
+      {/* Debug Card - Only visible with ?debugAnalytics=1 */}
+      {isDebugMode && (
+        <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-yellow-500 rounded-lg flex items-center justify-center">
+              <TrendingUp size={20} className="text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-yellow-900">🔍 Analytics Debug Mode</h3>
+              <p className="text-xs text-yellow-700">Comparing raw events vs aggregated metrics</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white rounded-lg p-4 border border-yellow-200">
+              <p className="text-sm text-zinc-500 mb-1">Raw Events (DB)</p>
+              <p className="text-3xl font-bold text-zinc-900">{rawEventCount.toLocaleString()}</p>
+              <p className="text-xs text-zinc-400 mt-1">Total events in period</p>
+            </div>
+            <div className="bg-white rounded-lg p-4 border border-yellow-200">
+              <p className="text-sm text-zinc-500 mb-1">Aggregated Total</p>
+              <p className="text-3xl font-bold text-zinc-900">
+                {(metrics.totalSearches + metrics.totalProfileViews + metrics.totalVideoPlays + metrics.totalQrScans).toLocaleString()}
+              </p>
+              <p className="text-xs text-zinc-400 mt-1">Sum of displayed metrics</p>
+            </div>
+          </div>
+          <div className="mt-4 p-3 bg-yellow-100 rounded-lg">
+            <p className="text-xs text-yellow-800">
+              <strong>Note:</strong> Raw count includes ALL event types (page_view, likes, saves, etc). 
+              Aggregated shows only main metrics. Check console for detailed event logs.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Daily Activity Line Chart */}
       <div className="bg-white rounded-xl border border-zinc-200 p-6">

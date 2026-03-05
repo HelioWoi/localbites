@@ -442,6 +442,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           .order('sort_order');
 
         console.log('Menu items loaded:', items, itemsError);
+        console.log('First item dish_order_url:', items?.[0]?.dish_order_url);
 
         if (items) {
           setMenuItems(items);
@@ -1044,6 +1045,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
       console.log('Before creating updateData - videoUrl:', videoUrl, 'photoUrl:', photoUrl);
       console.log('Price field - raw value:', menuItemPrice);
+      console.log('ORDER LINK field - raw value:', menuItemOrderingUrl);
       
       // Parse price correctly - empty string should be null, not 0
       const parsedPrice = menuItemPrice && menuItemPrice.trim() !== '' ? parseFloat(menuItemPrice) : null;
@@ -1058,6 +1060,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         video_url: videoUrl,
         dish_order_url: menuItemOrderingUrl.trim() || null,
       };
+      
+      console.log('🔍 UPDATE DATA BEING SENT:', JSON.stringify(updateData, null, 2));
 
       const currentUser = (await supabase.auth.getUser()).data.user;
       
@@ -1123,7 +1127,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       
       console.log('Update result:', updateResult);
       console.log('Update result price:', updateResult?.[0]?.price);
+      console.log('Update result dish_order_url:', updateResult?.[0]?.dish_order_url);
       console.log('Expected price:', updateData.price);
+      console.log('Expected dish_order_url:', updateData.dish_order_url);
       console.log('Full update result object:', JSON.stringify(updateResult, null, 2));
 
       if (error) {
@@ -1169,24 +1175,18 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       
       setUploadProgress(100);
 
-      // Update local state
-      setMenuItems(menuItems.map(i => 
-        i.id === editingMenuItem.id 
-          ? { 
-              ...i, 
-              name: menuItemName.trim(), 
-              category: finalCategory, 
-              description: menuItemDescription.trim() || null, 
-              price: menuItemPrice ? parseFloat(menuItemPrice) : null,
-              photo_url: photoUrl,
-              video_url: videoUrl
-            }
-          : i
-      ));
+      // Reload all menu items from DB to ensure state is 100% in sync (including dish_order_url)
+      const { data: freshItems } = await supabase
+        .from('menu_items')
+        .select('*')
+        .eq('partner_id', partnerData.id)
+        .order('category')
+        .order('sort_order');
 
-      // Update categories if new category was added
-      if (!categories.includes(finalCategory)) {
-        setCategories([...categories, finalCategory]);
+      if (freshItems) {
+        setMenuItems(freshItems);
+        const cats = [...new Set(freshItems.map((i: any) => i.category))].filter(Boolean) as string[];
+        setCategories(cats);
       }
 
       setTimeout(() => {
@@ -1957,19 +1957,20 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                       </div>
                       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            console.log('Editing item:', item);
-                            console.log('Item price:', item.price);
-                            console.log('Price as string:', item.price?.toString());
-                            setEditingMenuItem(item);
-                            setMenuItemName(item.name);
-                            setMenuItemCategory(item.category);
-                            setMenuItemDescription(item.description || '');
-                            const priceValue = item.price?.toString() || '';
-                            console.log('Setting menuItemPrice to:', priceValue);
-                            setMenuItemPrice(priceValue);
-                            setMenuItemOrderingUrl(item.dish_order_url || '');
+                            const { data: freshItem } = await supabase
+                              .from('menu_items')
+                              .select('*')
+                              .eq('id', item.id)
+                              .single();
+                            const itemToEdit = freshItem || item;
+                            setEditingMenuItem(itemToEdit);
+                            setMenuItemName(itemToEdit.name);
+                            setMenuItemCategory(itemToEdit.category);
+                            setMenuItemDescription(itemToEdit.description || '');
+                            setMenuItemPrice(itemToEdit.price?.toString() || '');
+                            setMenuItemOrderingUrl(itemToEdit.dish_order_url || '');
                             setShowMenuUploadModal(true);
                           }}
                           className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center shadow-md hover:bg-orange-600 transition-colors"
@@ -2065,13 +2066,20 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                                 <Star size={14} fill={item.is_featured ? 'white' : 'none'} />
                               </button>
                               <button
-                                onClick={(e) => { 
-                                  e.stopPropagation(); 
-                                  setEditingMenuItem(item);
-                                  setMenuItemName(item.name);
-                                  setMenuItemCategory(item.category);
-                                  setMenuItemDescription(item.description || '');
-                                  setMenuItemPrice(item.price?.toString() || '');
+                                onClick={async (e) => { 
+                                  e.stopPropagation();
+                                  const { data: freshItem } = await supabase
+                                    .from('menu_items')
+                                    .select('*')
+                                    .eq('id', item.id)
+                                    .single();
+                                  const itemToEdit = freshItem || item;
+                                  setEditingMenuItem(itemToEdit);
+                                  setMenuItemName(itemToEdit.name);
+                                  setMenuItemCategory(itemToEdit.category);
+                                  setMenuItemDescription(itemToEdit.description || '');
+                                  setMenuItemPrice(itemToEdit.price?.toString() || '');
+                                  setMenuItemOrderingUrl(itemToEdit.dish_order_url || '');
                                   setShowMenuUploadModal(true);
                                 }}
                                 className="p-2 bg-orange-500/90 backdrop-blur-sm rounded-full text-white hover:bg-orange-600 transition-colors shadow-lg"
