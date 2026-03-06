@@ -97,7 +97,7 @@ const PartnerLandingPage: React.FC = () => {
           <source src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/hero_desktop.mp4" type="video/mp4" />
         </video>
         <div className="absolute inset-0 bg-black/60" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32 pb-48">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-48">
           {/* Logo */}
           <a 
             href="https://menulove.com.au" 
@@ -127,10 +127,8 @@ const PartnerLandingPage: React.FC = () => {
               <span className="text-white">Video Menu </span>
               <span className="bg-gradient-to-r from-orange-400 via-orange-500 to-red-500 text-transparent bg-clip-text">for Restaurants</span>
             </h1>
-            <p className="text-lg sm:text-xl text-white/90 mb-8 max-w-2xl mx-auto font-medium leading-relaxed">
-              Let customers watch your dishes before they order.
-              <br />
-              Simple QR code. Short videos. More orders.
+            <p className="text-base sm:text-xl text-white/90 mb-8 max-w-2xl mx-auto font-medium leading-relaxed text-center">
+              Let customers watch your dishes before they order. Simple QR code. Short videos. More orders.
             </p>
             <div className="mb-8">
               <p className="text-yellow-300 text-xl font-black mb-2 animate-pulse">
@@ -828,7 +826,7 @@ const PartnerLandingPage: React.FC = () => {
                   </a>
                 </li>
                 <li>
-                  <a href="mailto:contact@menulove.com.au" className="text-zinc-400 hover:text-orange-500 transition-colors text-sm">
+                  <a href="/contact" className="text-zinc-400 hover:text-orange-500 transition-colors text-sm">
                     Contact Us
                   </a>
                 </li>
@@ -839,6 +837,11 @@ const PartnerLandingPage: React.FC = () => {
             <div>
               <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Legal</h3>
               <ul className="space-y-3">
+                <li>
+                  <a href="/faq" className="text-zinc-400 hover:text-orange-500 transition-colors text-sm">
+                    FAQ
+                  </a>
+                </li>
                 <li>
                   <a href="/privacy-policy" className="text-zinc-400 hover:text-orange-500 transition-colors text-sm">
                     Privacy Policy

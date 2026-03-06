@@ -138,7 +138,16 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     facebookUrl: '',
     tiktokUrl: '',
     orderingUrl: '',
-    enableOrderingButton: false
+    enableOrderingButton: false,
+    openingHours: {
+      monday: '',
+      tuesday: '',
+      wednesday: '',
+      thursday: '',
+      friday: '',
+      saturday: '',
+      sunday: ''
+    }
   });
   
   // Photo upload state
@@ -421,7 +430,16 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           facebookUrl: currentPartner.facebook_url || '',
           tiktokUrl: currentPartner.tiktok_url || '',
           orderingUrl: currentPartner.ordering_url || '',
-          enableOrderingButton: currentPartner.enable_ordering_button || false
+          enableOrderingButton: currentPartner.enable_ordering_button || false,
+          openingHours: currentPartner.opening_hours || {
+            monday: '',
+            tuesday: '',
+            wednesday: '',
+            thursday: '',
+            friday: '',
+            saturday: '',
+            sunday: ''
+          }
         });
 
         // Load banner images
@@ -509,7 +527,16 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         facebookUrl: '',
         tiktokUrl: '',
         orderingUrl: '',
-        enableOrderingButton: false
+        enableOrderingButton: false,
+        openingHours: {
+          monday: '',
+          tuesday: '',
+          wednesday: '',
+          thursday: '',
+          friday: '',
+          saturday: '',
+          sunday: ''
+        }
       });
 
       // Mark onboarding as completed
@@ -594,6 +621,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           tiktok_url: restaurantForm.tiktokUrl,
           ordering_url: restaurantForm.orderingUrl,
           enable_ordering_button: restaurantForm.enableOrderingButton,
+          opening_hours: restaurantForm.openingHours,
           slug: slug,
           ...googleData
         })
@@ -617,6 +645,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         tiktok_url: restaurantForm.tiktokUrl,
         ordering_url: restaurantForm.orderingUrl,
         enable_ordering_button: restaurantForm.enableOrderingButton,
+        opening_hours: restaurantForm.openingHours,
         slug,
         ...googleData
       });
@@ -2242,10 +2271,24 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                       type="text"
                       value={restaurantForm.address}
                       onChange={(e) => setRestaurantForm({ ...restaurantForm, address: e.target.value })}
+                      placeholder="123 Main St, Sydney NSW 2000, Australia"
                       className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
                   ) : (
-                    <p className="text-sm text-zinc-900">{partnerData?.address || '-'}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-zinc-900">{partnerData?.address || '-'}</p>
+                      {partnerData?.address && (
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(partnerData.address)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-orange-500 hover:text-orange-600 transition-colors"
+                          title="Open in Google Maps"
+                        >
+                          <MapPin size={14} />
+                        </a>
+                      )}
+                    </div>
                   )}
                 </div>
                 <div>

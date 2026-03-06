@@ -10,6 +10,10 @@ import PartnerPortal from './screens/partner/PartnerPortal';
 import PartnerLandingPage from './screens/PartnerLandingPage';
 import LiveExamplesPage from './screens/LiveExamplesPage';
 import DemoRestaurantLoader from './components/DemoRestaurantLoader';
+import ContactPage from './screens/ContactPage';
+import PrivacyPolicyPage from './screens/PrivacyPolicyPage';
+import TermsOfServicePage from './screens/TermsOfServicePage';
+import FAQPage from './screens/FAQPage';
 import SuperAdminPortal from './screens/admin/SuperAdminPortal';
 import RestaurantMenuLoader from './components/RestaurantMenuLoader';
 import RestaurantProfileLoader from './components/RestaurantProfileLoader';
@@ -130,20 +134,28 @@ const App: React.FC = () => {
     restaurantSlug = pathParts[0]; // First part is the slug
   }
 
-  // If on contact page route, redirect to static HTML
+  // If on contact page route, render ContactPage
   if (isContactRoute) {
-    window.location.href = '/contact.html';
-    return null;
+    return <ContactPage />;
   }
 
-  // If on legal pages route, redirect to static HTML
-  if (isLegalRoute) {
-    const legalPageMap: { [key: string]: string } = {
-      '/policy': '/legal/privacy-policy.html',
-      '/terms': '/legal/terms-of-service.html',
-      '/content-moderation': '/legal/content-moderation.html'
-    };
-    window.location.href = legalPageMap[window.location.pathname];
+  // If on FAQ page route, render FAQPage
+  if (window.location.pathname === '/faq') {
+    return <FAQPage />;
+  }
+
+  // If on legal pages route, render React components
+  if (window.location.pathname === '/privacy-policy' || window.location.pathname === '/policy') {
+    return <PrivacyPolicyPage />;
+  }
+  
+  if (window.location.pathname === '/terms-of-service' || window.location.pathname === '/terms') {
+    return <TermsOfServicePage />;
+  }
+  
+  // Content moderation still uses static HTML
+  if (window.location.pathname === '/content-moderation') {
+    window.location.href = '/legal/content-moderation.html';
     return null;
   }
 
