@@ -101,7 +101,7 @@ const PartnerLandingPage: React.FC = () => {
           {/* Logo */}
           <a 
             href="https://menulove.com.au" 
-            className="absolute top-6 left-4 sm:left-6 lg:left-8 flex items-center gap-2 hover:opacity-80 transition-opacity"
+            className="absolute top-12 left-4 sm:left-6 lg:left-8 flex items-center gap-2 hover:opacity-80 transition-opacity"
           >
             <img 
               src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png" 
@@ -114,12 +114,12 @@ const PartnerLandingPage: React.FC = () => {
           {/* Partner Access Button */}
           <a 
             href="/partner" 
-            className="absolute top-6 right-4 sm:right-6 lg:right-8 text-white text-sm font-semibold hover:text-yellow-300 transition-colors"
+            className="absolute top-12 right-4 sm:right-6 lg:right-8 text-white text-sm font-semibold hover:text-yellow-300 transition-colors"
           >
             Partner Access
           </a>
           
-          <div className="text-center">
+          <div className="text-center mt-16 sm:mt-20">
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black mb-6 leading-tight">
               <span className="text-white">The </span>
               <span className="bg-gradient-to-r from-orange-400 via-orange-500 to-red-500 text-transparent bg-clip-text">TikTok-Style</span>
@@ -726,11 +726,6 @@ const PartnerLandingPage: React.FC = () => {
                 className="h-16 w-auto grayscale hover:grayscale-0 transition-all duration-300 opacity-60 hover:opacity-100"
               />
               <img 
-                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/decision.png" 
-                alt="Decision" 
-                className="h-16 w-auto grayscale hover:grayscale-0 transition-all duration-300 opacity-60 hover:opacity-100"
-              />
-              <img 
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/flume.png" 
                 alt="Flume by the River" 
                 className="h-16 w-auto grayscale hover:grayscale-0 transition-all duration-300 opacity-60 hover:opacity-100"
@@ -752,11 +747,6 @@ const PartnerLandingPage: React.FC = () => {
                 className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
               />
               <img 
-                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/decision.png" 
-                alt="Decision" 
-                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
-              />
-              <img 
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/flume.png" 
                 alt="Flume by the River" 
                 className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
@@ -770,11 +760,6 @@ const PartnerLandingPage: React.FC = () => {
               <img 
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/brazzos.png" 
                 alt="Brazzos Smokehouse" 
-                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
-              />
-              <img 
-                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/decision.png" 
-                alt="Decision" 
                 className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
               />
               <img 
@@ -855,8 +840,8 @@ const PartnerLandingPage: React.FC = () => {
               </ul>
             </div>
 
-            {/* Mobile Access QR */}
-            <div>
+            {/* Mobile Access QR - Hidden on mobile, shown on desktop */}
+            <div className="hidden sm:block">
               <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Mobile Access</h3>
               <p className="text-zinc-400 text-sm mb-4">Best experience on mobile</p>
               <div className="bg-white p-3 rounded-xl inline-block">

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { textSearchRestaurants } from '../services/googlePlacesProxy';
 import RestaurantProfile from '../screens/RestaurantProfile';
+import RestaurantMenuPage from '../screens/RestaurantMenuPage';
 import DesktopRestaurantProfile from './DesktopRestaurantProfile';
 import { Loader2 } from 'lucide-react';
 
@@ -14,6 +15,7 @@ const DemoRestaurantLoader: React.FC<DemoRestaurantLoaderProps> = ({ slug }) => 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
+  const isMenuRoute = window.location.pathname.includes('/menu');
 
   // Desktop detection
   useEffect(() => {
@@ -24,6 +26,9 @@ const DemoRestaurantLoader: React.FC<DemoRestaurantLoaderProps> = ({ slug }) => 
   }, []);
 
   useEffect(() => {
+    // Mark that user is in demo mode for CTA button in sub-routes
+    sessionStorage.setItem('isDemoMode', 'true');
+    
     const loadRestaurant = async () => {
       try {
         // Fetch restaurant by slug
@@ -54,8 +59,11 @@ const DemoRestaurantLoader: React.FC<DemoRestaurantLoaderProps> = ({ slug }) => 
           console.error('Menu error:', menuError);
         }
 
-        // Get unique categories
-        const categories = [...new Set((menuItems || []).map(item => item.category))].filter(Boolean);
+        // Filter items with video first
+        const itemsWithVideo = (menuItems || []).filter(item => item.video_url);
+        
+        // Get unique categories from items that have videos only
+        const categories = [...new Set(itemsWithVideo.map(item => item.category))].filter(Boolean);
 
         // Fetch real Google rating for partner restaurant
         let googleRating = partnerData.rating || 4.5;
@@ -96,7 +104,7 @@ const DemoRestaurantLoader: React.FC<DemoRestaurantLoaderProps> = ({ slug }) => 
           isOpen: true,
           isSubscribed: true,
           banner_images: partnerData.banner_images || [],
-          dishes: (menuItems || []).map(item => ({
+          dishes: itemsWithVideo.map(item => ({
             id: item.id,
             name: item.name,
             description: item.description,
@@ -108,7 +116,7 @@ const DemoRestaurantLoader: React.FC<DemoRestaurantLoaderProps> = ({ slug }) => 
             isFeatured: item.is_featured || false,
             dish_order_url: item.dish_order_url,
           })),
-          menuItems: (menuItems || []).map(item => ({
+          menuItems: itemsWithVideo.map(item => ({
             id: item.id,
             name: item.name,
             description: item.description,
@@ -159,6 +167,11 @@ const DemoRestaurantLoader: React.FC<DemoRestaurantLoaderProps> = ({ slug }) => 
         </a>
       </div>
     );
+  }
+
+  // If menu route, render RestaurantMenuPage
+  if (isMenuRoute) {
+    return <RestaurantMenuPage restaurant={restaurant} />;
   }
 
   // Render desktop or mobile version - ALWAYS show back button for demo

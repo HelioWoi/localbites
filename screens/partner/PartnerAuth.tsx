@@ -24,10 +24,16 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
   console.log('Type param:', typeParam);
   console.log('Access token exists?', !!accessToken);
   console.log('Is recovery?', isRecovery);
-  console.log('Initial mode will be:', isRecovery ? 'reset-password' : 'signup');
+  
+  // Check if coming from demo CTA (step=2)
+  const urlParams = new URLSearchParams(window.location.search);
+  const stepParam = urlParams.get('step');
+  const isFromDemo = stepParam === '2';
+  
+  console.log('Initial mode will be:', isRecovery ? 'reset-password' : isFromDemo ? 'signup' : 'login');
   
   const [mode, setMode] = useState<'login' | 'signup' | 'magic' | 'sent' | 'reset-password'>(
-    isRecovery ? 'reset-password' : 'login'
+    isRecovery ? 'reset-password' : isFromDemo ? 'signup' : 'login'
   );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

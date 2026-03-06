@@ -366,12 +366,13 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
           <button 
             onClick={() => {
               const pathname = window.location.pathname;
-              const isAppFeedRoute = !pathname.startsWith('/r/');
+              const isDemoRoute = pathname.startsWith('/demo/');
+              const isQRRoute = pathname.startsWith('/r/');
               
-              if (isAppFeedRoute) {
-                // App feed route (/:slug/menu) - go back to /:slug
-                window.location.href = `/${restaurant.slug}`;
-              } else {
+              if (isDemoRoute) {
+                // Demo route (/demo/:slug/menu) - go back to /demo/:slug
+                window.location.href = `/demo/${restaurant.slug}`;
+              } else if (isQRRoute) {
                 // QR code route (/r/:slug/menu) - check for special routes
                 const params = new URLSearchParams(window.location.search);
                 const from = params.get('from');
@@ -383,6 +384,9 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                 } else {
                   window.location.href = `/r/${restaurant.slug}`;
                 }
+              } else {
+                // App feed route (/:slug/menu) - go back to /:slug
+                window.location.href = `/${restaurant.slug}`;
               }
             }}
             className="p-2 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all flex-shrink-0"
@@ -392,12 +396,13 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
           {/* Logo - clickable to go back */}
           <button onClick={() => {
             const pathname = window.location.pathname;
-            const isAppFeedRoute = !pathname.startsWith('/r/');
+            const isDemoRoute = pathname.startsWith('/demo/');
+            const isQRRoute = pathname.startsWith('/r/');
             
-            if (isAppFeedRoute) {
-              // App feed route (/:slug/menu) - go back to /:slug
-              window.location.href = `/${restaurant.slug}`;
-            } else {
+            if (isDemoRoute) {
+              // Demo route (/demo/:slug/menu) - go back to /demo/:slug
+              window.location.href = `/demo/${restaurant.slug}`;
+            } else if (isQRRoute) {
               // QR code route (/r/:slug/menu) - check for special routes
               const params = new URLSearchParams(window.location.search);
               const from = params.get('from');
@@ -409,6 +414,9 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               } else {
                 window.location.href = `/r/${restaurant.slug}`;
               }
+            } else {
+              // App feed route (/:slug/menu) - go back to /:slug
+              window.location.href = `/${restaurant.slug}`;
             }
           }} className="flex-shrink-0">
             {restaurant.logoUrl ? (
@@ -660,7 +668,17 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               <p className="text-white/60 text-sm mb-8">Thanks for watching our menu!</p>
               
               <div className="flex flex-col gap-3 w-full max-w-xs mx-auto">
-                {restaurant.googleMapsUrl && (
+                {/* Show trial CTA only on /demo/ routes or if coming from demo (sessionStorage) */}
+                {(window.location.pathname.startsWith('/demo/') || sessionStorage.getItem('isDemoMode') === 'true') ? (
+                  <a 
+                    href="/partner?step=2"
+                    onClick={() => sessionStorage.removeItem('isDemoMode')}
+                    className="flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl transition-all"
+                  >
+                    <Sparkles size={18} />
+                    Loved it? Start Your Free Menu
+                  </a>
+                ) : restaurant.googleMapsUrl && (
                   <a 
                     href={restaurant.googleMapsUrl}
                     target="_blank"

@@ -69,14 +69,21 @@ const isEmailConfirmationRoute = window.location.pathname === '/confirm-email';
 // Check if we're on live examples page
 const isLiveExamplesRoute = window.location.pathname === '/live-examples';
 
-// Check if we're on demo route (/demo/:slug)
+// Check if we're on demo route (/demo/:slug or /demo/:slug/menu)
 const isDemoRoute = window.location.pathname.startsWith('/demo/');
+const isDemoMenuRoute = window.location.pathname.match(/^\/demo\/([^\/]+)\/menu/);
 
 const App: React.FC = () => {
-  // Demo Route - for live examples (doesn't affect /r/ routes in production)
+  // Demo Menu Route - /demo/:slug/menu
+  if (isDemoMenuRoute) {
+    const demoSlug = isDemoMenuRoute[1];
+    return <DemoRestaurantLoader slug={demoSlug} />;
+  }
+  
+  // Demo Profile Route - /demo/:slug
   if (isDemoRoute) {
     const demoSlug = window.location.pathname.split('/')[2];
-    if (demoSlug) {
+    if (demoSlug && demoSlug !== 'menu') {
       return <DemoRestaurantLoader slug={demoSlug} />;
     }
   }

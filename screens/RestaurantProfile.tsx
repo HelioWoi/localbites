@@ -426,7 +426,13 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
       const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const dishId = dishesWithVideo[startIndex]?.id;
       
-      if (isStandalone) {
+      // Check if we're in demo mode
+      const isDemoMode = window.location.pathname.startsWith('/demo/');
+      
+      if (isDemoMode) {
+        // Demo route - navigate to /demo/:slug/menu
+        window.location.href = `/demo/${slug}/menu${dishId ? `?dish=${dishId}` : ''}`;
+      } else if (isStandalone) {
         // QR code standalone - navigate to /r/:slug/menu
         window.location.href = `/r/${slug}/menu${dishId ? `?dish=${dishId}` : ''}`;
       } else {
@@ -701,9 +707,12 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         
         {/* Header buttons */}
         <div className="absolute top-14 left-6 right-6 flex justify-between">
-          <button onClick={onBack} className="p-3 bg-black/20 backdrop-blur-md rounded-full text-white active:scale-90 transition-transform">
-            <ChevronLeft size={24}/>
-          </button>
+          {/* Back button - Hidden on /r/ routes, shown on /demo/ routes */}
+          {!window.location.pathname.startsWith('/r/') && (
+            <button onClick={onBack} className="p-3 bg-black/20 backdrop-blur-md rounded-full text-white active:scale-90 transition-transform">
+              <ChevronLeft size={24}/>
+            </button>
+          )}
           {!isStandalone && (
             <div className="flex gap-3">
               {restaurant.isSubscribed && (
