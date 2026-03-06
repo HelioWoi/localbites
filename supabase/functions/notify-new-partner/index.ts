@@ -105,7 +105,7 @@ serve(async (req) => {
               <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 30px;">
                 <tr>
                   <td align="center">
-                    <a href="https://menulove.com.au/super-admin" style="display: inline-block; background-color: #f97316; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-size: 14px; font-weight: 600; box-shadow: 0 2px 4px rgba(249, 115, 22, 0.3);">
+                    <a href="https://menulove.com.au/admin" style="display: inline-block; background-color: #f97316; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-size: 14px; font-weight: 600; box-shadow: 0 2px 4px rgba(249, 115, 22, 0.3);">
                       View in Admin Dashboard
                     </a>
                   </td>
