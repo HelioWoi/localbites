@@ -38,15 +38,12 @@ interface RestaurantMenuPageProps {
 const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) => {
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  // For demo routes, try to start unmuted (will fallback to muted if browser blocks)
-  const isDemoRoute = window.location.pathname.startsWith('/demo/');
-  const [isMuted, setIsMuted] = useState(!isDemoRoute); // Demo starts unmuted, others muted
+  const [isMuted, setIsMuted] = useState(true); // Start muted, user clicks to unmute
   const [isPlaying, setIsPlaying] = useState(true);
   const [showSavedOnly, setShowSavedOnly] = useState(false); // Filter for saved videos
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [videoReady, setVideoReady] = useState<Set<number>>(new Set()); // Track which videos are ready to play
-  const [autoUnmuteAttempted, setAutoUnmuteAttempted] = useState(false);
   
   // Likes and saves state
   const [likedItems, setLikedItems] = useState<Set<string>>(new Set());
@@ -270,20 +267,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
         }
         video.muted = isMuted;
         if (isPlaying && video.readyState >= 2) {
-          video.play().then(() => {
-            // For demo routes, try to unmute after successful play
-            if (isDemoRoute && !autoUnmuteAttempted && isMuted) {
-              setAutoUnmuteAttempted(true);
-              // Try to unmute - if browser blocks, it will stay muted
-              video.muted = false;
-              setIsMuted(false);
-            }
-          }).catch(() => {
-            // If unmuted play fails, fallback to muted
-            if (!isMuted) {
-              video.muted = true;
-              setIsMuted(true);
-            }
+          video.play().catch(() => {
+            // Silently handle play errors
           });
         }
       } else {
