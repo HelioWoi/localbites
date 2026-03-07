@@ -38,12 +38,15 @@ interface RestaurantMenuPageProps {
 const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) => {
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(true); // Start muted, user clicks to unmute
+  // For demo routes, try to start unmuted (will fallback to muted if browser blocks)
+  const isDemoRoute = window.location.pathname.startsWith('/demo/');
+  const [isMuted, setIsMuted] = useState(!isDemoRoute); // Demo starts unmuted, others muted
   const [isPlaying, setIsPlaying] = useState(true);
   const [showSavedOnly, setShowSavedOnly] = useState(false); // Filter for saved videos
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [videoReady, setVideoReady] = useState<Set<number>>(new Set()); // Track which videos are ready to play
+  const [autoUnmuteAttempted, setAutoUnmuteAttempted] = useState(false);
   
   // Likes and saves state
   const [likedItems, setLikedItems] = useState<Set<string>>(new Set());
@@ -267,7 +270,21 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
         }
         video.muted = isMuted;
         if (isPlaying && video.readyState >= 2) {
-          video.play().catch(() => {});
+          video.play().then(() => {
+            // For demo routes, try to unmute after successful play
+            if (isDemoRoute && !autoUnmuteAttempted && isMuted) {
+              setAutoUnmuteAttempted(true);
+              // Try to unmute - if browser blocks, it will stay muted
+              video.muted = false;
+              setIsMuted(false);
+            }
+          }).catch(() => {
+            // If unmuted play fails, fallback to muted
+            if (!isMuted) {
+              video.muted = true;
+              setIsMuted(true);
+            }
+          });
         }
       } else {
         // ADJACENT (±1): preload but pause
@@ -370,8 +387,15 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               const isQRRoute = pathname.startsWith('/r/');
               
               if (isDemoRoute) {
-                // Demo route (/demo/:slug/menu) - go back to /demo/:slug
-                window.location.href = `/demo/${restaurant.slug}`;
+                // Demo route (/demo/:slug/menu) - check for special routes
+                const params = new URLSearchParams(window.location.search);
+                const from = params.get('from');
+                
+                if (from === 'full-menu') {
+                  window.location.href = `/demo/${restaurant.slug}/full-menu`;
+                } else {
+                  window.location.href = `/demo/${restaurant.slug}`;
+                }
               } else if (isQRRoute) {
                 // QR code route (/r/:slug/menu) - check for special routes
                 const params = new URLSearchParams(window.location.search);
@@ -400,8 +424,15 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
             const isQRRoute = pathname.startsWith('/r/');
             
             if (isDemoRoute) {
-              // Demo route (/demo/:slug/menu) - go back to /demo/:slug
-              window.location.href = `/demo/${restaurant.slug}`;
+              // Demo route (/demo/:slug/menu) - check for special routes
+              const params = new URLSearchParams(window.location.search);
+              const from = params.get('from');
+              
+              if (from === 'full-menu') {
+                window.location.href = `/demo/${restaurant.slug}/full-menu`;
+              } else {
+                window.location.href = `/demo/${restaurant.slug}`;
+              }
             } else if (isQRRoute) {
               // QR code route (/r/:slug/menu) - check for special routes
               const params = new URLSearchParams(window.location.search);
@@ -479,7 +510,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
             ))}
             {/* Full Menu Link */}
             <a
-              href={`${window.location.pathname.startsWith('/r/') ? '/r/' : '/'}${restaurant.slug}/full-menu`}
+              href={`${window.location.pathname.startsWith('/demo/') ? '/demo/' : window.location.pathname.startsWith('/r/') ? '/r/' : '/'}${restaurant.slug}/full-menu`}
               className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap bg-white/10 text-orange-400 hover:bg-white/20 transition-all border border-orange-400/30"
             >
               <UtensilsCrossed size={12} />

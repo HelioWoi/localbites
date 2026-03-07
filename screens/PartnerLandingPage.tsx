@@ -553,7 +553,7 @@ const PartnerLandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl sm:text-5xl font-black text-zinc-900 mb-4">
-              Perfect for Food Trucks & Market Stalls
+              Perfect for Food Trucks & Market Vendors
             </h2>
             <p className="text-xl text-zinc-600 max-w-3xl mx-auto leading-relaxed">
               Showcase your menu at festivals, markets, and events across Australia. Let customers browse your offerings before they reach your window with a simple QR code scan.

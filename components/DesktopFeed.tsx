@@ -862,7 +862,7 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
                 <span className="text-xl font-extrabold">MenuLove</span>
               </div>
               <p className="text-zinc-400 text-sm leading-relaxed">
-                Video Menus & Smart Discovery
+                Video Menus & Smart Ordering
               </p>
             </div>
             <div>
@@ -909,7 +909,7 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
             </div>
             <div className="text-center pt-6 border-t border-zinc-800 mt-6">
               <p className="text-zinc-400 text-sm mb-2">
-                MenuLove - Video Menus & Smart Discovery
+                MenuLove - Video Menus & Smart Ordering
               </p>
               <p className="text-zinc-500 text-sm mb-1">
                 Built with <span className="text-orange-500">🧡</span> in Australia | <a href="mailto:contact@menulove.com.au" className="text-orange-500 hover:text-orange-400 transition-colors">contact@menulove.com.au</a>

@@ -173,7 +173,7 @@ serve(async (req) => {
           <tr>
             <td style="background-color: #fafafa; padding: 30px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
               <p style="margin: 0 0 10px; color: #71717a; font-size: 14px;">
-                MenuLove - Video Menus & Smart Discovery
+                MenuLove - Video Menus & Smart Ordering
               </p>
               <p style="margin: 0; color: #a1a1aa; font-size: 12px;">
                 Built with 🧡 in Australia

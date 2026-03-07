@@ -43,7 +43,7 @@ const FAQPage: React.FC = () => {
       answer: "Track QR code scans, video views, most popular dishes, peak viewing times, and customer engagement. Analytics help you understand what dishes attract attention and optimize your menu accordingly."
     },
     {
-      question: "Is MenuLove suitable for food trucks and market stalls?",
+      question: "Is MenuLove suitable for food trucks and market vendors?",
       answer: "Absolutely! MenuLove is perfect for mobile vendors. Display your QR code on your truck, tent, or signage. Customers can browse your menu while waiting in line, reducing decision time and increasing order speed."
     },
     {

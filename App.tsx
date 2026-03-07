@@ -30,6 +30,7 @@ import WhyVideoMenusPage from './screens/WhyVideoMenusPage';
 import HelpPage from './screens/HelpPage';
 import EmailConfirmation from './screens/EmailConfirmation';
 import UnsubscribePage from './screens/UnsubscribePage';
+import EmailNotConfirmedPage from './screens/partner/EmailNotConfirmedPage';
 import { getNearbyRestaurants, getRestaurantDetails, getRemainingSearches, searchRestaurantsByQuery } from './services/geminiService';
 import { TriageData } from './services/aiAssistant';
 import { likeRestaurant, unlikeRestaurant, saveRestaurant, unsaveRestaurant, getUserLikes, getUserSaves, getAllLikesCounts } from './services/interactionService';
@@ -73,11 +74,18 @@ const isUnsubscribeRoute = window.location.pathname === '/unsubscribe';
 // Check if we're on live examples page
 const isLiveExamplesRoute = window.location.pathname === '/live-examples';
 
-// Check if we're on demo route (/demo/:slug or /demo/:slug/menu)
+// Check if we're on demo route (/demo/:slug, /demo/:slug/menu, or /demo/:slug/full-menu)
 const isDemoRoute = window.location.pathname.startsWith('/demo/');
-const isDemoMenuRoute = window.location.pathname.match(/^\/demo\/([^\/]+)\/menu/);
+const isDemoMenuRoute = window.location.pathname.match(/^\/demo\/([^\/]+)\/menu$/);
+const isDemoFullMenuRoute = window.location.pathname.match(/^\/demo\/([^\/]+)\/full-menu$/);
 
 const App: React.FC = () => {
+  // Demo Full Menu Route - /demo/:slug/full-menu
+  if (isDemoFullMenuRoute) {
+    const demoSlug = isDemoFullMenuRoute[1];
+    return <FullMenuLoader slug={demoSlug} />;
+  }
+
   // Demo Menu Route - /demo/:slug/menu
   if (isDemoMenuRoute) {
     const demoSlug = isDemoMenuRoute[1];
@@ -87,7 +95,7 @@ const App: React.FC = () => {
   // Demo Profile Route - /demo/:slug
   if (isDemoRoute) {
     const demoSlug = window.location.pathname.split('/')[2];
-    if (demoSlug && demoSlug !== 'menu') {
+    if (demoSlug && demoSlug !== 'menu' && demoSlug !== 'full-menu') {
       return <DemoRestaurantLoader slug={demoSlug} />;
     }
   }
@@ -105,6 +113,12 @@ const App: React.FC = () => {
   // Unsubscribe Route
   if (isUnsubscribeRoute) {
     return <UnsubscribePage />;
+  }
+
+  // Email Not Confirmed Route
+  const isEmailNotConfirmedRoute = window.location.pathname === '/partner/email-not-confirmed';
+  if (isEmailNotConfirmedRoute) {
+    return <EmailNotConfirmedPage />;
   }
 
   // Check if we're on a QR code restaurant route (/r/slug)

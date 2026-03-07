@@ -125,14 +125,18 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
 
   const handleBack = () => {
     const pathname = window.location.pathname;
-    const isAppFeedRoute = !pathname.startsWith('/r/');
+    const isDemoRoute = pathname.startsWith('/demo/');
+    const isQRRoute = pathname.startsWith('/r/');
     
-    if (isAppFeedRoute) {
-      // App feed route (/:slug/full-menu) - go back to /:slug
-      window.location.href = `/${restaurant.slug}`;
-    } else {
+    if (isDemoRoute) {
+      // Demo route (/demo/:slug/full-menu) - go back to /demo/:slug
+      window.location.href = `/demo/${restaurant.slug}`;
+    } else if (isQRRoute) {
       // QR code route (/r/:slug/full-menu) - go back to /r/:slug
       window.location.href = `/r/${restaurant.slug}`;
+    } else {
+      // App feed route (/:slug/full-menu) - go back to /:slug
+      window.location.href = `/${restaurant.slug}`;
     }
   };
 
@@ -148,8 +152,9 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
 
     if (item.videoUrl) {
       const pathname = window.location.pathname;
-      const isAppFeedRoute = !pathname.startsWith('/r/');
-      const prefix = isAppFeedRoute ? '/' : '/r/';
+      const isDemoRoute = pathname.startsWith('/demo/');
+      const isQRRoute = pathname.startsWith('/r/');
+      const prefix = isDemoRoute ? '/demo/' : isQRRoute ? '/r/' : '/';
       window.location.href = `${prefix}${restaurant.slug}/menu?from=full-menu&dish=${item.id}`;
     } else {
       setSelectedItem(item);

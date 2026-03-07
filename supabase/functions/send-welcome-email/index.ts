@@ -152,7 +152,7 @@ serve(async (req) => {
                       <tr>
                         <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e5e7eb;">
                           <p style="margin: 0 0 8px 0; color: #71717a; font-size: 13px;">
-                            MenuLove - Video Menus & Smart Discovery
+                            MenuLove - Video Menus & Smart Ordering
                           </p>
                           <p style="margin: 0 0 4px 0; color: #a1a1aa; font-size: 12px;">
                             Built with <span style="color: #f97316;">🧡</span> in Australia | <a href="mailto:contact@menulove.com.au" style="color: #f97316; text-decoration: none;">contact@menulove.com.au</a>
