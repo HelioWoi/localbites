@@ -2,8 +2,8 @@ import React, { useEffect } from 'react';
 
 const LiveExamplesPage: React.FC = () => {
   useEffect(() => {
-    // Redirect directly to Backstreet Cafe demo route (shows rotating banners + back button)
-    window.location.href = '/demo/backstreet-cafe';
+    // Redirect directly to Backstreet Cafe demo menu (video feed)
+    window.location.href = '/demo/backstreet-cafe/menu';
   }, []);
 
   return (

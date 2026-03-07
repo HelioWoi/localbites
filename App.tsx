@@ -29,6 +29,7 @@ import VideoMenuPlatformPage from './screens/VideoMenuPlatformPage';
 import WhyVideoMenusPage from './screens/WhyVideoMenusPage';
 import HelpPage from './screens/HelpPage';
 import EmailConfirmation from './screens/EmailConfirmation';
+import UnsubscribePage from './screens/UnsubscribePage';
 import { getNearbyRestaurants, getRestaurantDetails, getRemainingSearches, searchRestaurantsByQuery } from './services/geminiService';
 import { TriageData } from './services/aiAssistant';
 import { likeRestaurant, unlikeRestaurant, saveRestaurant, unsaveRestaurant, getUserLikes, getUserSaves, getAllLikesCounts } from './services/interactionService';
@@ -66,6 +67,9 @@ const isHelpRoute = window.location.pathname === '/help';
 // Check if we're on email confirmation page
 const isEmailConfirmationRoute = window.location.pathname === '/confirm-email';
 
+// Check if we're on unsubscribe page
+const isUnsubscribeRoute = window.location.pathname === '/unsubscribe';
+
 // Check if we're on live examples page
 const isLiveExamplesRoute = window.location.pathname === '/live-examples';
 
@@ -97,6 +101,12 @@ const App: React.FC = () => {
   if (isEmailConfirmationRoute) {
     return <EmailConfirmation />;
   }
+
+  // Unsubscribe Route
+  if (isUnsubscribeRoute) {
+    return <UnsubscribePage />;
+  }
+
   // Check if we're on a QR code restaurant route (/r/slug)
   const isQRCodeRoute = window.location.pathname.startsWith('/r/');
   const isQRMenuRoute = isQRCodeRoute && window.location.pathname.endsWith('/menu');

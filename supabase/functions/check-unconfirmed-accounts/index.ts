@@ -19,11 +19,12 @@ serve(async (req) => {
 
     console.log('[Check Unconfirmed Accounts] Starting check...');
 
-    // Get all partners with unconfirmed emails
+    // Get all partners with unconfirmed emails who want to receive marketing emails
     const { data: unconfirmedPartners, error: partnersError } = await supabase
       .from('partners')
       .select('*')
       .eq('email_confirmed', false)
+      .eq('marketing_emails_enabled', true)
       .order('created_at', { ascending: false });
 
     if (partnersError) {
