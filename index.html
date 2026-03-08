@@ -217,6 +217,21 @@
   }
 }
 </script>
+
+<!-- Google Analytics 4 - Traffic & Acquisition Tracking -->
+<!-- Safe: Loads async, fails gracefully, does not block app -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-846VMWZYX5"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-846VMWZYX5', {
+    'send_page_view': true,
+    'anonymize_ip': true
+  });
+</script>
+<!-- End Google Analytics 4 -->
+
 </head>
 <body>
     <!-- Desktop-only splash (hidden on mobile) -->
