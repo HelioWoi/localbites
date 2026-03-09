@@ -169,8 +169,9 @@ const DemoRestaurantLoader: React.FC<DemoRestaurantLoaderProps> = ({ slug }) => 
     );
   }
 
-  // If menu route, render RestaurantMenuPage
-  if (isMenuRoute) {
+  // If menu route on MOBILE, render RestaurantMenuPage (fullscreen)
+  // On DESKTOP, keep the modal open (don't switch to fullscreen)
+  if (isMenuRoute && !isDesktop) {
     return <RestaurantMenuPage restaurant={restaurant} />;
   }
 

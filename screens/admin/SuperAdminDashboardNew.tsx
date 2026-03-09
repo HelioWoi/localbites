@@ -4,10 +4,11 @@ import {
   Users, Video, DollarSign, TrendingUp, Search, Bell, LogOut,
   Home, FileText, Settings, BarChart3, Crown, Clock, CheckCircle,
   MoreVertical, TrendingDown, Activity, Menu, X, ShieldAlert, Trash2, Check,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, UserPlus
 } from 'lucide-react';
 import SuperAdminAnalytics from './SuperAdminAnalytics';
 import ConfirmationModal from '../../components/ConfirmationModal';
+import GoogleAnalyticsWidget from '../../components/GoogleAnalyticsWidget';
 import { getOnlineVisitors } from '../../services/eventsService';
 import { 
   isNotificationSupported, 
@@ -51,7 +52,16 @@ interface Metrics {
   restaurantesLocais: number;
 }
 
-type TabType = 'overview' | 'partners' | 'revenue' | 'content' | 'analytics';
+interface TeamMember {
+  id: string;
+  email: string;
+  phone_number: string | null;
+  created_at: string;
+  last_login: string | null;
+  sms_notifications_enabled: boolean;
+}
+
+type TabType = 'overview' | 'partners' | 'revenue' | 'content' | 'analytics' | 'team';
 
 interface SuperAdminDashboardNewProps {
   user: any;
@@ -95,6 +105,9 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
   const [partnerToDelete, setPartnerToDelete] = useState<{ id: string; name: string } | null>(null);
   const [selectedPartners, setSelectedPartners] = useState<Set<string>>(new Set());
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [isAddingMember, setIsAddingMember] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
@@ -103,7 +116,10 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
     loadRemovalRequests();
     loadOnlineVisitors();
     checkNotificationPermission();
-  }, []);
+    if (activeTab === 'team') {
+      loadTeamMembers();
+    }
+  }, [activeTab]);
 
   // Auto-refresh online visitors every 30 seconds
   useEffect(() => {
@@ -188,29 +204,56 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
 
   const loadOnlineVisitors = async () => {
     try {
-      const count = await getOnlineVisitors();
-      
-      // Send notifications if visitor count increased from 0
-      if (count > 0 && previousVisitorCount === 0) {
-        // Browser notification
-        if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
-          new Notification('🟢 Visitante Online!', {
-            body: `${count} ${count === 1 ? 'visitor is' : 'visitors are'} browsing MenuLove right now!`,
-            icon: '/menulove-logo.png',
-            tag: 'visitor-alert'
-          });
+      // Fetch from GA4 Edge Function for accurate real-time data
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/ga4-analytics`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const count = result.data?.activeUsers || 0;
+        
+        // Send notifications if visitor count increased from 0
+        if (count > 0 && previousVisitorCount === 0) {
+          // Browser notification
+          if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+            try {
+              const registration = await navigator.serviceWorker.ready;
+              await registration.showNotification('🔥 Visitor Alert', {
+                body: `${count} visitor${count > 1 ? 's' : ''} online now!`,
+                tag: 'visitor-alert',
+                icon: '/menulove-logo.png',
+              });
+            } catch (error) {
+              console.error('Error showing notification:', error);
+            }
+          }
+          
+          // SMS notification
+          if (smsNotificationsEnabled && phoneNumber) {
+            await sendVisitorAlertSMS(phoneNumber, count);
+          }
         }
         
-        // SMS notification
-        if (smsNotificationsEnabled && phoneNumber) {
-          await sendVisitorAlertSMS(phoneNumber, count);
-        }
+        setPreviousVisitorCount(count);
+        setOnlineVisitors(count);
+      } else {
+        // Fallback to Supabase events if GA4 fails
+        const count = await getOnlineVisitors();
+        setOnlineVisitors(count);
       }
-      
-      setPreviousVisitorCount(count);
-      setOnlineVisitors(count);
     } catch (error) {
       console.error('Error loading online visitors:', error);
+      // Fallback to Supabase events on error
+      try {
+        const count = await getOnlineVisitors();
+        setOnlineVisitors(count);
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+      }
     }
   };
 
@@ -389,6 +432,111 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
       }
     } catch (error) {
       console.error('Error loading removal requests:', error);
+    }
+  };
+
+  // Load team members
+  const loadTeamMembers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('super_admins')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (!error && data) {
+        setTeamMembers(data);
+      }
+    } catch (error) {
+      console.error('Error loading team members:', error);
+    }
+  };
+
+  // Add team member
+  const handleAddTeamMember = async () => {
+    if (!newMemberEmail || !newMemberEmail.includes('@')) {
+      alert('Please enter a valid email address');
+      return;
+    }
+
+    setIsAddingMember(true);
+    try {
+      const { data, error } = await supabase
+        .from('super_admins')
+        .insert([{
+          email: newMemberEmail.toLowerCase().trim(),
+          sms_notifications_enabled: false,
+        }])
+        .select();
+
+      if (error) {
+        console.error('Error adding team member:', error);
+        if (error.code === '23505') {
+          alert('This email is already registered as a team member');
+        } else {
+          alert(`Failed to add team member: ${error.message || 'Unknown error'}`);
+        }
+        setIsAddingMember(false);
+        return;
+      }
+
+      // Send invitation email
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        
+        const emailResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-team-invitation`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            email: newMemberEmail.toLowerCase().trim(),
+            invitedBy: currentUser?.email || 'Admin',
+          }),
+        });
+
+        if (!emailResponse.ok) {
+          console.error('Failed to send invitation email');
+        }
+      } catch (emailError) {
+        console.error('Error sending invitation email:', emailError);
+      }
+
+      alert(`Team member added! An invitation email has been sent to: ${newMemberEmail}`);
+      setNewMemberEmail('');
+      loadTeamMembers();
+    } catch (error: any) {
+      console.error('Error adding team member:', error);
+      alert(`Failed to add team member: ${error?.message || 'Please try again'}`);
+    } finally {
+      setIsAddingMember(false);
+    }
+  };
+
+  // Remove team member
+  const handleRemoveTeamMember = async (id: string, email: string) => {
+    if (email === user.email) {
+      alert('You cannot remove yourself from the team');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to remove ${email} from the team?`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('super_admins')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      alert('Team member removed successfully');
+      loadTeamMembers();
+    } catch (error) {
+      console.error('Error removing team member:', error);
+      alert('Failed to remove team member. Please try again.');
     }
   };
 
@@ -611,9 +759,17 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
 
   return (
     <div className="min-h-screen bg-zinc-50 flex">
+      {/* Overlay for mobile */}
+      {isSidebarOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-white border-r border-zinc-200 flex flex-col transition-all duration-300 ${
-        isSidebarOpen ? 'w-64 translate-x-0' : 'w-20 -translate-x-full lg:translate-x-0'
+        isSidebarOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full lg:w-20 lg:translate-x-0'
       }`}>
         {/* Logo */}
         <div className="p-6 border-b border-zinc-200">
@@ -622,7 +778,7 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
               <img 
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png" 
                 alt="MenuLove" 
-                className="w-10 h-10 rounded-xl flex-shrink-0 object-cover"
+                className="w-10 h-10 rounded-xl flex-shrink-0 object-contain"
               />
               {isSidebarOpen && <span className="text-lg font-bold text-zinc-900 whitespace-nowrap">Super Admin</span>}
             </div>
@@ -660,6 +816,7 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
             { id: 'revenue', label: 'Revenue', icon: DollarSign },
             { id: 'content', label: 'Content', icon: Video },
             { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+            { id: 'team', label: 'Team', icon: UserPlus },
           ].map((item) => (
             <button
               key={item.id}
@@ -699,14 +856,14 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
       )}
 
       {/* Main Content */}
-      <div className="flex-1">
+      <div className="flex-1 flex flex-col min-h-screen">
         {/* Top Bar */}
-        <div className="bg-white border-b border-zinc-200 sticky top-0 z-30">
-          <div className="px-4 lg:px-6 py-4 flex items-center justify-between">
+        <header className="bg-white border-b border-zinc-200 px-4 lg:px-6 py-4 sticky top-0 z-30">
+          <div className="flex items-center justify-between">
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="lg:hidden p-2 text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors"
+              className="lg:hidden p-2 text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors mr-3"
             >
               <Menu size={24} />
             </button>
@@ -966,7 +1123,7 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
               </button>
             ))}
           </div>
-        </div>
+        </header>
 
         {/* Content Area */}
         <div className="p-4 lg:p-6">
@@ -1011,14 +1168,14 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                 <p className={`text-xs mt-3 transition-colors duration-500 ${
                   onlineVisitors > 0 ? 'text-green-600' : 'text-zinc-400'
                 }`}>
-                  Active visitors in the last 2 minutes • Updates every 30s
+                  Real-time from Google Analytics • Updates every 30s
                 </p>
               </div>
 
               {/* Metrics Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {/* Total Partners */}
-                <div className="bg-white rounded-xl p-6 border border-zinc-200">
+                <div className="bg-white rounded-xl p-6 border border-zinc-200 group relative">
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-12 h-12 bg-zinc-100 rounded-xl flex items-center justify-center">
                       <Users size={24} className="text-zinc-600" />
@@ -1028,10 +1185,17 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                   <p className="text-3xl font-bold text-zinc-900 mb-1">{metrics.totalPartners}</p>
                   <p className="text-sm text-zinc-500 mb-3">Total Partners</p>
                   <MiniLineChart color="#71717a" />
+                  
+                  {/* Tooltip */}
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    <div className="bg-zinc-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg max-w-xs">
+                      Total number of restaurant partners registered on the platform
+                    </div>
+                  </div>
                 </div>
 
                 {/* Active Subscriptions */}
-                <div className="bg-white rounded-xl p-6 border border-zinc-200">
+                <div className="bg-white rounded-xl p-6 border border-zinc-200 group relative">
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-12 h-12 bg-zinc-100 rounded-xl flex items-center justify-center">
                       <Crown size={24} className="text-zinc-600" />
@@ -1041,10 +1205,16 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                   <p className="text-3xl font-bold text-zinc-900 mb-1">{metrics.activeSubscriptions}</p>
                   <p className="text-sm text-zinc-500 mb-3">Active Subscriptions</p>
                   <MiniLineChart color="#71717a" />
+                  
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    <div className="bg-zinc-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg max-w-xs">
+                      Partners currently paying for premium subscription plans
+                    </div>
+                  </div>
                 </div>
 
                 {/* Monthly Revenue */}
-                <div className="bg-white rounded-xl p-6 border border-zinc-200">
+                <div className="bg-white rounded-xl p-6 border border-zinc-200 group relative">
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-12 h-12 bg-zinc-100 rounded-xl flex items-center justify-center">
                       <DollarSign size={24} className="text-zinc-600" />
@@ -1054,10 +1224,16 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                   <p className="text-3xl font-bold text-zinc-900 mb-1">{formatCurrency(metrics.monthlyRevenue)}</p>
                   <p className="text-sm text-zinc-500 mb-3">Monthly Revenue</p>
                   <MiniLineChart color="#71717a" />
+                  
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    <div className="bg-zinc-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg max-w-xs">
+                      Total recurring revenue from all active subscriptions this month
+                    </div>
+                  </div>
                 </div>
 
                 {/* Total Videos */}
-                <div className="bg-white rounded-xl p-6 border border-zinc-200">
+                <div className="bg-white rounded-xl p-6 border border-zinc-200 group relative">
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-12 h-12 bg-zinc-100 rounded-xl flex items-center justify-center">
                       <Video size={24} className="text-zinc-600" />
@@ -1067,47 +1243,80 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                   <p className="text-3xl font-bold text-zinc-900 mb-1">{metrics.totalVideos}</p>
                   <p className="text-sm text-zinc-500 mb-3">Total Videos</p>
                   <MiniLineChart color="#71717a" />
+                  
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    <div className="bg-zinc-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg max-w-xs">
+                      Total number of menu videos uploaded across all restaurants
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Secondary Metrics */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {/* Trial Users */}
-                <div className="bg-white rounded-xl p-6 border border-zinc-200">
+                <div className="bg-white rounded-xl p-6 border border-zinc-200 group relative">
                   <div className="flex items-center gap-3 mb-2">
                     <Clock size={20} className="text-blue-500" />
                     <p className="text-sm font-medium text-zinc-600">Trial Users</p>
                   </div>
                   <p className="text-4xl font-bold text-zinc-900">{metrics.trialUsers}</p>
+                  
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    <div className="bg-zinc-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg max-w-xs">
+                      Partners currently on free trial period before subscription
+                    </div>
+                  </div>
                 </div>
 
                 {/* Conversion Rate */}
-                <div className="bg-white rounded-xl p-6 border border-zinc-200">
+                <div className="bg-white rounded-xl p-6 border border-zinc-200 group relative">
                   <div className="flex items-center gap-3 mb-2">
                     <TrendingUp size={20} className="text-green-500" />
                     <p className="text-sm font-medium text-zinc-600">Conversion Rate</p>
                   </div>
                   <p className="text-4xl font-bold text-zinc-900">{metrics.conversionRate.toFixed(1)}%</p>
+                  
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    <div className="bg-zinc-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg max-w-xs">
+                      Percentage of trial users who converted to paid subscriptions
+                    </div>
+                  </div>
                 </div>
 
                 {/* Churn Rate */}
-                <div className="bg-white rounded-xl p-6 border border-zinc-200">
+                <div className="bg-white rounded-xl p-6 border border-zinc-200 group relative">
                   <div className="flex items-center gap-3 mb-2">
                     <TrendingDown size={20} className="text-red-500" />
                     <p className="text-sm font-medium text-zinc-600">Churn Rate</p>
                   </div>
                   <p className="text-4xl font-bold text-zinc-900">{metrics.churnRate.toFixed(1)}%</p>
+                  
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    <div className="bg-zinc-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg max-w-xs">
+                      Percentage of paying customers who cancelled their subscription
+                    </div>
+                  </div>
                 </div>
 
                 {/* Restaurantes Locais */}
-                <div className="bg-white rounded-xl p-6 border border-zinc-200">
+                <div className="bg-white rounded-xl p-6 border border-zinc-200 group relative">
                   <div className="flex items-center gap-3 mb-2">
                     <Users size={20} className="text-orange-500" />
                     <p className="text-sm font-medium text-zinc-600">Restaurantes Locais</p>
                   </div>
                   <p className="text-4xl font-bold text-zinc-900">{metrics.restaurantesLocais}</p>
+                  
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    <div className="bg-zinc-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg max-w-xs">
+                      Local restaurants discovered from Google Places API in the area
+                    </div>
+                  </div>
                 </div>
               </div>
+
+              {/* Google Analytics Widget */}
+              <GoogleAnalyticsWidget />
 
               {/* Bottom Section */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1788,6 +1997,111 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
           {/* Analytics Tab */}
           {activeTab === 'analytics' && (
             <SuperAdminAnalytics />
+          )}
+
+          {/* Team Tab */}
+          {activeTab === 'team' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold text-zinc-900">Team Management</h2>
+                <p className="text-sm text-zinc-500 mt-1">Manage admin panel access for your team</p>
+              </div>
+
+              {/* Add Team Member */}
+              <div className="bg-white rounded-xl border border-zinc-200 p-6">
+                <h3 className="text-lg font-bold text-zinc-900 mb-4">Add Team Member</h3>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-2">
+                    Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    value={newMemberEmail}
+                    onChange={(e) => setNewMemberEmail(e.target.value)}
+                    placeholder="team@example.com"
+                    className="w-full px-4 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+                <button
+                  onClick={handleAddTeamMember}
+                  disabled={isAddingMember || !newMemberEmail}
+                  className="mt-4 px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  <UserPlus size={18} />
+                  {isAddingMember ? 'Adding...' : 'Add Team Member'}
+                </button>
+                <p className="text-xs text-zinc-500 mt-3">
+                  Team members will be able to access the admin panel using their email address.
+                </p>
+              </div>
+
+              {/* Team Members List */}
+              <div className="bg-white rounded-xl border border-zinc-200 p-6">
+                <h3 className="text-lg font-bold text-zinc-900 mb-4">
+                  Team Members ({teamMembers.length})
+                </h3>
+                {teamMembers.length > 0 ? (
+                  <div className="space-y-3">
+                    {teamMembers.map((member) => (
+                      <div
+                        key={member.id}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-zinc-50 rounded-lg gap-3"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-medium text-zinc-900 truncate">
+                              {member.email}
+                            </p>
+                            {member.email === user.email && (
+                              <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-medium rounded">
+                                You
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
+                            <span className="text-xs text-zinc-400">
+                              Added {new Date(member.created_at).toLocaleDateString()}
+                            </span>
+                            {member.last_login && (
+                              <span className="text-xs text-zinc-400">
+                                • Last login {new Date(member.last_login).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveTeamMember(member.id, member.email)}
+                          disabled={member.email === user.email}
+                          className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium whitespace-nowrap"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <UserPlus size={48} className="text-zinc-300 mx-auto mb-3" />
+                    <p className="text-sm text-zinc-500">No team members yet</p>
+                    <p className="text-xs text-zinc-400 mt-1">Add team members to give them admin access</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Info Box */}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <div className="flex gap-3">
+                  <ShieldAlert size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-bold text-blue-900 mb-1">Admin Access</h4>
+                    <p className="text-xs text-blue-700">
+                      Team members will have full access to the admin panel. They can view all partners, 
+                      analytics, revenue data, and manage content. Only add trusted team members.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>

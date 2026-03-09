@@ -15,6 +15,7 @@ import PrivacyPolicyPage from './screens/PrivacyPolicyPage';
 import TermsOfServicePage from './screens/TermsOfServicePage';
 import FAQPage from './screens/FAQPage';
 import SuperAdminPortal from './screens/admin/SuperAdminPortal';
+import AdminSetup from './screens/admin/AdminSetup';
 import RestaurantMenuLoader from './components/RestaurantMenuLoader';
 import RestaurantProfileLoader from './components/RestaurantProfileLoader';
 import FullMenuLoader from './components/FullMenuLoader';
@@ -201,6 +202,11 @@ const App: React.FC = () => {
 
   if (isHelpRoute) {
     return <HelpPage />;
+  }
+
+  // If on admin setup route, render Admin Setup
+  if (window.location.pathname === '/admin/setup') {
+    return <AdminSetup />;
   }
 
   // If on admin route, render Super Admin Portal

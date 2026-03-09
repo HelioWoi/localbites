@@ -1,128 +1,137 @@
 import React, { useState, useEffect } from 'react';
 import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+  BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import {
-  TrendingUp, Users, Search, Eye, Video, QrCode, Calendar,
-  Smartphone, Monitor, Tablet, ArrowUp, ArrowDown, Loader2, MapPin, Clock
+  Eye, Video, QrCode, Loader2, Smartphone
 } from 'lucide-react';
-import {
-  getDashboardMetrics,
-  getDailyActivity,
-  getTopSearchTerms,
-  getMostViewedRestaurants,
-  getDeviceBreakdown,
-  getTopPerformingRestaurants,
-  getOnlineVisitors,
-  getTopLocations,
-  getGlobalHourlyActivity,
-  getRawEventCount,
-  DashboardMetrics,
-  DailyActivity,
-  SearchTerm,
-  RestaurantViews,
-  DeviceBreakdown,
-  TopRestaurant,
-  LocationData,
-  HourlyActivity
-} from '../../services/eventsService';
+import { supabase } from '../../lib/supabase';
 
-type DateRange = 'today' | '7days' | '30days' | 'custom';
+type DateRange = '7days' | '30days';
 
 const COLORS = ['#f97316', '#fb923c', '#fdba74', '#fed7aa'];
+
+interface PartnerMetrics {
+  restaurantId: string;
+  restaurantName: string;
+  profileViews: number;
+  videoPlays: number;
+  qrScans: number;
+  totalEngagement: number;
+}
+
+interface DeviceData {
+  device: string;
+  count: number;
+  percentage: number;
+}
 
 const SuperAdminAnalytics: React.FC = () => {
   const [dateRange, setDateRange] = useState<DateRange>('7days');
   const [loading, setLoading] = useState(true);
-  const [onlineVisitors, setOnlineVisitors] = useState(0);
   
-  // Metrics
-  const [metrics, setMetrics] = useState<DashboardMetrics>({
-    totalVisitors: 0,
-    totalSearches: 0,
-    totalProfileViews: 0,
-    totalVideoPlays: 0,
-    totalQrScans: 0,
-  });
+  // Summary metrics
+  const [totalProfileViews, setTotalProfileViews] = useState(0);
+  const [totalVideoPlays, setTotalVideoPlays] = useState(0);
+  const [totalQrScans, setTotalQrScans] = useState(0);
   
-  // Charts data
-  const [dailyActivity, setDailyActivity] = useState<DailyActivity[]>([]);
-  const [topSearches, setTopSearches] = useState<SearchTerm[]>([]);
-  const [topRestaurants, setTopRestaurants] = useState<RestaurantViews[]>([]);
-  const [deviceData, setDeviceData] = useState<DeviceBreakdown[]>([]);
-  const [topPerformers, setTopPerformers] = useState<TopRestaurant[]>([]);
-  const [topLocations, setTopLocations] = useState<LocationData[]>([]);
-  const [hourlyActivity, setHourlyActivity] = useState<HourlyActivity[]>([]);
-  const [rawEventCount, setRawEventCount] = useState<number>(0);
-  const [isDebugMode, setIsDebugMode] = useState(false);
-
-  useEffect(() => {
-    const debugParam = new URLSearchParams(window.location.search).get('debugAnalytics');
-    setIsDebugMode(debugParam === '1');
-  }, []);
+  // Partner data
+  const [partnerMetrics, setPartnerMetrics] = useState<PartnerMetrics[]>([]);
+  const [deviceData, setDeviceData] = useState<DeviceData[]>([]);
 
   useEffect(() => {
     loadAnalytics();
   }, [dateRange]);
 
-  // Auto-refresh online visitors every 30 seconds
-  useEffect(() => {
-    loadOnlineVisitors();
-    const interval = setInterval(loadOnlineVisitors, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
   const getDaysFromRange = (): number => {
-    switch (dateRange) {
-      case 'today': return 1;
-      case '7days': return 7;
-      case '30days': return 30;
-      default: return 7;
-    }
-  };
-
-  const loadOnlineVisitors = async () => {
-    try {
-      const count = await getOnlineVisitors();
-      setOnlineVisitors(count);
-    } catch (error) {
-      console.error('Error loading online visitors:', error);
-    }
+    return dateRange === '7days' ? 7 : 30;
   };
 
   const loadAnalytics = async () => {
     setLoading(true);
     try {
       const days = getDaysFromRange();
-      
-      const [
-        metricsData,
-        activityData,
-        searchesData,
-        restaurantsData,
-        devicesData,
-        performersData,
-        rawCount
-      ] = await Promise.all([
-        getDashboardMetrics(days),
-        getDailyActivity(days),
-        getTopSearchTerms(10),
-        getMostViewedRestaurants(10),
-        getDeviceBreakdown(),
-        getTopPerformingRestaurants(10),
-        getRawEventCount(days)
-      ]);
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
 
-      setMetrics(metricsData);
-      setDailyActivity(activityData);
-      setTopSearches(searchesData);
-      setTopRestaurants(restaurantsData);
-      setDeviceData(devicesData);
-      setTopPerformers(performersData);
-      setTopLocations([]);
-      setHourlyActivity([]);
-      setRawEventCount(rawCount);
+      // Fetch all partners
+      const { data: partners, error: partnersError } = await supabase
+        .from('partners')
+        .select('id, restaurant_name')
+        .order('restaurant_name');
+
+      if (partnersError) throw partnersError;
+
+      // Fetch events for each partner
+      const { data: events, error: eventsError } = await supabase
+        .from('events')
+        .select('event_type, restaurant_id, device, created_at')
+        .gte('created_at', startDate.toISOString())
+        .in('event_type', ['restaurant_profile_view', 'video_play', 'qr_scan']);
+
+      if (eventsError) throw eventsError;
+
+      // Calculate metrics per partner
+      const metricsMap = new Map<string, PartnerMetrics>();
+      
+      partners?.forEach(partner => {
+        metricsMap.set(partner.id, {
+          restaurantId: partner.id,
+          restaurantName: partner.restaurant_name,
+          profileViews: 0,
+          videoPlays: 0,
+          qrScans: 0,
+          totalEngagement: 0,
+        });
+      });
+
+      // Count events
+      let totalViews = 0;
+      let totalPlays = 0;
+      let totalScans = 0;
+      const deviceCounts = new Map<string, number>();
+
+      events?.forEach(event => {
+        const metrics = metricsMap.get(event.restaurant_id);
+        if (metrics) {
+          if (event.event_type === 'restaurant_profile_view') {
+            metrics.profileViews++;
+            totalViews++;
+          } else if (event.event_type === 'video_play') {
+            metrics.videoPlays++;
+            totalPlays++;
+          } else if (event.event_type === 'qr_scan') {
+            metrics.qrScans++;
+            totalScans++;
+          }
+          metrics.totalEngagement++;
+        }
+
+        // Count devices
+        const device = event.device || 'unknown';
+        deviceCounts.set(device, (deviceCounts.get(device) || 0) + 1);
+      });
+
+      // Convert to arrays and sort
+      const metricsArray = Array.from(metricsMap.values())
+        .filter(m => m.totalEngagement > 0)
+        .sort((a, b) => b.totalEngagement - a.totalEngagement);
+
+      // Calculate device percentages
+      const totalDeviceCount = Array.from(deviceCounts.values()).reduce((a, b) => a + b, 0);
+      const devices: DeviceData[] = Array.from(deviceCounts.entries()).map(([device, count]) => ({
+        device: device.charAt(0).toUpperCase() + device.slice(1),
+        count,
+        percentage: totalDeviceCount > 0 ? (count / totalDeviceCount) * 100 : 0,
+      }));
+
+      setTotalProfileViews(totalViews);
+      setTotalVideoPlays(totalPlays);
+      setTotalQrScans(totalScans);
+      setPartnerMetrics(metricsArray);
+      setDeviceData(devices);
+
     } catch (error) {
       console.error('Error loading analytics:', error);
     } finally {
@@ -143,21 +152,11 @@ const SuperAdminAnalytics: React.FC = () => {
       {/* Header with Date Filter */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-zinc-900">Platform Analytics</h2>
-          <p className="text-sm text-zinc-500 mt-1">Track platform performance and user behavior</p>
+          <h2 className="text-2xl font-bold text-zinc-900">Partner Analytics</h2>
+          <p className="text-sm text-zinc-500 mt-1">Real-time data from registered restaurant partners</p>
         </div>
         
         <div className="flex gap-2">
-          <button
-            onClick={() => setDateRange('today')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              dateRange === 'today'
-                ? 'bg-orange-500 text-white'
-                : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50'
-            }`}
-          >
-            Today
-          </button>
           <button
             onClick={() => setDateRange('7days')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -181,333 +180,141 @@ const SuperAdminAnalytics: React.FC = () => {
         </div>
       </div>
 
-      {/* Online Visitors - Live Indicator */}
-      <div className={`rounded-xl border-2 p-6 transition-all duration-500 ${
-        onlineVisitors > 0 
-          ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200' 
-          : 'bg-gradient-to-br from-zinc-50 to-zinc-100 border-zinc-200'
-      }`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-500 ${
-                onlineVisitors > 0 ? 'bg-green-500' : 'bg-zinc-400'
-              }`}>
-                <Users size={24} className="text-white" />
-              </div>
-              {onlineVisitors > 0 && (
-                <div className="absolute inset-0 w-12 h-12 bg-green-500 rounded-full animate-ping opacity-75"></div>
-              )}
-            </div>
-            <div>
-              <p className={`text-3xl font-bold transition-colors duration-500 ${
-                onlineVisitors > 0 ? 'text-green-700' : 'text-zinc-500'
-              }`}>{onlineVisitors}</p>
-              <p className={`text-sm font-medium transition-colors duration-500 ${
-                onlineVisitors > 0 ? 'text-green-600' : 'text-zinc-400'
-              }`}>
-                {onlineVisitors > 0 ? 'Online Now' : 'No visitors'}
-              </p>
-            </div>
-          </div>
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors duration-500 ${
-            onlineVisitors > 0 ? 'bg-green-500' : 'bg-zinc-400'
-          }`}>
-            <div className={`w-2 h-2 bg-white rounded-full ${onlineVisitors > 0 ? 'animate-pulse' : ''}`}></div>
-            <span className="text-xs font-bold text-white uppercase">Live</span>
-          </div>
-        </div>
-        <p className={`text-xs mt-3 transition-colors duration-500 ${
-          onlineVisitors > 0 ? 'text-green-600' : 'text-zinc-400'
-        }`}>
-          Active visitors in the last 2 minutes • Updates every 30s
-        </p>
-      </div>
-
-      {/* Top Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Total Visitors */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
-          <div className="flex items-center justify-between mb-2">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Users size={20} className="text-blue-600" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-zinc-900">{metrics.totalVisitors.toLocaleString()}</p>
-          <p className="text-sm text-zinc-500">Total Visitors</p>
-        </div>
-
-        {/* Total Searches */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
-          <div className="flex items-center justify-between mb-2">
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Search size={20} className="text-purple-600" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-zinc-900">{metrics.totalSearches.toLocaleString()}</p>
-          <p className="text-sm text-zinc-500">Total Searches</p>
-        </div>
-
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Profile Views */}
         <div className="bg-white rounded-xl border border-zinc-200 p-6">
           <div className="flex items-center justify-between mb-2">
-            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-              <Eye size={20} className="text-orange-600" />
+            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+              <Eye size={24} className="text-orange-600" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-zinc-900">{metrics.totalProfileViews.toLocaleString()}</p>
-          <p className="text-sm text-zinc-500">Profile Views</p>
+          <p className="text-3xl font-bold text-zinc-900">{totalProfileViews.toLocaleString()}</p>
+          <p className="text-sm text-zinc-500 mt-1">Profile Views</p>
+          <p className="text-xs text-zinc-400 mt-2">Total /r/restaurant-name visits</p>
         </div>
 
         {/* Video Plays */}
         <div className="bg-white rounded-xl border border-zinc-200 p-6">
           <div className="flex items-center justify-between mb-2">
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <Video size={20} className="text-green-600" />
+            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <Video size={24} className="text-green-600" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-zinc-900">{metrics.totalVideoPlays.toLocaleString()}</p>
-          <p className="text-sm text-zinc-500">Video Plays</p>
+          <p className="text-3xl font-bold text-zinc-900">{totalVideoPlays.toLocaleString()}</p>
+          <p className="text-sm text-zinc-500 mt-1">Video Plays</p>
+          <p className="text-xs text-zinc-400 mt-2">Total menu video views</p>
         </div>
 
         {/* QR Scans */}
         <div className="bg-white rounded-xl border border-zinc-200 p-6">
           <div className="flex items-center justify-between mb-2">
-            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-              <QrCode size={20} className="text-red-600" />
+            <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+              <QrCode size={24} className="text-red-600" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-zinc-900">{metrics.totalQrScans.toLocaleString()}</p>
-          <p className="text-sm text-zinc-500">QR Scans</p>
+          <p className="text-3xl font-bold text-zinc-900">{totalQrScans.toLocaleString()}</p>
+          <p className="text-sm text-zinc-500 mt-1">QR Code Scans</p>
+          <p className="text-xs text-zinc-400 mt-2">Physical QR code scans</p>
         </div>
       </div>
 
-      {/* Debug Card - Only visible with ?debugAnalytics=1 */}
-      {isDebugMode && (
-        <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-yellow-500 rounded-lg flex items-center justify-center">
-              <TrendingUp size={20} className="text-white" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-yellow-900">🔍 Analytics Debug Mode</h3>
-              <p className="text-xs text-yellow-700">Comparing raw events vs aggregated metrics</p>
-            </div>
+      {/* Device Breakdown */}
+      {deviceData.length > 0 && (
+        <div className="bg-white rounded-xl border border-zinc-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Smartphone size={20} className="text-orange-600" />
+            <h3 className="text-lg font-bold text-zinc-900">Device Breakdown</h3>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white rounded-lg p-4 border border-yellow-200">
-              <p className="text-sm text-zinc-500 mb-1">Raw Events (DB)</p>
-              <p className="text-3xl font-bold text-zinc-900">{rawEventCount.toLocaleString()}</p>
-              <p className="text-xs text-zinc-400 mt-1">Total events in period</p>
-            </div>
-            <div className="bg-white rounded-lg p-4 border border-yellow-200">
-              <p className="text-sm text-zinc-500 mb-1">Aggregated Total</p>
-              <p className="text-3xl font-bold text-zinc-900">
-                {(metrics.totalSearches + metrics.totalProfileViews + metrics.totalVideoPlays + metrics.totalQrScans).toLocaleString()}
-              </p>
-              <p className="text-xs text-zinc-400 mt-1">Sum of displayed metrics</p>
-            </div>
-          </div>
-          <div className="mt-4 p-3 bg-yellow-100 rounded-lg">
-            <p className="text-xs text-yellow-800">
-              <strong>Note:</strong> Raw count includes ALL event types (page_view, likes, saves, etc). 
-              Aggregated shows only main metrics. Check console for detailed event logs.
-            </p>
+          <div className="flex items-center justify-center">
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={deviceData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={(entry: any) => `${entry.device}: ${entry.percentage.toFixed(1)}%`}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="count"
+                >
+                  {deviceData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
 
-      {/* Daily Activity Line Chart */}
+      {/* Partner Performance Table */}
       <div className="bg-white rounded-xl border border-zinc-200 p-6">
-        <h3 className="text-lg font-bold text-zinc-900 mb-4">Daily Activity</h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={dailyActivity}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" />
-            <XAxis dataKey="date" stroke="#71717a" fontSize={12} />
-            <YAxis stroke="#71717a" fontSize={12} />
-            <Tooltip 
-              contentStyle={{ 
-                backgroundColor: '#fff', 
-                border: '1px solid #e4e4e7',
-                borderRadius: '8px'
-              }}
-            />
-            <Legend />
-            <Line type="monotone" dataKey="pageViews" stroke="#3b82f6" strokeWidth={2} name="Page Views" />
-            <Line type="monotone" dataKey="searches" stroke="#8b5cf6" strokeWidth={2} name="Searches" />
-            <Line type="monotone" dataKey="videoPlays" stroke="#10b981" strokeWidth={2} name="Video Plays" />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Search Terms */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
-          <h3 className="text-lg font-bold text-zinc-900 mb-4">Top Search Terms</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={topSearches} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" />
-              <XAxis type="number" stroke="#71717a" fontSize={12} />
-              <YAxis dataKey="term" type="category" stroke="#71717a" fontSize={12} width={100} />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#fff', 
-                  border: '1px solid #e4e4e7',
-                  borderRadius: '8px'
-                }}
-              />
-              <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Most Viewed Restaurants */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
-          <h3 className="text-lg font-bold text-zinc-900 mb-4">Most Viewed Restaurants</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={topRestaurants} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" />
-              <XAxis type="number" stroke="#71717a" fontSize={12} />
-              <YAxis dataKey="restaurantName" type="category" stroke="#71717a" fontSize={12} width={120} />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#fff', 
-                  border: '1px solid #e4e4e7',
-                  borderRadius: '8px'
-                }}
-              />
-              <Bar dataKey="views" fill="#f97316" radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Top Locations & Hourly Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Locations */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <MapPin size={20} className="text-orange-600" />
-            <h3 className="text-lg font-bold text-zinc-900">Top Locations</h3>
-          </div>
-          {topLocations.length > 0 ? (
-            <div className="space-y-3">
-              {topLocations.map((location, index) => (
-                <div key={location.location} className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg hover:bg-zinc-100 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <span className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-sm font-bold text-orange-600">
-                      {index + 1}
-                    </span>
-                    <span className="font-medium text-zinc-900">{location.location}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold text-zinc-900">{location.views} views</span>
-                    <span className="text-xs font-medium text-zinc-500 bg-zinc-200 px-2 py-1 rounded">
-                      {location.percentage.toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-zinc-400">
-              <MapPin size={48} className="mb-2" />
-              <p className="text-sm">No location data yet</p>
-            </div>
-          )}
-        </div>
-
-        {/* Global Hourly Activity */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock size={20} className="text-blue-600" />
-            <h3 className="text-lg font-bold text-zinc-900">Peak Hours</h3>
-          </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={hourlyActivity}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" />
-              <XAxis 
-                dataKey="hour" 
-                stroke="#71717a" 
-                fontSize={12}
-                tickFormatter={(hour) => `${hour}h`}
-              />
-              <YAxis stroke="#71717a" fontSize={12} />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#fff', 
-                  border: '1px solid #e4e4e7',
-                  borderRadius: '8px'
-                }}
-                labelFormatter={(hour) => `${hour}:00`}
-              />
-              <Bar dataKey="views" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Device Breakdown Pie Chart */}
-      <div className="bg-white rounded-xl border border-zinc-200 p-6">
-        <h3 className="text-lg font-bold text-zinc-900 mb-4">Device Breakdown</h3>
-        <div className="flex items-center justify-center">
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={deviceData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ device, percentage }) => `${device}: ${percentage.toFixed(1)}%`}
-                outerRadius={100}
-                fill="#8884d8"
-                dataKey="count"
-              >
-                {deviceData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Top Performing Restaurants Table */}
-      <div className="bg-white rounded-xl border border-zinc-200 p-6">
-        <h3 className="text-lg font-bold text-zinc-900 mb-4">Top Performing Restaurants</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-zinc-200">
-                <th className="text-left py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Restaurant</th>
-                <th className="text-right py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Profile Views</th>
-                <th className="text-right py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Video Plays</th>
-                <th className="text-right py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">QR Scans</th>
-                <th className="text-right py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Directions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topPerformers.map((restaurant, index) => (
-                <tr key={restaurant.restaurantId} className="border-b border-zinc-100 hover:bg-zinc-50">
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-3">
-                      <span className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center text-xs font-bold text-orange-600">
-                        {index + 1}
-                      </span>
-                      <span className="font-medium text-zinc-900">{restaurant.restaurantName}</span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-right font-semibold text-zinc-900">{restaurant.profileViews}</td>
-                  <td className="py-3 px-4 text-right font-semibold text-zinc-900">{restaurant.videoPlays}</td>
-                  <td className="py-3 px-4 text-right font-semibold text-zinc-900">{restaurant.qrScans}</td>
-                  <td className="py-3 px-4 text-right font-semibold text-zinc-900">{restaurant.directionsClicks}</td>
+        <h3 className="text-lg font-bold text-zinc-900 mb-4">Partner Performance</h3>
+        {partnerMetrics.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-zinc-200">
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Restaurant</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Profile Views</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Video Plays</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">QR Scans</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-zinc-600 uppercase">Total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {partnerMetrics.map((partner, index) => (
+                  <tr key={partner.restaurantId} className="border-b border-zinc-100 hover:bg-zinc-50">
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-3">
+                        <span className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center text-xs font-bold text-orange-600">
+                          {index + 1}
+                        </span>
+                        <span className="font-medium text-zinc-900">{partner.restaurantName}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-right font-semibold text-zinc-900">{partner.profileViews}</td>
+                    <td className="py-3 px-4 text-right font-semibold text-zinc-900">{partner.videoPlays}</td>
+                    <td className="py-3 px-4 text-right font-semibold text-zinc-900">{partner.qrScans}</td>
+                    <td className="py-3 px-4 text-right font-bold text-orange-600">{partner.totalEngagement}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-64 text-zinc-400">
+            <Eye size={48} className="mb-2" />
+            <p className="text-sm">No partner activity yet</p>
+            <p className="text-xs mt-1">Data will appear when partners receive visits</p>
+          </div>
+        )}
       </div>
+
+      {/* Top Performers Chart */}
+      {partnerMetrics.length > 0 && (
+        <div className="bg-white rounded-xl border border-zinc-200 p-6">
+          <h3 className="text-lg font-bold text-zinc-900 mb-4">Top 10 Partners by Engagement</h3>
+          <ResponsiveContainer width="100%" height={400}>
+            <BarChart data={partnerMetrics.slice(0, 10)} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" />
+              <XAxis type="number" stroke="#71717a" fontSize={12} />
+              <YAxis dataKey="restaurantName" type="category" stroke="#71717a" fontSize={12} width={150} />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: '#fff', 
+                  border: '1px solid #e4e4e7',
+                  borderRadius: '8px'
+                }}
+              />
+              <Bar dataKey="totalEngagement" fill="#f97316" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   );
 };
