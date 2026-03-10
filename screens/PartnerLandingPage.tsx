@@ -480,70 +480,42 @@ const PartnerLandingPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Features List */}
-      <div className="bg-gradient-to-br from-zinc-900 to-zinc-800 py-20">
+      {/* Video Section - Minimalist */}
+      <div className="bg-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-3xl sm:text-4xl font-black text-white mb-6">
-                All Features Included
-              </h2>
-              <p className="text-lg text-zinc-300 mb-8 leading-relaxed">
-                Get access to our complete platform with no hidden fees or limitations.
-              </p>
-              <div className="grid sm:grid-cols-2 gap-4">
-                {features.map((feature, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <CheckCircle2 className="text-green-400 flex-shrink-0 mt-1" size={20} />
-                    <span className="text-white font-medium">{feature}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-orange-500 to-amber-500 rounded-3xl p-10 text-center shadow-2xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 bg-yellow-300 text-orange-900 px-6 py-2 font-black text-sm rounded-bl-2xl">
-                BETA SPECIAL
-              </div>
-              <div className="text-white/90 text-sm font-bold uppercase tracking-wider mb-3 mt-6">
-                Limited Beta Access
-              </div>
-              <div className="mb-2">
-                <p className="text-6xl font-black text-white mb-2">FREE</p>
-                <p className="text-yellow-300 text-2xl font-black animate-pulse">Only 10 Spots Left</p>
-              </div>
-              <p className="text-white/80 text-sm mb-6">30 day trial. No credit card required. No commission fees.</p>
-              <ul className="text-left space-y-3 mb-8 text-white">
-                <li className="flex items-center gap-3">
-                  <Star className="text-yellow-300 flex-shrink-0" size={22} fill="currentColor" />
-                  <span className="font-semibold">Unlimited menu videos</span>
-                </li>
-                <li className="flex items-center gap-3">
-                  <Star className="text-yellow-300 flex-shrink-0" size={22} fill="currentColor" />
-                  <span className="font-semibold">Import from Uber & platforms</span>
-                </li>
-                <li className="flex items-center gap-3">
-                  <Star className="text-yellow-300 flex-shrink-0" size={20} fill="currentColor" />
-                  <span className="font-semibold">QR Code &amp; shareable menu link</span>
-                </li>
-                <li className="flex items-center gap-3">
-                  <Star className="text-yellow-300 flex-shrink-0" size={20} fill="currentColor" />
-                  <span className="font-semibold">Advanced analytics</span>
-                </li>
-                <li className="flex items-center gap-3">
-                  <Star className="text-yellow-300 flex-shrink-0" size={20} fill="currentColor" />
-                  <span className="font-semibold">30-day free trial</span>
-                </li>
-              </ul>
-              <button
-                onClick={scrollToForm}
-                className="block w-full py-4 bg-white text-orange-600 font-black text-lg rounded-2xl hover:bg-yellow-300 hover:text-orange-700 transition-all transform hover:scale-105 shadow-xl"
+          {/* Title Section */}
+          <div className="text-center mb-12">
+            <h2 className="text-4xl sm:text-5xl font-black text-zinc-900 mb-4">
+              Your Menu. In Video. Ready to Sell.
+            </h2>
+            <p className="text-xl text-zinc-600 max-w-2xl mx-auto">
+              A smarter video menu for hospitality venues.
+            </p>
+          </div>
+
+          {/* Video */}
+          <div className="flex justify-center mb-8">
+            <div className="relative rounded-3xl overflow-hidden w-full max-w-[500px]">
+              <video
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-full h-auto"
               >
-                Start Your Free Trial
-              </button>
-              <p className="mt-4 text-white/80 text-sm font-medium">
-                No credit card required • Cancel anytime
-              </p>
+                <source src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/final%20video.mp4" type="video/mp4" />
+              </video>
             </div>
+          </div>
+
+          {/* CTA Button */}
+          <div className="flex justify-center">
+            <a
+              href="/demo/backstreet-cafe/menu"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-orange-500 text-white font-bold text-lg rounded-2xl hover:bg-orange-600 transition-all transform hover:scale-105 shadow-lg"
+            >
+              See Live Example →
+            </a>
           </div>
         </div>
       </div>
