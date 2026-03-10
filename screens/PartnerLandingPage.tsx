@@ -34,7 +34,7 @@ const PartnerLandingPage: React.FC = () => {
     },
     {
       icon: BarChart3,
-      title: "Advanced Analytics Dashboard",
+      title: "Track Performance & Insights",
       description: "Track video plays, order clicks, likes, saves, and shares in real-time. See peak hours, top dishes, and customer engagement with detailed metrics. Export reports in CSV, Excel, or PDF."
     },
     {
@@ -65,7 +65,7 @@ const PartnerLandingPage: React.FC = () => {
     "Connect your existing checkout (Square, Stripe, Bopple and more)",
     "Order Now buttons (no commission!)",
     "Public view counter & social proof",
-    "Advanced analytics dashboard",
+    "Track performance & insights",
     "Real-time metrics & reports",
     "Custom QR codes for each location",
     "Customer engagement tracking",
@@ -128,7 +128,7 @@ const PartnerLandingPage: React.FC = () => {
               <span className="bg-gradient-to-r from-orange-400 via-orange-500 to-red-500 text-transparent bg-clip-text">for Restaurants</span>
             </h1>
             <p className="text-base sm:text-xl text-white/90 mb-8 max-w-2xl mx-auto font-medium leading-relaxed text-center">
-              Let customers watch your dishes before they order. Simple QR code. Short videos. More orders.
+              Show your dishes in short videos so customers stop guessing, decide faster, and are more likely to order your best items.
             </p>
             <div className="mb-8">
               <p className="text-yellow-300 text-xl font-black mb-2 animate-pulse">
@@ -143,14 +143,14 @@ const PartnerLandingPage: React.FC = () => {
                 onClick={scrollToForm}
                 className="group px-8 py-4 bg-white text-orange-600 font-black text-lg rounded-2xl hover:bg-yellow-300 hover:text-orange-700 transition-all transform hover:scale-105 shadow-2xl flex items-center gap-2"
               >
-                Start Free Trial
+                Create My Video Menu
                 <ArrowRight className="group-hover:translate-x-1 transition-transform" size={24} />
               </button>
               <a
                 href="/live-examples"
                 className="px-8 py-4 bg-white/10 backdrop-blur-sm text-white font-bold text-lg rounded-2xl hover:bg-white/20 transition-all border-2 border-white/30"
               >
-                See Live Example
+                See a live example
               </a>
             </div>
           </div>
@@ -235,7 +235,7 @@ const PartnerLandingPage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-2xl font-bold text-zinc-900 mb-2">
-                    Watch Orders Increase
+                    Help Customers Choose Faster
                   </h3>
                   <p className="text-zinc-600 leading-relaxed">
                     Video menus increase order value by 65%. Customers see your food in action and make faster, bigger decisions.
@@ -248,7 +248,7 @@ const PartnerLandingPage: React.FC = () => {
                   onClick={scrollToForm}
                   className="inline-flex items-center gap-2 px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold text-lg rounded-xl transition-all transform hover:scale-105 shadow-lg"
                 >
-                  Start Your Free Trial
+                  Create My Video Menu
                   <ArrowRight size={20} />
                 </button>
               </div>
@@ -363,7 +363,6 @@ const PartnerLandingPage: React.FC = () => {
                     const signupData = {
                       restaurantName: formData.get('restaurantName'),
                       email: formData.get('email'),
-                      phone: formData.get('phone'),
                       address: formData.get('address')
                     };
                     sessionStorage.setItem('partnerSignupStep1', JSON.stringify(signupData));
@@ -393,16 +392,6 @@ const PartnerLandingPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-2">Phone</label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    placeholder="+61 400 000 000"
-                    className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition-all"
-                    required
-                  />
-                </div>
-                <div>
                   <label className="block text-sm font-bold text-zinc-700 mb-2">Address</label>
                   <input
                     type="text"
@@ -416,7 +405,7 @@ const PartnerLandingPage: React.FC = () => {
                   type="submit"
                   className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-black text-lg rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
                 >
-                  Start free trial
+                  Create My Video Menu
                   <ArrowRight size={20} />
                 </button>
                 <p className="text-center text-sm text-zinc-500">
@@ -514,7 +503,7 @@ const PartnerLandingPage: React.FC = () => {
               href="/demo/backstreet-cafe/menu"
               className="inline-flex items-center gap-2 px-8 py-4 bg-orange-500 text-white font-bold text-lg rounded-2xl hover:bg-orange-600 transition-all transform hover:scale-105 shadow-lg"
             >
-              See Live Example →
+              See a live example →
             </a>
           </div>
         </div>
@@ -654,7 +643,7 @@ const PartnerLandingPage: React.FC = () => {
             onClick={scrollToForm}
             className="inline-flex items-center gap-2 px-10 py-5 bg-white text-orange-600 font-black text-xl rounded-2xl hover:bg-yellow-300 hover:text-orange-700 transition-all transform hover:scale-105 shadow-2xl mb-4"
           >
-            Click Here and Start Using
+            Create My Video Menu
             <ArrowRight size={24} />
           </button>
           <p className="text-yellow-300 text-lg font-black mb-3 animate-pulse">

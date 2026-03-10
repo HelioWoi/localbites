@@ -910,7 +910,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
                     <Loader2 size={20} className="animate-spin" />
                   ) : (
                     <>
-                      {mode === 'signup' ? 'Start free trial' : mode === 'magic' ? 'Send magic link' : 'Sign in'}
+                      {mode === 'signup' ? 'Create My Video Menu' : mode === 'magic' ? 'Send magic link' : 'Sign in'}
                       <ArrowRight size={18} />
                     </>
                   )}
