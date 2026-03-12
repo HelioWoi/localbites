@@ -3202,7 +3202,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       <footer className="mt-12 py-8 border-t border-zinc-200 bg-white">
         <div className="text-center">
           <p className="text-zinc-500 text-sm mb-1">
-            MenuLove - Video Menus & Smart Ordering
+            MenuLove™ - Video Menus & Smart Ordering
           </p>
           <p className="text-zinc-400 text-sm mb-1">
             Built with <span className="text-orange-500">🧡</span> in Australia | <a href="mailto:contact@menulove.com.au" className="text-orange-500 hover:text-orange-600 transition-colors">contact@menulove.com.au</a>

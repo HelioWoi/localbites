@@ -50,6 +50,85 @@ const CrispChatWithAI = () => {
       
       // Note: When a human operator (Helio Woi) joins, their name will automatically replace LoveBot AI
       // Welcome message should be configured in Crisp dashboard to avoid duplicates
+      
+      // Add soft pulse animation to chat icon only (not the chat box)
+      const addPulseAnimation = () => {
+        // Add keyframes to document
+        const style = document.createElement('style');
+        style.textContent = `
+          @keyframes crisp-icon-pulse {
+            0%, 100% { 
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 0 rgba(249, 115, 22, 0.5);
+            }
+            50% { 
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 8px rgba(249, 115, 22, 0);
+            }
+          }
+        `;
+        document.head.appendChild(style);
+        
+        // Find and animate the chat bubble icon
+        const findAndAnimateIcon = () => {
+          // Try multiple selectors to find the floating chat button
+          const selectors = [
+            '.crisp-client [data-chat-status]',
+            '.crisp-client .cc-unoo',
+            '.crisp-client .cc-1xry .cc-unoo',
+            '.crisp-client div[role="button"]'
+          ];
+          
+          for (const selector of selectors) {
+            const icon = document.querySelector(selector);
+            if (icon && icon instanceof HTMLElement) {
+              console.log('[CrispChat] Found chat icon, applying pulse animation');
+              icon.style.animation = 'crisp-icon-pulse 2.5s ease-in-out infinite';
+              return true;
+            }
+          }
+          return false;
+        };
+        
+        // Try to find icon immediately
+        if (!findAndAnimateIcon()) {
+          // If not found, observe DOM changes
+          const observer = new MutationObserver(() => {
+            if (findAndAnimateIcon()) {
+              observer.disconnect();
+            }
+          });
+          
+          observer.observe(document.body, {
+            childList: true,
+            subtree: true
+          });
+          
+          // Stop observing after 10 seconds
+          setTimeout(() => observer.disconnect(), 10000);
+        }
+      };
+      
+      // Apply pulse animation after Crisp loads
+      setTimeout(addPulseAnimation, 2000);
+      
+      // Auto-open chat when user scrolls to middle of page
+      let hasAutoOpened = false;
+      const handleScroll = () => {
+        if (hasAutoOpened) return;
+        
+        const scrollPosition = window.scrollY;
+        const pageHeight = document.documentElement.scrollHeight - window.innerHeight;
+        const scrollPercentage = (scrollPosition / pageHeight) * 100;
+        
+        // Open chat when user scrolls to 50% of page
+        if (scrollPercentage >= 50) {
+          console.log('[CrispChat] Auto-opening chat at 50% scroll');
+          window.$crisp.push(['do', 'chat:open']);
+          hasAutoOpened = true;
+          window.removeEventListener('scroll', handleScroll);
+        }
+      };
+      
+      window.addEventListener('scroll', handleScroll);
 
       // Track if human operator is active
       let humanOperatorActive = false;

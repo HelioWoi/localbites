@@ -493,7 +493,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
               className="w-12 h-12 rounded-xl"
             />
             <div>
-              <span className="text-xl font-bold text-zinc-900">MenuLove</span>
+              <span className="text-xl font-bold text-zinc-900">MenuLove™</span>
               <span className="text-xl font-light text-zinc-400 ml-1">Partner</span>
             </div>
           </a>
