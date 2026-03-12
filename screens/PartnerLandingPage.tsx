@@ -17,6 +17,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import CrispChatWithAI from '../components/CrispChatWithAI';
+import PromoPopup from '../components/PromoPopup';
 
 const PartnerLandingPage: React.FC = () => {
   const [formSubmitted, setFormSubmitted] = useState(false);
@@ -848,6 +849,9 @@ const PartnerLandingPage: React.FC = () => {
 
       {/* Crisp Chat Widget with AI */}
       <CrispChatWithAI />
+
+      {/* Promo Popup - 30 Day Free Trial */}
+      <PromoPopup />
     </div>
   );
 };
