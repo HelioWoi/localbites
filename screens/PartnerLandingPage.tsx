@@ -16,6 +16,7 @@ import {
   Search,
   Sparkles
 } from 'lucide-react';
+import CrispChatWithAI from '../components/CrispChatWithAI';
 
 const PartnerLandingPage: React.FC = () => {
   const [formSubmitted, setFormSubmitted] = useState(false);
@@ -108,7 +109,7 @@ const PartnerLandingPage: React.FC = () => {
               alt="MenuLove" 
               className="w-7 h-7 sm:w-8 sm:h-8"
             />
-            <span className="text-white font-black text-xl sm:text-2xl">MenuLove</span>
+            <span className="text-white font-black text-xl sm:text-2xl">MenuLove™</span>
           </a>
 
           {/* Partner Access Button */}
@@ -178,7 +179,7 @@ const PartnerLandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl sm:text-5xl font-black text-zinc-900 mb-4">
-              How MenuLove Works
+              How MenuLove™ Works
             </h2>
             <p className="text-xl text-zinc-600 max-w-2xl mx-auto">
               The TikTok-style video menu platform built for cafés and restaurants that want to stand out.
@@ -266,7 +267,7 @@ const PartnerLandingPage: React.FC = () => {
                 The Video Menu Built for Australian Hospitality
               </h2>
               <p className="text-xl text-zinc-600 mb-8 leading-relaxed">
-                From busy cafés to fine dining, MenuLove gives every Australian restaurant a premium video menu experience. No app download required, works on any device, scanned in seconds.
+                From busy cafés to fine dining, MenuLove™ gives every Australian restaurant a premium video menu experience. No app download required, works on any device, scanned in seconds.
               </p>
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
@@ -307,7 +308,7 @@ const PartnerLandingPage: React.FC = () => {
             {/* Left: Benefits */}
             <div>
               <h2 className="text-3xl sm:text-4xl font-black text-zinc-900 mb-6">
-                Why Choose MenuLove?
+                Why Choose MenuLove™?
               </h2>
               <div className="space-y-6">
                 <div className="flex items-start gap-4">
@@ -750,7 +751,7 @@ const PartnerLandingPage: React.FC = () => {
                   alt="MenuLove" 
                   className="w-10 h-10"
                 />
-                <span className="text-white font-black text-2xl">MenuLove</span>
+                <span className="text-white font-black text-2xl">MenuLove™</span>
               </div>
               <p className="text-zinc-400 text-sm">
                 Video Menus & Smart Ordering
@@ -819,7 +820,7 @@ const PartnerLandingPage: React.FC = () => {
           <div className="border-t border-zinc-800 pt-8 mb-8">
             <div className="max-w-3xl mx-auto text-center">
               <p className="text-zinc-500 text-sm leading-relaxed">
-                <span className="text-orange-500 font-bold">Beta Version:</span> MenuLove is currently in beta testing. 
+                <span className="text-orange-500 font-bold">Beta Version:</span> MenuLove™ is currently in beta testing. 
                 We're working hard to deliver the best experience for Australian restaurants. 
                 Your feedback helps us improve and build the perfect platform for showcasing your culinary creations. 
                 Join us in revolutionizing how restaurants connect with customers through video menus.
@@ -833,7 +834,7 @@ const PartnerLandingPage: React.FC = () => {
           {/* Bottom Section */}
           <div className="text-center pt-6 border-t border-zinc-800">
             <p className="text-zinc-400 text-sm mb-2">
-              MenuLove - Video Menus & Smart Ordering
+              MenuLove™ - Video Menus & Smart Ordering
             </p>
             <p className="text-zinc-500 text-sm mb-1">
               Built with <span className="text-orange-500">🧡</span> in Australia | <a href="mailto:contact@menulove.com.au" className="text-orange-500 hover:text-orange-400 transition-colors">contact@menulove.com.au</a>
@@ -844,6 +845,9 @@ const PartnerLandingPage: React.FC = () => {
           </div>
         </div>
       </footer>
+
+      {/* Crisp Chat Widget with AI */}
+      <CrispChatWithAI />
     </div>
   );
 };
