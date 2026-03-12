@@ -109,26 +109,6 @@ const CrispChatWithAI = () => {
       
       // Apply pulse animation after Crisp loads
       setTimeout(addPulseAnimation, 2000);
-      
-      // Auto-open chat when user scrolls to middle of page
-      let hasAutoOpened = false;
-      const handleScroll = () => {
-        if (hasAutoOpened) return;
-        
-        const scrollPosition = window.scrollY;
-        const pageHeight = document.documentElement.scrollHeight - window.innerHeight;
-        const scrollPercentage = (scrollPosition / pageHeight) * 100;
-        
-        // Open chat when user scrolls to 50% of page
-        if (scrollPercentage >= 50) {
-          console.log('[CrispChat] Auto-opening chat at 50% scroll');
-          window.$crisp.push(['do', 'chat:open']);
-          hasAutoOpened = true;
-          window.removeEventListener('scroll', handleScroll);
-        }
-      };
-      
-      window.addEventListener('scroll', handleScroll);
 
       // Track if human operator is active
       let humanOperatorActive = false;
