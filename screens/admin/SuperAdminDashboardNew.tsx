@@ -4,7 +4,7 @@ import {
   Users, Video, DollarSign, TrendingUp, Search, Bell, LogOut,
   Home, FileText, Settings, BarChart3, Crown, Clock, CheckCircle,
   MoreVertical, TrendingDown, Activity, Menu, X, ShieldAlert, Trash2, Check,
-  ChevronLeft, ChevronRight, UserPlus
+  ChevronLeft, ChevronRight, UserPlus, MessageCircle
 } from 'lucide-react';
 import SuperAdminAnalytics from './SuperAdminAnalytics';
 import ConfirmationModal from '../../components/ConfirmationModal';
@@ -61,7 +61,7 @@ interface TeamMember {
   sms_notifications_enabled: boolean;
 }
 
-type TabType = 'overview' | 'partners' | 'revenue' | 'content' | 'analytics' | 'team';
+type TabType = 'overview' | 'partners' | 'revenue' | 'content' | 'analytics' | 'team' | 'chat';
 
 interface SuperAdminDashboardNewProps {
   user: any;
@@ -98,6 +98,7 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
   const [onlineVisitors, setOnlineVisitors] = useState(0);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [previousVisitorCount, setPreviousVisitorCount] = useState(0);
+  const [activeChatsCount, setActiveChatsCount] = useState(0);
   const [smsNotificationsEnabled, setSmsNotificationsEnabled] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [showPhoneInput, setShowPhoneInput] = useState(false);
@@ -115,15 +116,17 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
     loadActivityLog();
     loadRemovalRequests();
     loadOnlineVisitors();
+    loadActiveChats();
+    loadTeamMembers();
     checkNotificationPermission();
-    if (activeTab === 'team') {
-      loadTeamMembers();
-    }
   }, [activeTab]);
 
-  // Auto-refresh online visitors every 30 seconds
+  // Auto-refresh online visitors and active chats every 30 seconds
   useEffect(() => {
-    const interval = setInterval(loadOnlineVisitors, 30000);
+    const interval = setInterval(() => {
+      loadOnlineVisitors();
+      loadActiveChats();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -199,6 +202,33 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
       } catch (error) {
         console.error('Error disabling SMS:', error);
       }
+    }
+  };
+
+  const loadActiveChats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chat_conversations')
+        .select('*')
+        .in('status', ['bot_only', 'human_takeover']);
+
+      if (error) throw error;
+      
+      const now = Date.now();
+      const fiveMinutesAgo = now - (5 * 60 * 1000);
+      
+      // Only count users CURRENTLY ACTIVE (last message within 5 minutes)
+      const activeUsers = data?.filter(conv => {
+        const messages = conv.messages || [];
+        if (messages.length <= 1) return false; // Exclude welcome-only
+        
+        const lastMessageTime = new Date(conv.last_message_at).getTime();
+        return lastMessageTime > fiveMinutesAgo; // Active in last 5 minutes
+      }) || [];
+      
+      setActiveChatsCount(activeUsers.length);
+    } catch (error) {
+      console.error('Error loading active chats:', error);
     }
   };
 
@@ -817,19 +847,33 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
             { id: 'content', label: 'Content', icon: Video },
             { id: 'analytics', label: 'Analytics', icon: BarChart3 },
             { id: 'team', label: 'Team', icon: UserPlus },
+            { id: 'chat', label: 'Live Chat', icon: MessageCircle, badge: activeChatsCount },
           ].map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id as TabType)}
+              onClick={() => {
+                if (item.id === 'chat') {
+                  window.location.href = '/admin/live-chat';
+                } else {
+                  setActiveTab(item.id as TabType);
+                }
+              }}
               className={`w-full flex items-center ${isSidebarOpen ? 'gap-3 px-4' : 'justify-center px-2'} py-3 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === item.id
                   ? 'bg-orange-500 text-white'
                   : 'text-zinc-600 hover:bg-zinc-100'
-              }`}
+              } relative`}
               title={!isSidebarOpen ? item.label : ''}
             >
               <item.icon size={18} />
               {isSidebarOpen && item.label}
+              {item.badge !== undefined && item.badge > 0 && (
+                <span className={`ml-auto px-2 py-0.5 rounded-full text-xs font-bold ${
+                  activeTab === item.id ? 'bg-white text-green-500' : 'bg-green-500 text-white'
+                } animate-pulse`}>
+                  {item.badge}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -1108,11 +1152,18 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
               { id: 'revenue', label: 'Revenue', icon: DollarSign },
               { id: 'content', label: 'Content', icon: Video },
               { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+              { id: 'chat', label: 'Live Chat', icon: MessageCircle, badge: activeChatsCount },
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as TabType)}
-                className={`flex items-center gap-2 px-1 py-3 text-sm font-medium border-b-2 transition-colors ${
+                onClick={() => {
+                  if (tab.id === 'chat') {
+                    window.location.href = '/admin/live-chat';
+                  } else {
+                    setActiveTab(tab.id as TabType);
+                  }
+                }}
+                className={`flex items-center gap-2 px-1 py-3 text-sm font-medium border-b-2 transition-colors relative ${
                   activeTab === tab.id
                     ? 'border-orange-500 text-orange-500'
                     : 'border-transparent text-zinc-600 hover:text-zinc-900'
@@ -1120,6 +1171,11 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
               >
                 <tab.icon size={16} />
                 {tab.label}
+                {tab.badge !== undefined && tab.badge > 0 && (
+                  <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-bold bg-green-500 text-white animate-pulse">
+                    {tab.badge}
+                  </span>
+                )}
               </button>
             ))}
           </div>

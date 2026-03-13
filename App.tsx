@@ -6,6 +6,7 @@ import FilterSelectionScreen from './screens/FilterSelectionScreen';
 import LocationSelector from './screens/LocationSelector';
 import RestaurantProfile from './screens/RestaurantProfile';
 import AdminDashboard from './screens/AdminDashboard';
+import AdminLiveChatV2 from './pages/AdminLiveChatV2';
 import PartnerPortal from './screens/partner/PartnerPortal';
 import PartnerLandingPage from './screens/PartnerLandingPage';
 import LiveExamplesPage from './screens/LiveExamplesPage';
@@ -32,6 +33,7 @@ import HelpPage from './screens/HelpPage';
 import EmailConfirmation from './screens/EmailConfirmation';
 import UnsubscribePage from './screens/UnsubscribePage';
 import EmailNotConfirmedPage from './screens/partner/EmailNotConfirmedPage';
+import PromoPopup from './components/PromoPopup';
 import { getNearbyRestaurants, getRestaurantDetails, getRemainingSearches, searchRestaurantsByQuery } from './services/geminiService';
 import { TriageData } from './services/aiAssistant';
 import { likeRestaurant, unlikeRestaurant, saveRestaurant, unsaveRestaurant, getUserLikes, getUserSaves, getAllLikesCounts } from './services/interactionService';
@@ -99,6 +101,11 @@ const App: React.FC = () => {
     if (demoSlug && demoSlug !== 'menu' && demoSlug !== 'full-menu') {
       return <DemoRestaurantLoader slug={demoSlug} />;
     }
+  }
+
+  // Admin Live Chat Route
+  if (window.location.pathname === '/admin/live-chat') {
+    return <AdminLiveChatV2 />;
   }
 
   // Live Examples Route
@@ -2855,6 +2862,9 @@ const App: React.FC = () => {
         />
       )}
       </div>{/* End mobile wrapper lg:hidden */}
+
+      {/* Promo Popup - 30 Day Free Trial */}
+      <PromoPopup />
     </div>
   );
 };

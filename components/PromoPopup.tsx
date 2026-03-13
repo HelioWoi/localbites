@@ -13,13 +13,17 @@ const PromoPopup: React.FC = () => {
       return;
     }
 
-    // Show popup after 30 seconds
-    const timer = setTimeout(() => {
-      setIsVisible(true);
-    }, 30000); // 30 seconds
+    // Show popup when user tries to leave page (exit intent)
+    const handleMouseLeave = (e: MouseEvent) => {
+      // Detect when mouse leaves viewport at the top
+      if (e.clientY <= 0 && !isVisible) {
+        setIsVisible(true);
+      }
+    };
 
-    return () => clearTimeout(timer);
-  }, []);
+    document.addEventListener('mouseleave', handleMouseLeave);
+    return () => document.removeEventListener('mouseleave', handleMouseLeave);
+  }, [isVisible]);
 
   const handleClose = () => {
     setIsClosing(true);
