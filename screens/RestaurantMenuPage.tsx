@@ -378,6 +378,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                 
                 if (from === 'full-menu') {
                   window.location.href = `/demo/${restaurant.slug}/full-menu`;
+                } else if (from === 'saved') {
+                  window.location.href = `/demo/${restaurant.slug}/saved`;
                 } else {
                   window.location.href = `/demo/${restaurant.slug}`;
                 }
@@ -389,7 +391,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                 if (from === 'full-menu') {
                   window.location.href = `/r/${restaurant.slug}/full-menu`;
                 } else if (from === 'saved') {
-                  window.location.href = `/r/${restaurant.slug}/saved`;
+                  window.location.href = `/demo/${restaurant.slug}/saved`;
                 } else {
                   window.location.href = `/r/${restaurant.slug}`;
                 }
@@ -415,6 +417,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               
               if (from === 'full-menu') {
                 window.location.href = `/demo/${restaurant.slug}/full-menu`;
+              } else if (from === 'saved') {
+                window.location.href = `/demo/${restaurant.slug}/saved`;
               } else {
                 window.location.href = `/demo/${restaurant.slug}`;
               }
@@ -426,7 +430,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               if (from === 'full-menu') {
                 window.location.href = `/r/${restaurant.slug}/full-menu`;
               } else if (from === 'saved') {
-                window.location.href = `/r/${restaurant.slug}/saved`;
+                window.location.href = `/demo/${restaurant.slug}/saved`;
               } else {
                 window.location.href = `/r/${restaurant.slug}`;
               }

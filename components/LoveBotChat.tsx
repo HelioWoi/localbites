@@ -24,6 +24,7 @@ const LoveBotChat: React.FC = () => {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [showEmailCapture, setShowEmailCapture] = useState(false);
+  const [showEmailInput, setShowEmailInput] = useState(false);
   const [userEmail, setUserEmail] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -115,6 +116,14 @@ const LoveBotChat: React.FC = () => {
             setConversationMode('HUMAN_MODE');
           }
           
+          // Update status if returned to AI
+          if (payload.new.status === 'bot_only' && conversationStatus === 'human_takeover') {
+            console.log('[LoveBot] Returned to AI mode!');
+            setConversationStatus('bot_only');
+            setConversationMode('AI_MODE');
+            setLastAgentMessageTime(null);
+          }
+          
           // Update messages if new messages from admin
           if (payload.new.messages && payload.new.messages.length > messages.length) {
             console.log('[LoveBot] New messages detected from admin');
@@ -122,7 +131,8 @@ const LoveBotChat: React.FC = () => {
               id: msg.id,
               role: msg.role,
               content: msg.content,
-              timestamp: new Date(msg.timestamp)
+              timestamp: new Date(msg.timestamp),
+              ...(msg.attachment_url && { attachment_url: msg.attachment_url })
             }));
             
             // Play notification sound for new assistant messages
@@ -885,49 +895,69 @@ const LoveBotChat: React.FC = () => {
 
           {/* Input */}
           <div className="bg-white border-t border-zinc-200">
-            {/* Email Banner - Always Visible */}
-            <div className="px-4 pt-3 pb-2 bg-zinc-50 border-b border-zinc-200">
-              <div className="flex items-center gap-2">
-                <input
-                  type="email"
-                  value={userEmail}
-                  onChange={(e) => setUserEmail(e.target.value)}
-                  placeholder="Leave your email for follow-up (optional)"
-                  className="flex-1 px-3 py-2 border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
-                />
+            {/* Email Banner - Discrete */}
+            <div className="px-4 pt-2 pb-2 bg-zinc-50 border-b border-zinc-200">
+              {!showEmailInput ? (
                 <button
-                  onClick={async () => {
-                    if (userEmail.trim() && sessionId) {
-                      try {
-                        await supabase
-                          .from('chat_conversations')
-                          .update({
-                            user_info: {
-                              email: userEmail,
-                              email_captured_at: new Date().toISOString()
-                            }
-                          })
-                          .eq('session_id', sessionId);
-                        
-                        const confirmMsg: Message = {
-                          id: Date.now().toString(),
-                          role: 'assistant',
-                          content: "✅ Thanks! We'll reach out to you at " + userEmail + " within 24 hours.",
-                          timestamp: new Date()
-                        };
-                        setMessages(prev => [...prev, confirmMsg]);
-                        setUserEmail('');
-                      } catch (error) {
-                        console.error('[LoveBot] Error saving email:', error);
-                      }
-                    }
-                  }}
-                  disabled={!userEmail.trim()}
-                  className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 text-sm font-medium"
+                  onClick={() => setShowEmailInput(true)}
+                  className="w-full text-left text-xs text-zinc-400 hover:text-zinc-600 transition-colors py-1"
                 >
-                  Send
+                  Click here to leave your email for follow-up
                 </button>
-              </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="email"
+                    value={userEmail}
+                    onChange={(e) => setUserEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    className="flex-1 px-3 py-2 border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
+                    autoFocus
+                  />
+                  <button
+                    onClick={async () => {
+                      if (userEmail.trim() && sessionId) {
+                        try {
+                          await supabase
+                            .from('chat_conversations')
+                            .update({
+                              user_info: {
+                                email: userEmail,
+                                email_captured_at: new Date().toISOString()
+                              }
+                            })
+                            .eq('session_id', sessionId);
+                          
+                          const confirmMsg: Message = {
+                            id: Date.now().toString(),
+                            role: 'assistant',
+                            content: "✅ Thanks! We'll reach out to you at " + userEmail + " within 24 hours.",
+                            timestamp: new Date()
+                          };
+                          setMessages(prev => [...prev, confirmMsg]);
+                          setUserEmail('');
+                          setShowEmailInput(false);
+                        } catch (error) {
+                          console.error('[LoveBot] Error saving email:', error);
+                        }
+                      }
+                    }}
+                    disabled={!userEmail.trim()}
+                    className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 text-sm font-medium"
+                  >
+                    Send
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowEmailInput(false);
+                      setUserEmail('');
+                    }}
+                    className="text-zinc-400 hover:text-zinc-600"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              )}
             </div>
             
             <div className="p-4">

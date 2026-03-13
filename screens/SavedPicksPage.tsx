@@ -88,9 +88,17 @@ const SavedPicksPage: React.FC<SavedPicksPageProps> = ({ restaurant }) => {
   };
 
   const handleBack = () => {
-    // Check if we're on /r/ route or app feed route
+    // Check if we're on /demo/, /r/ route or app feed route
+    const isDemoRoute = window.location.pathname.startsWith('/demo/');
     const isQRRoute = window.location.pathname.startsWith('/r/');
-    window.location.href = isQRRoute ? `/r/${restaurant.slug}` : `/${restaurant.slug}`;
+    
+    if (isDemoRoute) {
+      window.location.href = `/demo/${restaurant.slug}`;
+    } else if (isQRRoute) {
+      window.location.href = `/r/${restaurant.slug}`;
+    } else {
+      window.location.href = `/${restaurant.slug}`;
+    }
   };
 
   const handleItemClick = (item: MenuItem) => {
