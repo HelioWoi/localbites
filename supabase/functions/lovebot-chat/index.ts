@@ -1,5 +1,4 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { GoogleGenerativeAI } from 'https://esm.sh/@google/generative-ai@0.1.3';
 
 const LOVEBOT_SYSTEM_PROMPT = `You are LoveBot, the official assistant of MenuLove.
 
@@ -221,27 +220,53 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Gemini AI
-    const genAI = new GoogleGenerativeAI(geminiApiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-
-    // Build conversation context
-    let conversationContext = LOVEBOT_SYSTEM_PROMPT + '\n\n';
+    // Build conversation history in Gemini format
+    const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
     
     if (conversationHistory && conversationHistory.length > 0) {
-      conversationContext += 'Previous conversation:\n';
       conversationHistory.forEach((msg: any) => {
-        conversationContext += `${msg.role === 'user' ? 'User' : 'LoveBot'}: ${msg.content}\n`;
+        contents.push({
+          role: msg.role === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.content }]
+        });
       });
-      conversationContext += '\n';
     }
     
-    conversationContext += `User: ${message}\n\nLoveBot:`;
+    // Add current user message
+    contents.push({
+      role: 'user',
+      parts: [{ text: message }]
+    });
 
-    // Generate response
-    const result = await model.generateContent(conversationContext);
-    const response = await result.response;
-    const botReply = response.text();
+    // Call Gemini API directly
+    const apiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: LOVEBOT_SYSTEM_PROMPT }]
+          },
+          contents: contents
+        })
+      }
+    );
+
+    if (!apiResponse.ok) {
+      const errorText = await apiResponse.text();
+      console.error('[LoveBot] Gemini API error:', apiResponse.status, errorText);
+      throw new Error(`Gemini API error: ${apiResponse.status}`);
+    }
+
+    const data = await apiResponse.json();
+    const botReply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!botReply) {
+      throw new Error('No response from Gemini');
+    }
 
     return new Response(
       JSON.stringify({ 

@@ -16,7 +16,7 @@ import {
   Search,
   Sparkles
 } from 'lucide-react';
-import CrispChatWithAI from '../components/CrispChatWithAI';
+import LoveBotChat from '../components/LoveBotChat';
 import PromoPopup from '../components/PromoPopup';
 
 const PartnerLandingPage: React.FC = () => {
@@ -847,8 +847,8 @@ const PartnerLandingPage: React.FC = () => {
         </div>
       </footer>
 
-      {/* Crisp Chat Widget with AI */}
-      <CrispChatWithAI />
+      {/* LoveBot Custom Chat Widget */}
+      <LoveBotChat />
 
       {/* Promo Popup - 30 Day Free Trial */}
       <PromoPopup />
