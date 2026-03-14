@@ -272,7 +272,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
           });
         }
       } else {
-        // ADJACENT (±1): preload but pause
+        // ADJACENT (±1): preload metadata only, pause playback
         const videoUrl = filteredItems[index]?.videoUrl || '';
         if (video.src !== videoUrl) {
           video.src = videoUrl;
@@ -282,9 +282,18 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
       }
     });
     
-    // Retry play every 500ms until video is actually playing (mobile 4G fix)
+    // Retry play with timeout limit (max 10 attempts = 5 seconds)
+    let retryCount = 0;
+    const maxRetries = 10;
     const retryInterval = setInterval(() => {
       const activeVideo = videoRefs.current[activeVideoIndex];
+      retryCount++;
+      
+      if (retryCount >= maxRetries) {
+        clearInterval(retryInterval);
+        return;
+      }
+      
       if (activeVideo && isPlaying && activeVideo.paused && activeVideo.readyState >= 2) {
         activeVideo.play().catch(() => {});
       }
@@ -530,7 +539,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               loop
               muted
               playsInline
-              preload="auto"
+              preload={index === activeVideoIndex ? "auto" : "metadata"}
               onCanPlay={() => {
                 setVideoReady(prev => new Set(prev).add(index));
                 // Auto-play if this is the active video

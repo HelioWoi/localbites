@@ -282,51 +282,15 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
     loadGoogleReviews();
   }, [restaurant.id]);
   
-  // Auto-play videos in 3-second cycles
+  // Keep grid videos paused - only show first frame
   useEffect(() => {
-    const playTimers = new Map<HTMLVideoElement, NodeJS.Timeout>();
-
-    const playVideoCycle = (video: HTMLVideoElement) => {
-      // Reset to start
-      video.currentTime = 0;
-      
-      // Play for 3 seconds
-      video.play().catch(() => {});
-      
-      // Pause after 3 seconds and schedule next cycle
-      const timer = setTimeout(() => {
-        video.pause();
-        
-        // Wait a moment and start next cycle
-        const nextCycleTimer = setTimeout(() => {
-          playVideoCycle(video);
-        }, 100); // Small delay before next cycle
-        
-        playTimers.set(video, nextCycleTimer);
-      }, 3000);
-      
-      playTimers.set(video, timer);
-    };
-
-    // Start cycles for all videos
+    // Ensure all grid videos are paused and show first frame
     gridVideoRefs.current.forEach((video) => {
       if (video) {
-        playVideoCycle(video);
+        video.pause();
+        video.currentTime = 0.1; // Show first frame
       }
     });
-
-    return () => {
-      // Cleanup all timers
-      playTimers.forEach((timer) => clearTimeout(timer));
-      playTimers.clear();
-      
-      // Pause all videos
-      gridVideoRefs.current.forEach((video) => {
-        if (video) {
-          video.pause();
-        }
-      });
-    };
   }, [filteredVideos]);
   
   // Sync saved dishes when changed in video feed

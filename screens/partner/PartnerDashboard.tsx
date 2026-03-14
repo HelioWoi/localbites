@@ -901,34 +901,30 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     setUploadProgress(10);
 
     try {
-      // TEMPORARY: Skip compression to test if that's the issue
-      let fileToUpload = uploadFile;
-      console.log('Skipping compression for testing - uploading original video');
-      setUploadProgress(30);
-      
       // Check if video needs compression
-      // const needsCompression = await shouldCompressVideo(uploadFile);
+      let fileToUpload = uploadFile;
+      const needsCompression = await shouldCompressVideo(uploadFile);
       
-      // if (needsCompression) {
-      //   setUploadProgress(15);
-      //   console.log('Compressing video for optimal mobile playback...');
-      //   
-      //   // Compress video with progress callback
-      //   fileToUpload = await compressVideo(uploadFile, {
-      //     maxWidth: 720,
-      //     maxHeight: 1280,
-      //     quality: 0.8,
-      //     onProgress: (progress) => {
-      //       // Map compression progress to 15-50% of total progress
-      //       setUploadProgress(15 + (progress * 0.35));
-      //     },
-      //   });
-      //   
-      //   console.log(`Video compressed: ${(uploadFile.size / 1024 / 1024).toFixed(2)}MB → ${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`);
-      //   setUploadProgress(50);
-      // } else {
-      //   setUploadProgress(30);
-      // }
+      if (needsCompression) {
+        setUploadProgress(15);
+        console.log('Compressing video for optimal mobile playback...');
+        
+        // Compress video with progress callback
+        fileToUpload = await compressVideo(uploadFile, {
+          maxWidth: 720,
+          maxHeight: 1280,
+          quality: 0.8,
+          onProgress: (progress) => {
+            // Map compression progress to 15-50% of total progress
+            setUploadProgress(15 + (progress * 0.35));
+          },
+        });
+        
+        console.log(`Video compressed: ${(uploadFile.size / 1024 / 1024).toFixed(2)}MB → ${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`);
+        setUploadProgress(50);
+      } else {
+        setUploadProgress(30);
+      }
 
       // Sanitizar nome do arquivo para garantir URLs seguras
       const sanitizedName = sanitizeFileName(fileToUpload.name, menuItemName.trim());
