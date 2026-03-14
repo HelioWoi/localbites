@@ -134,8 +134,11 @@ const DemoRestaurantLoader: React.FC<DemoRestaurantLoaderProps> = ({ slug }) => 
 
         // Update Open Graph meta tags for sharing
         const restaurantName = restaurantData.name;
+        // Use banner photo first (photo_url), then logo, then fallback
         const restaurantImage = partnerData.photo_url || partnerData.logo_url || 'https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/img-site.jpg';
-        const restaurantDescription = `${restaurantData.cuisine} • ${restaurantData.address || 'Local Restaurant'} • Video Menu on MenuLove™`;
+        // Restaurant-focused description
+        const restaurantDescription = `${restaurantData.cuisine}${restaurantData.address ? ` in ${restaurantData.address}` : ''} • Explore our video menu with delicious dishes`;
+        const restaurantTitle = `${restaurantName} - ${restaurantData.cuisine}`;
         
         // Update or create meta tags
         const updateMetaTag = (property: string, content: string) => {
@@ -159,18 +162,20 @@ const DemoRestaurantLoader: React.FC<DemoRestaurantLoaderProps> = ({ slug }) => 
         };
 
         // Update Open Graph tags
-        updateMetaTag('og:title', `${restaurantName} - Video Menu | MenuLove™`);
+        updateMetaTag('og:title', restaurantTitle);
         updateMetaTag('og:description', restaurantDescription);
         updateMetaTag('og:image', restaurantImage);
         updateMetaTag('og:url', window.location.href);
+        updateMetaTag('og:type', 'restaurant');
         
         // Update Twitter Card tags
-        updateMetaName('twitter:title', `${restaurantName} - Video Menu | MenuLove™`);
+        updateMetaName('twitter:card', 'summary_large_image');
+        updateMetaName('twitter:title', restaurantTitle);
         updateMetaName('twitter:description', restaurantDescription);
         updateMetaName('twitter:image', restaurantImage);
         
         // Update page title
-        document.title = `${restaurantName} - Video Menu | MenuLove™`;
+        document.title = restaurantTitle;
 
         setRestaurant(restaurantData);
         setLoading(false);
