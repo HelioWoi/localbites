@@ -134,6 +134,13 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug,
         const restaurantName = restaurantData.name;
         // Use banner photo first (photo_url), then logo, then fallback
         const restaurantImage = partnerData.photo_url || partnerData.logo_url || 'https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/img-site.jpg';
+        
+        // Debug logging
+        console.log('[RestaurantProfileLoader] Open Graph Image Debug:');
+        console.log('  - photo_url:', partnerData.photo_url);
+        console.log('  - logo_url:', partnerData.logo_url);
+        console.log('  - Selected image:', restaurantImage);
+        
         // Restaurant-focused description
         const restaurantDescription = `${restaurantData.cuisine}${restaurantData.address ? ` in ${restaurantData.address}` : ''} • Explore our video menu with delicious dishes`;
         const restaurantTitle = `${restaurantName} - ${restaurantData.cuisine}`;

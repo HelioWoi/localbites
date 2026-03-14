@@ -218,8 +218,19 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         return;
       }
       
-      // Priority 1: Active Stripe subscription (PAID)
-      if (partner?.subscription_status === 'active' && partner?.subscription_end_date) {
+      // Priority 1: Stripe trialing status (FREE trial from Stripe)
+      if (partner?.subscription_status === 'trialing' && partner?.subscription_end_date) {
+        const endDate = new Date(partner.subscription_end_date);
+        const today = new Date();
+        const diffTime = endDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        setSubscriptionDaysLeft(Math.max(0, diffDays));
+        setHasActiveSubscription(true);
+        setHasPaidSubscription(false); // Still on FREE trial
+        console.log('[PartnerDashboard] Stripe trial detected:', diffDays, 'days remaining');
+      }
+      // Priority 2: Active Stripe subscription (PAID)
+      else if (partner?.subscription_status === 'active' && partner?.subscription_end_date) {
         const endDate = new Date(partner.subscription_end_date);
         const today = new Date();
         const diffTime = endDate.getTime() - today.getTime();
@@ -228,7 +239,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         setHasActiveSubscription(true);
         setHasPaidSubscription(true); // User has PAID subscription
       } 
-      // Priority 2: Trial period (FREE - no Stripe subscription yet)
+      // Priority 3: Manual trial period (FREE - no Stripe subscription yet)
       else if (partner?.trial_ends_at) {
         const endDate = new Date(partner.trial_ends_at);
         const today = new Date();
@@ -609,6 +620,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         }
       }
 
+      // Convert opening hours object to array format for database
+      const openingHoursArray = Object.entries(restaurantForm.openingHours)
+        .filter(([_, hours]) => hours && hours.trim())
+        .map(([day, hours]) => `${day.charAt(0).toUpperCase() + day.slice(1)}: ${hours}`);
+
       const { error } = await supabase
         .from('partners')
         .update({
@@ -622,7 +638,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           tiktok_url: restaurantForm.tiktokUrl,
           ordering_url: restaurantForm.orderingUrl,
           enable_ordering_button: restaurantForm.enableOrderingButton,
-          opening_hours: restaurantForm.openingHours,
+          opening_hours: openingHoursArray.length > 0 ? openingHoursArray : null,
           slug: slug,
           ...googleData
         })

@@ -689,6 +689,11 @@ const PartnerLandingPage: React.FC = () => {
                 className="h-16 w-auto grayscale hover:grayscale-0 transition-all duration-300 opacity-60 hover:opacity-100"
               />
               <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/decision.png" 
+                alt="Decisions Cafe" 
+                className="h-16 w-auto grayscale hover:grayscale-0 transition-all duration-300 opacity-60 hover:opacity-100"
+              />
+              <img 
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/flume.png" 
                 alt="Flume by the River" 
                 className="h-16 w-auto grayscale hover:grayscale-0 transition-all duration-300 opacity-60 hover:opacity-100"
@@ -710,6 +715,11 @@ const PartnerLandingPage: React.FC = () => {
                 className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
               />
               <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/decision.png" 
+                alt="Decisions Cafe" 
+                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
+              />
+              <img 
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/flume.png" 
                 alt="Flume by the River" 
                 className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
@@ -723,6 +733,11 @@ const PartnerLandingPage: React.FC = () => {
               <img 
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/brazzos.png" 
                 alt="Brazzos Smokehouse" 
+                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
+              />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/decision.png" 
+                alt="Decisions Cafe" 
                 className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
               />
               <img 
