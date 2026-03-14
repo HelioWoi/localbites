@@ -83,7 +83,7 @@ const DemoRestaurantLoader: React.FC<DemoRestaurantLoaderProps> = ({ slug }) => 
           }
         }
 
-        setRestaurant({
+        const restaurantData = {
           id: partnerData.id,
           name: partnerData.restaurant_name || partnerData.email?.split('@')[0] || 'Restaurant',
           slug: partnerData.slug,
@@ -130,7 +130,49 @@ const DemoRestaurantLoader: React.FC<DemoRestaurantLoaderProps> = ({ slug }) => 
           reviews: [],
           reviewSnippets: [],
           openingHours: partnerData.google_opening_hours || [],
-        });
+        };
+
+        // Update Open Graph meta tags for sharing
+        const restaurantName = restaurantData.name;
+        const restaurantImage = partnerData.photo_url || partnerData.logo_url || 'https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/img-site.jpg';
+        const restaurantDescription = `${restaurantData.cuisine} • ${restaurantData.address || 'Local Restaurant'} • Video Menu on MenuLove™`;
+        
+        // Update or create meta tags
+        const updateMetaTag = (property: string, content: string) => {
+          let meta = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement;
+          if (!meta) {
+            meta = document.createElement('meta');
+            meta.setAttribute('property', property);
+            document.head.appendChild(meta);
+          }
+          meta.setAttribute('content', content);
+        };
+
+        const updateMetaName = (name: string, content: string) => {
+          let meta = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement;
+          if (!meta) {
+            meta = document.createElement('meta');
+            meta.setAttribute('name', name);
+            document.head.appendChild(meta);
+          }
+          meta.setAttribute('content', content);
+        };
+
+        // Update Open Graph tags
+        updateMetaTag('og:title', `${restaurantName} - Video Menu | MenuLove™`);
+        updateMetaTag('og:description', restaurantDescription);
+        updateMetaTag('og:image', restaurantImage);
+        updateMetaTag('og:url', window.location.href);
+        
+        // Update Twitter Card tags
+        updateMetaName('twitter:title', `${restaurantName} - Video Menu | MenuLove™`);
+        updateMetaName('twitter:description', restaurantDescription);
+        updateMetaName('twitter:image', restaurantImage);
+        
+        // Update page title
+        document.title = `${restaurantName} - Video Menu | MenuLove™`;
+
+        setRestaurant(restaurantData);
         setLoading(false);
       } catch (err) {
         console.error('Load error:', err);
