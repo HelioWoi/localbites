@@ -543,6 +543,27 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
     }
   };
 
+  // Resend password reset email
+  const handleResendPassword = async (email: string) => {
+    try {
+      // Use production domain for password reset redirect
+      const redirectUrl = window.location.hostname === 'localhost' 
+        ? 'https://menulove.com.au/admin/reset-password'
+        : `${window.location.origin}/admin/reset-password`;
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl,
+      });
+
+      if (error) throw error;
+
+      alert(`Password reset email sent to ${email}!\n\nThey will receive an email with instructions to set a new password.`);
+    } catch (error: any) {
+      console.error('Error sending password reset:', error);
+      alert(`Failed to send password reset email: ${error?.message || 'Please try again'}`);
+    }
+  };
+
   // Remove team member
   const handleRemoveTeamMember = async (id: string, email: string) => {
     if (email === user.email) {
@@ -2125,13 +2146,21 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                             )}
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleRemoveTeamMember(member.id, member.email)}
-                          disabled={member.email === user.email}
-                          className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium whitespace-nowrap"
-                        >
-                          Remove
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleResendPassword(member.email)}
+                            className="px-4 py-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors text-sm font-medium whitespace-nowrap"
+                          >
+                            Resend Password
+                          </button>
+                          <button
+                            onClick={() => handleRemoveTeamMember(member.id, member.email)}
+                            disabled={member.email === user.email}
+                            className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium whitespace-nowrap"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
