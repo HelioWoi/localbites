@@ -137,7 +137,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     trackEvent({
       restaurantId: restaurant.id,
       eventType: 'order_button_click',
-      eventValue: item.id,
+      itemId: item.id,
+      itemType: item.category,
     });
 
     // Open ordering URL in same page
@@ -178,6 +179,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   // Toggle like
   const toggleLike = async (itemId: string) => {
     const { likeRestaurant, unlikeRestaurant } = await import('../services/interactionService');
+    const item = restaurant.menuItems.find(i => i.id === itemId);
     
     setLikedItems(prev => {
       const next = new Set(prev);
@@ -191,7 +193,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
         setLikesCounts(newCounts);
       } else {
         next.add(itemId);
-        likeRestaurant(itemId);
+        likeRestaurant(restaurant.id, itemId, item?.category);
         // Update count
         const currentCount = likesCounts.get(itemId) || 0;
         const newCounts = new Map(likesCounts);
@@ -203,15 +205,20 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   };
   
   // Toggle save
-  const toggleSave = (itemId: string) => {
+  const toggleSave = async (itemId: string) => {
     console.log('[RestaurantMenuPage] Toggle save:', itemId);
+    const { saveRestaurant, unsaveRestaurant } = await import('../services/interactionService');
+    const item = restaurant.menuItems.find(i => i.id === itemId);
+    
     setSavedItems(prev => {
       const next = new Set(prev);
       if (next.has(itemId)) {
         next.delete(itemId);
+        unsaveRestaurant(itemId);
         console.log('[RestaurantMenuPage] Removed from saved');
       } else {
         next.add(itemId);
+        saveRestaurant(restaurant.id, itemId, item?.category);
         console.log('[RestaurantMenuPage] Added to saved');
       }
       localStorage.setItem(`saved_dishes_${restaurant.id}`, JSON.stringify([...next]));
@@ -539,7 +546,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               loop
               muted
               playsInline
-              preload={index === activeVideoIndex ? "auto" : "metadata"}
+              preload={Math.abs(index - activeVideoIndex) <= 1 ? "auto" : "none"}
               onCanPlay={() => {
                 setVideoReady(prev => new Set(prev).add(index));
                 // Auto-play if this is the active video

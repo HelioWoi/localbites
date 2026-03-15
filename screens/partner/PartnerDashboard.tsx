@@ -443,15 +443,31 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           tiktokUrl: currentPartner.tiktok_url || '',
           orderingUrl: currentPartner.ordering_url || '',
           enableOrderingButton: currentPartner.enable_ordering_button || false,
-          openingHours: currentPartner.opening_hours || {
-            monday: '',
-            tuesday: '',
-            wednesday: '',
-            thursday: '',
-            friday: '',
-            saturday: '',
-            sunday: ''
-          }
+          openingHours: (() => {
+            // Convert array format from DB to object format for form
+            const defaultHours = {
+              monday: '',
+              tuesday: '',
+              wednesday: '',
+              thursday: '',
+              friday: '',
+              saturday: '',
+              sunday: ''
+            };
+            
+            if (currentPartner.opening_hours && Array.isArray(currentPartner.opening_hours)) {
+              currentPartner.opening_hours.forEach((entry: string) => {
+                const [day, ...hoursParts] = entry.split(': ');
+                const hours = hoursParts.join(': ');
+                const dayLower = day.toLowerCase();
+                if (dayLower in defaultHours) {
+                  defaultHours[dayLower as keyof typeof defaultHours] = hours;
+                }
+              });
+            }
+            
+            return defaultHours;
+          })()
         });
 
         // Load banner images
@@ -2382,6 +2398,35 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                   </div>
                 </div>
 
+                {/* Opening Hours Section */}
+                <div className="pt-4 border-t border-zinc-100">
+                  <h4 className="text-xs font-semibold text-zinc-700 mb-3">Opening Hours</h4>
+                  <p className="text-xs text-zinc-500 mb-3">Enter your business hours (e.g., "5:30 AM - 1:00 PM" or "Closed")</p>
+                  <div className="space-y-3">
+                    {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => (
+                      <div key={day}>
+                        <label className="block text-xs font-medium text-zinc-500 mb-1 capitalize">{day}</label>
+                        {editingRestaurant ? (
+                          <input
+                            type="text"
+                            value={restaurantForm.openingHours[day as keyof typeof restaurantForm.openingHours]}
+                            onChange={(e) => setRestaurantForm({ 
+                              ...restaurantForm, 
+                              openingHours: { ...restaurantForm.openingHours, [day]: e.target.value }
+                            })}
+                            placeholder="e.g., 5:30 AM - 1:00 PM"
+                            className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          />
+                        ) : (
+                          <p className="text-sm text-zinc-900">
+                            {partnerData?.opening_hours?.[day] || '-'}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
               </div>
 
               {/* Save Button */}
@@ -2480,7 +2525,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                 }
                 
                 return (
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
                     {archivedItems.map(item => (
                       <div key={item.id} className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg">
                         <div className="flex-1">

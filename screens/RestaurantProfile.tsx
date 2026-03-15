@@ -58,6 +58,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   
   // View counts state
   const [viewCounts, setViewCounts] = useState<Map<string, number>>(new Map());
+  const [showOpeningHours, setShowOpeningHours] = useState(false);
   
   // Reload saved dishes when component mounts (e.g., returning from menu page)
   useEffect(() => {
@@ -346,7 +347,8 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
     trackEvent({
       restaurantId: restaurant.id,
       eventType: 'order_button_click',
-      eventValue: dish.id,
+      itemId: dish.id,
+      itemType: dish.category,
     });
 
     // Open ordering URL in same page
@@ -830,25 +832,14 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
           </a>
         )}
 
-        {/* REVIEWS - Card style */}
-        {(restaurant.rating || sortedReviews.length > 0) && (
-          <button 
-            onClick={() => sortedReviews.length > 0 && setShowReviewsReel(true)}
-            className="w-full bg-white rounded-2xl border border-zinc-200 p-4 flex items-center justify-between active:bg-zinc-50 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <Star size={20} className="text-amber-500" fill="currentColor" />
-              <span className="text-base font-bold text-zinc-900">{restaurant.rating || '4.5'}</span>
-              <span className="text-sm text-zinc-400">({restaurant.totalReviews || sortedReviews.length} reviews)</span>
-            </div>
-            {sortedReviews.length > 0 && (
-              <div className="flex items-center gap-1 text-orange-500">
-                <span className="text-xs font-semibold">See more</span>
-                <ChevronRight size={16} />
-              </div>
-            )}
-          </button>
-        )}
+        {/* FULL MENU Button */}
+        <a
+          href={`${window.location.pathname.startsWith('/demo/') ? '/demo/' : isStandalone ? '/r/' : '/'}${restaurant.slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/full-menu`}
+          className="w-full bg-orange-500 text-white rounded-2xl border border-orange-500 p-4 flex items-center justify-center gap-2 font-semibold text-base active:bg-orange-600 transition-colors"
+        >
+          <UtensilsCrossed size={20} />
+          <span>Full Menu</span>
+        </a>
 
         {/* Phone - Card style */}
         {restaurant.phone && (
@@ -862,24 +853,32 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
           </a>
         )}
 
-        {/* Opening Hours - Card style */}
+        {/* Opening Hours - Collapsible Card */}
         {restaurant.openingHours && restaurant.openingHours.length > 0 && (
           <div className="w-full bg-white rounded-2xl border border-zinc-200 p-4">
-            <div className="flex items-center gap-3 mb-3">
-              <Clock size={20} className="text-orange-500 flex-shrink-0" />
-              <span className="text-base font-bold text-zinc-900">Opening Hours</span>
-            </div>
-            <div className="space-y-1.5 pl-8">
-              {restaurant.openingHours.map((hours, idx) => {
-                const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-                const isToday = hours.toLowerCase().startsWith(today.toLowerCase());
-                return (
-                  <p key={idx} className={`text-sm ${isToday ? 'font-bold text-orange-600' : 'text-zinc-600'}`}>
-                    {hours}
-                  </p>
-                );
-              })}
-            </div>
+            <button
+              onClick={() => setShowOpeningHours(!showOpeningHours)}
+              className="w-full flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <Clock size={20} className="text-orange-500 flex-shrink-0" />
+                <span className="text-base font-bold text-zinc-900">Opening Hours</span>
+              </div>
+              <ChevronRight size={18} className={`text-zinc-400 transition-transform ${showOpeningHours ? 'rotate-90' : ''}`} />
+            </button>
+            {showOpeningHours && (
+              <div className="space-y-1.5 pl-8 mt-3">
+                {restaurant.openingHours.map((hours, idx) => {
+                  const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                  const isToday = hours.toLowerCase().startsWith(today.toLowerCase());
+                  return (
+                    <p key={idx} className={`text-sm ${isToday ? 'font-bold text-orange-600' : 'text-zinc-600'}`}>
+                      {hours}
+                    </p>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

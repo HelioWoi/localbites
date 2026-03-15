@@ -83,11 +83,20 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
 
-  const toggleSave = (itemId: string, e: React.MouseEvent) => {
+  const toggleSave = async (itemId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const { saveRestaurant, unsaveRestaurant } = await import('../services/interactionService');
+    const item = restaurant.menuItems.find(i => i.id === itemId);
+    
     setSavedItems(prev => {
       const next = new Set(prev);
-      if (next.has(itemId)) next.delete(itemId); else next.add(itemId);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+        unsaveRestaurant(itemId);
+      } else {
+        next.add(itemId);
+        saveRestaurant(restaurant.id, itemId, item?.category);
+      }
       localStorage.setItem(`saved_dishes_${restaurant.id}`, JSON.stringify([...next]));
       return next;
     });
@@ -101,7 +110,8 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
     trackEvent({
       restaurantId: restaurant.id,
       eventType: 'order_button_click',
-      eventValue: item.id,
+      itemId: item.id,
+      itemType: item.category,
     });
 
     window.location.href = orderUrl;
@@ -147,7 +157,8 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
     trackEvent({
       restaurantId: restaurant.id,
       eventType: 'item_view',
-      eventValue: item.id,
+      itemId: item.id,
+      itemType: item.category,
     });
 
     if (item.videoUrl) {
@@ -297,7 +308,7 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
                       >
                         <Bookmark 
                           size={18} 
-                          className={savedItems.has(item.id) ? 'text-orange-500' : 'text-zinc-300'}
+                          className={savedItems.has(item.id) ? 'text-orange-500' : 'text-zinc-400'}
                           fill={savedItems.has(item.id) ? 'currentColor' : 'none'}
                         />
                       </button>

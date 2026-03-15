@@ -58,6 +58,45 @@ const getLocationCity = async (): Promise<string | null> => {
   }
 };
 
+// Detect referrer/traffic source
+const getReferrer = (): string => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const source = urlParams.get('source');
+  
+  // Check for explicit source parameter (e.g., ?source=qr)
+  if (source) return source;
+  
+  // Check document referrer
+  const docReferrer = document.referrer;
+  if (!docReferrer) return 'direct';
+  
+  try {
+    const referrerUrl = new URL(docReferrer);
+    const referrerHost = referrerUrl.hostname;
+    
+    // Social media
+    if (referrerHost.includes('facebook.com') || referrerHost.includes('fb.com')) return 'social';
+    if (referrerHost.includes('instagram.com')) return 'social';
+    if (referrerHost.includes('twitter.com') || referrerHost.includes('t.co')) return 'social';
+    if (referrerHost.includes('linkedin.com')) return 'social';
+    if (referrerHost.includes('tiktok.com')) return 'social';
+    
+    // Search engines
+    if (referrerHost.includes('google.com')) return 'search';
+    if (referrerHost.includes('bing.com')) return 'search';
+    if (referrerHost.includes('yahoo.com')) return 'search';
+    if (referrerHost.includes('duckduckgo.com')) return 'search';
+    
+    // Same domain = internal link
+    if (referrerHost === window.location.hostname) return 'link';
+    
+    // External link
+    return 'link';
+  } catch {
+    return 'direct';
+  }
+};
+
 // Check if debug mode is enabled
 const isDebugMode = (): boolean => {
   return new URLSearchParams(window.location.search).get('debugAnalytics') === '1';
@@ -95,6 +134,7 @@ export const trackEvent = async ({
     const finalSessionId = sessionId || getSessionId();
     const device = getDeviceType();
     const locationCity = await getLocationCity();
+    const finalReferrer = referrer || getReferrer();
 
     const eventData = {
       restaurant_id: restaurantId || null,
@@ -105,10 +145,10 @@ export const trackEvent = async ({
       event_value: eventValue || null,
       device,
       location_city: locationCity,
-      referrer: referrer || null,
+      referrer: finalReferrer,
     };
 
-    debugLog(`📊 Event fired: ${eventType}`, { restaurantId, itemId, eventValue, device });
+    debugLog(`📊 Event fired: ${eventType}`, { restaurantId, itemId, eventValue, device, referrer: finalReferrer });
 
     const { error } = await supabase.from('events').insert(eventData);
 

@@ -127,7 +127,7 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug,
           categories,
           reviews: [],
           reviewSnippets: [],
-          openingHours: partnerData.google_opening_hours || [],
+          openingHours: partnerData.opening_hours || [],
         };
 
         // Update Open Graph meta tags for sharing
