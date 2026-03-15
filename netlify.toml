@@ -2,6 +2,11 @@
   command = "npm run build"
   publish = "dist"
 
+# Edge Functions for dynamic Open Graph tags
+[[edge_functions]]
+  function = "og-tags"
+  path = "/r/*"
+
 # Serve static files first (robots.txt, sitemap.xml) - prevent SPA fallback
 [[redirects]]
   from = "/robots.txt"

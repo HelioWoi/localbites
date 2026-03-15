@@ -84,48 +84,40 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
         }, 100);
       }
     }
-    
-    // Load likes counts from Supabase
-    const loadLikesCounts = async () => {
-      try {
-        const { getAllLikesCounts } = await import('../services/interactionService');
-        const itemIds = restaurant.menuItems.map(item => item.id);
-        const counts = await getAllLikesCounts(itemIds);
-        setLikesCounts(counts);
-      } catch (error) {
-        console.error('Failed to load likes counts:', error);
-      }
-    };
-    loadLikesCounts();
-    
-    // Load view counts from analytics
-    const loadViewCounts = async () => {
-      try {
-        const itemIds = restaurant.menuItems.map(item => item.id);
-        const counts = await getMenuItemViewCounts(itemIds);
-        
-        // If no real data, add mock data for visual testing
-        if (counts.size === 0) {
-          const mockCounts = new Map<string, number>();
-          restaurant.menuItems.forEach((item, index) => {
-            // Generate random view counts between 50-500 for testing
-            mockCounts.set(item.id, Math.floor(Math.random() * 450) + 50);
-          });
-          setViewCounts(mockCounts);
-        } else {
-          setViewCounts(counts);
+  }, [restaurant.id, restaurant.menuItems]);
+  
+  // Lazy load analytics data AFTER first video is ready (non-blocking)
+  useEffect(() => {
+    // Wait for first video to be ready before loading analytics
+    const timer = setTimeout(() => {
+      // Load likes counts from Supabase
+      const loadLikesCounts = async () => {
+        try {
+          const { getAllLikesCounts } = await import('../services/interactionService');
+          const itemIds = restaurant.menuItems.map(item => item.id);
+          const counts = await getAllLikesCounts(itemIds);
+          setLikesCounts(counts);
+        } catch (error) {
+          console.error('Failed to load likes counts:', error);
         }
-      } catch (error) {
-        console.error('Failed to load view counts:', error);
-        // Fallback to mock data on error
-        const mockCounts = new Map<string, number>();
-        restaurant.menuItems.forEach((item, index) => {
-          mockCounts.set(item.id, Math.floor(Math.random() * 450) + 50);
-        });
-        setViewCounts(mockCounts);
-      }
-    };
-    loadViewCounts();
+      };
+      
+      // Load view counts from analytics
+      const loadViewCounts = async () => {
+        try {
+          const itemIds = restaurant.menuItems.map(item => item.id);
+          const counts = await getMenuItemViewCounts(itemIds);
+          setViewCounts(counts);
+        } catch (error) {
+          console.error('Failed to load view counts:', error);
+        }
+      };
+      
+      // Load both in parallel (non-blocking)
+      Promise.all([loadLikesCounts(), loadViewCounts()]);
+    }, 500); // Wait 500ms after mount to let video load first
+    
+    return () => clearTimeout(timer);
   }, [restaurant.id, restaurant.menuItems]);
   
   // Order Now - redirect to ordering system
@@ -289,9 +281,9 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
       }
     });
     
-    // Retry play with timeout limit (max 10 attempts = 5 seconds)
+    // Retry play with timeout limit (max 5 attempts = 5 seconds)
     let retryCount = 0;
-    const maxRetries = 10;
+    const maxRetries = 5;
     const retryInterval = setInterval(() => {
       const activeVideo = videoRefs.current[activeVideoIndex];
       retryCount++;
@@ -307,7 +299,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
       if (activeVideo && !activeVideo.paused) {
         clearInterval(retryInterval);
       }
-    }, 500);
+    }, 1000);
     
     return () => clearInterval(retryInterval);
   }, [activeVideoIndex, isMuted, isPlaying, filteredItems]);
@@ -546,7 +538,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               loop
               muted
               playsInline
-              preload={Math.abs(index - activeVideoIndex) <= 1 ? "auto" : "none"}
+              preload={index === activeVideoIndex ? "auto" : Math.abs(index - activeVideoIndex) === 1 ? "metadata" : "none"}
               onCanPlay={() => {
                 setVideoReady(prev => new Set(prev).add(index));
                 // Auto-play if this is the active video
