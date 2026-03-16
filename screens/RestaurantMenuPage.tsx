@@ -158,7 +158,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
 
   // Share dish
   const shareDish = async (item: MenuItem) => {
-    const shareUrl = `${window.location.origin}/${restaurant.slug}/menu?dish=${item.id}`;
+    const shareUrl = `${window.location.origin}/r/${restaurant.slug}/menu?dish=${item.id}`;
     const shareText = `Check out this ${item.name} from ${restaurant.name}! 🍽️`;
 
     // Use Web Share API if available (mobile)
