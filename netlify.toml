@@ -20,13 +20,7 @@
   status = 200
   force = true
 
-# Explicit SPA fallback for /r/* routes (restaurant pages)
-[[redirects]]
-  from = "/r/*"
-  to = "/index.html"
-  status = 200
-
-# SPA fallback for all other routes
+# SPA fallback for all routes (Edge Functions run BEFORE this redirect)
 [[redirects]]
   from = "/*"
   to = "/index.html"
