@@ -13,6 +13,24 @@ const RestaurantMenuLoader: React.FC<RestaurantMenuLoaderProps> = ({ slug }) => 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Desktop detection - redirect to profile on desktop
+  useEffect(() => {
+    const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+    if (isDesktop) {
+      // On desktop, redirect to profile instead of fullscreen menu
+      const currentPath = window.location.pathname;
+      const searchParams = window.location.search;
+      
+      if (currentPath.startsWith('/r/')) {
+        // QR route - redirect to /r/:slug
+        window.location.href = `/r/${slug}${searchParams}`;
+      } else {
+        // App feed route - redirect to /:slug
+        window.location.href = `/${slug}${searchParams}`;
+      }
+    }
+  }, [slug]);
+
   useEffect(() => {
     const loadRestaurant = async () => {
       try {
