@@ -76,15 +76,18 @@ export default async (request, context) => {
       .replace(/<title>[^<]*<\/title>/g, `<title>${ogTitle}</title>`)
       .replace(/<meta name="description" content="[^"]*"[^>]*>/g, `<meta name="description" content="${ogDescription}" />`);
 
+    const newHeaders = new Headers(response.headers);
+    newHeaders.set("content-type", "text/html; charset=utf-8");
+    newHeaders.set("cache-control", "public, max-age=0, must-revalidate");
+    newHeaders.set("x-og-function", "executed");
+    newHeaders.set("x-og-slug", slug);
+    newHeaders.set("x-og-restaurant-found", restaurant ? "yes" : "no");
+    newHeaders.set("x-og-title", ogTitle);
+
     return new Response(html, {
-      headers: {
-        "content-type": "text/html; charset=utf-8",
-        "cache-control": "public, max-age=0, must-revalidate",
-        "x-og-function": "executed",
-        "x-og-slug": slug,
-        "x-og-restaurant-found": restaurant ? "yes" : "no",
-        "x-og-title": ogTitle,
-      },
+      status: response.status,
+      statusText: response.statusText,
+      headers: newHeaders,
     });
   } catch (error) {
     console.error("OG Edge Function error:", error);
