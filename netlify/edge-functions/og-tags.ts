@@ -94,10 +94,11 @@ export default async (request, context) => {
     newHeaders.set("x-og-function", "executed");
     newHeaders.set("x-og-slug", slug);
     newHeaders.set("x-og-restaurant-found", restaurant ? "yes" : "no");
-    newHeaders.set("x-og-title", ogTitle);
+    // Encode title to ASCII-safe string for header
+    newHeaders.set("x-og-title", encodeURIComponent(ogTitle));
     
     debugHeaders.forEach((value, key) => newHeaders.set(key, value));
-    debugHeaders.set("x-og-debug-6", "returning-modified-html");
+    newHeaders.set("x-og-debug-6", "returning-modified-html");
 
     return new Response(html, {
       status: response.status,
