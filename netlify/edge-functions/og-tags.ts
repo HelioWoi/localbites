@@ -8,6 +8,7 @@ interface Partner {
   photo_url?: string;
   logo_url?: string;
   cover_photo_url?: string;
+  banner_images?: string[];
 }
 
 interface Dish {
@@ -25,7 +26,7 @@ async function getPartnerBySlug(slug: string): Promise<Partner | null> {
     if (!supabaseKey) return null;
 
     const response = await fetch(
-      `${supabaseUrl}/rest/v1/partners?slug=eq.${slug}&select=restaurant_name,slug,photo_url,logo_url,cover_photo_url`,
+      `${supabaseUrl}/rest/v1/partners?slug=eq.${slug}&select=restaurant_name,slug,photo_url,logo_url,cover_photo_url,banner_images`,
       {
         headers: {
           "apikey": supabaseKey,
@@ -110,7 +111,9 @@ export default async (request, context) => {
       // Dish-specific OG tags
       ogTitle = dish.name;
       ogDescription = `${partner.restaurant_name} - ${dish.name}`;
-      ogImage = dish.thumbnail_url || dish.video_url || partner.photo_url || partner.logo_url || partner.cover_photo_url || DEFAULT_OG_IMAGE;
+      // Use thumbnail if available, otherwise use first banner image, then restaurant photos
+      const firstBanner = partner.banner_images && partner.banner_images.length > 0 ? partner.banner_images[0] : null;
+      ogImage = dish.thumbnail_url || firstBanner || partner.photo_url || partner.logo_url || partner.cover_photo_url || DEFAULT_OG_IMAGE;
     } else if (partner) {
       // Restaurant OG tags
       ogTitle = partner.restaurant_name;
