@@ -20,7 +20,13 @@
   status = 200
   force = true
 
-# SPA fallback for all routes (including root)
+# Explicit SPA fallback for /r/* routes (restaurant pages)
+[[redirects]]
+  from = "/r/*"
+  to = "/index.html"
+  status = 200
+
+# SPA fallback for all other routes
 [[redirects]]
   from = "/*"
   to = "/index.html"
