@@ -221,12 +221,17 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug,
     );
   }
 
+  // Check if user came from external link (partner share link context)
+  // If no referrer or referrer is not from MenuLove, hide back button
+  const isExternalLink = !document.referrer || !document.referrer.includes('menulove.com.au');
+  const showBackButton = !isExternalLink && !isAppFeed;
+
   // Render desktop or mobile version based on screen size
   if (isDesktop) {
     return (
       <DesktopRestaurantProfile 
         restaurant={restaurant}
-        onClose={() => window.location.href = '/'}
+        onClose={showBackButton ? () => window.location.href = '/' : undefined}
         isSaved={false}
         onToggleSave={() => {}}
         isQRRoute={isQRRoute}
@@ -237,7 +242,7 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug,
   return (
     <RestaurantProfile 
       restaurant={restaurant} 
-      onBack={() => window.location.href = '/'} 
+      onBack={showBackButton ? () => window.location.href = '/' : undefined} 
       isSaved={false}
       onToggleSave={() => {}}
       openReviews={false}

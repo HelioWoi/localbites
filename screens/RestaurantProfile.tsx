@@ -8,7 +8,7 @@ import { getMenuItemViewCounts } from '../services/partnerAnalyticsService';
 
 interface RestaurantProfileProps {
   restaurant: Restaurant;
-  onBack: () => void;
+  onBack?: () => void;
   isSaved: boolean;
   onToggleSave: () => void;
   openReviews?: boolean;
@@ -680,8 +680,8 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         
         {/* Header buttons */}
         <div className="absolute top-14 left-6 right-6 flex justify-between">
-          {/* Back button - Hidden on /r/ routes, shown on /demo/ routes */}
-          {!window.location.pathname.startsWith('/r/') && (
+          {/* Back button - Hidden on /r/ routes, shown on /demo/ routes, hidden when onBack is undefined (external link) */}
+          {!window.location.pathname.startsWith('/r/') && onBack && (
             <button onClick={onBack} className="p-3 bg-black/20 backdrop-blur-md rounded-full text-white active:scale-90 transition-transform">
               <ChevronLeft size={24}/>
             </button>

@@ -150,7 +150,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
         {/* Header */}
         <div className="sticky top-0 bg-white z-10 px-6 py-4 flex items-center justify-between border-b border-zinc-100">
           <div className="flex items-center gap-3">
-            {!isQRRoute && (
+            {!isQRRoute && onClose && (
               <button
                 onClick={onClose}
                 className="w-8 h-8 rounded-full hover:bg-zinc-100 flex items-center justify-center transition-colors"
