@@ -5,6 +5,7 @@ const DEFAULT_OG_DESCRIPTION = "Transform your restaurant menu with engaging vid
 interface Partner {
   restaurant_name: string;
   slug: string;
+  photo_url?: string;
   logo_url?: string;
   cover_photo_url?: string;
 }
@@ -17,7 +18,7 @@ async function getPartnerBySlug(slug: string): Promise<Partner | null> {
     if (!supabaseKey) return null;
 
     const response = await fetch(
-      `${supabaseUrl}/rest/v1/partners?slug=eq.${slug}&select=restaurant_name,slug,logo_url,cover_photo_url`,
+      `${supabaseUrl}/rest/v1/partners?slug=eq.${slug}&select=restaurant_name,slug,photo_url,logo_url,cover_photo_url`,
       {
         headers: {
           "apikey": supabaseKey,
@@ -75,7 +76,7 @@ export default async (request, context) => {
     const ogDescription = partner
       ? `Explore the menu of ${partner.restaurant_name} through short videos.`
       : DEFAULT_OG_DESCRIPTION;
-    const ogImage = partner?.logo_url || partner?.cover_photo_url || DEFAULT_OG_IMAGE;
+    const ogImage = partner?.photo_url || partner?.logo_url || partner?.cover_photo_url || DEFAULT_OG_IMAGE;
     const ogUrl = request.url;
 
     html = html
