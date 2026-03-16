@@ -1,7 +1,8 @@
 import type { Context } from "https://edge.netlify.com";
 
-const SUPABASE_URL = "https://quybuvapflnzcaedjbkl.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF1eWJ1dmFwZmxuemNhZWRqYmtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU3OTY4MjAsImV4cCI6MjA1MTM3MjgyMH0.kKMZxPWTqJWZIlkQKQVqQkOjJJfGjNTvNLGJQqNGPjY";
+// Environment variables (set in Netlify dashboard)
+const SUPABASE_URL = Deno.env.get("VITE_SUPABASE_URL") || "https://quybuvapflnzcaedjbkl.supabase.co";
+const SUPABASE_ANON_KEY = Deno.env.get("VITE_SUPABASE_ANON_KEY") || "";
 
 const DEFAULT_OG_IMAGE = "https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/img-site.jpg";
 const DEFAULT_OG_TITLE = "MenuLove™ - Video Menus for Restaurants";
