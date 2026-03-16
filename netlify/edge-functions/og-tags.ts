@@ -35,6 +35,9 @@ async function getRestaurantBySlug(slug: string): Promise<Restaurant | null> {
 }
 
 export default async (request, context) => {
+  const debugHeaders = new Headers();
+  debugHeaders.set("x-og-debug-1", "function-started");
+  
   try {
     const url = new URL(request.url);
     const path = url.pathname;
@@ -44,19 +47,28 @@ export default async (request, context) => {
     }
 
     const slug = path.replace("/r/", "").split("?")[0];
+    debugHeaders.set("x-og-debug-2", `slug-extracted:${slug}`);
+    
     if (!slug) {
       return context.next();
     }
 
     const restaurant = await getRestaurantBySlug(slug);
+    debugHeaders.set("x-og-debug-3", `restaurant:${restaurant ? "found" : "not-found"}`);
+    
     const response = await context.next();
+    debugHeaders.set("x-og-debug-4", "response-received");
+    
     const contentType = response.headers.get("content-type") || "";
 
     if (!contentType.includes("text/html")) {
-      return response;
+      const passthrough = new Response(response.body, response);
+      debugHeaders.forEach((value, key) => passthrough.headers.set(key, value));
+      return passthrough;
     }
 
     let html = await response.text();
+    debugHeaders.set("x-og-debug-5", "html-extracted");
 
     const ogTitle = restaurant ? restaurant.name : DEFAULT_OG_TITLE;
     const ogDescription = restaurant
@@ -83,6 +95,9 @@ export default async (request, context) => {
     newHeaders.set("x-og-slug", slug);
     newHeaders.set("x-og-restaurant-found", restaurant ? "yes" : "no");
     newHeaders.set("x-og-title", ogTitle);
+    
+    debugHeaders.forEach((value, key) => newHeaders.set(key, value));
+    debugHeaders.set("x-og-debug-6", "returning-modified-html");
 
     return new Response(html, {
       status: response.status,
@@ -91,6 +106,9 @@ export default async (request, context) => {
     });
   } catch (error) {
     console.error("OG Edge Function error:", error);
-    return context.next();
+    const errorResponse = await context.next();
+    debugHeaders.set("x-og-error", String(error));
+    debugHeaders.forEach((value, key) => errorResponse.headers.set(key, value));
+    return errorResponse;
   }
 };
