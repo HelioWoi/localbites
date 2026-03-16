@@ -76,7 +76,12 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     // Check if URL has ?dish=id parameter to open specific video
     const dishId = urlParams.get('dish');
     if (dishId) {
-      const dishIndex = restaurant.menuItems.findIndex(item => item.id === dishId);
+      // If category filter is active, find index in filtered list
+      const itemsList = categoryParam 
+        ? restaurant.menuItems.filter(item => item.category === categoryParam)
+        : restaurant.menuItems;
+      
+      const dishIndex = itemsList.findIndex(item => item.id === dishId);
       if (dishIndex !== -1) {
         setActiveVideoIndex(dishIndex);
         // Scroll to the video
