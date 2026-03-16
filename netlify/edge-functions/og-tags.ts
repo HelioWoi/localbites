@@ -1,12 +1,8 @@
 import type { Context } from "https://edge.netlify.com";
 
-// Environment variables - uses separate names to avoid overriding Vite build vars
-const SUPABASE_URL = Deno.env.get("SUPABASE_EDGE_URL") || Deno.env.get("VITE_SUPABASE_URL") || "https://quybuvapflnzcaedjbkl.supabase.co";
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_EDGE_ANON_KEY") || Deno.env.get("VITE_SUPABASE_ANON_KEY") || "";
-
 const DEFAULT_OG_IMAGE = "https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/img-site.jpg";
-const DEFAULT_OG_TITLE = "MenuLove™ - Video Menus for Restaurants";
-const DEFAULT_OG_DESCRIPTION = "Transform your restaurant menu with engaging video content. MenuLove™ helps Australian cafés and restaurants showcase dishes through TikTok-style videos.";
+const DEFAULT_OG_TITLE = "MenuLove\u2122 - Video Menus for Restaurants";
+const DEFAULT_OG_DESCRIPTION = "Transform your restaurant menu with engaging video content.";
 
 interface Restaurant {
   name: string;
@@ -17,22 +13,33 @@ interface Restaurant {
 
 async function getRestaurantBySlug(slug: string): Promise<Restaurant | null> {
   try {
+    const supabaseUrl = "https://quybuvapflnzcaedjbkl.supabase.co";
+    const supabaseKey = Deno.env.get("VITE_SUPABASE_ANON_KEY") || "";
+    
+    if (!supabaseKey) {
+      console.error("VITE_SUPABASE_ANON_KEY not set");
+      return null;
+    }
+
     const response = await fetch(
-      `${SUPABASE_URL}/rest/v1/restaurants?slug=eq.${slug}&select=name,slug,profile_image_url,cuisine`,
+      `${supabaseUrl}/rest/v1/restaurants?slug=eq.${slug}&select=name,slug,profile_image_url,cuisine`,
       {
         headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          "apikey": supabaseKey,
+          "Authorization": `Bearer ${supabaseKey}`,
         },
       }
     );
 
-    if (!response.ok) return null;
-    
+    if (!response.ok) {
+      console.error("Supabase response not ok:", response.status);
+      return null;
+    }
+
     const data = await response.json();
     return data && data.length > 0 ? data[0] : null;
   } catch (error) {
-    console.error('Error fetching restaurant:', error);
+    console.error("Error fetching restaurant:", error);
     return null;
   }
 }
@@ -42,104 +49,57 @@ export default async (request: Request, context: Context) => {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    // Only handle /r/:slug routes
-    if (!path.startsWith('/r/')) {
+    if (!path.startsWith("/r/")) {
       return context.next();
     }
 
-    // Extract slug from path
-    const slug = path.replace('/r/', '').split('?')[0]; // Remove query params
-    
-    // If no slug, let React handle it
+    const slug = path.replace("/r/", "").split("?")[0];
+
     if (!slug) {
       return context.next();
     }
-    
-    // Fetch restaurant data
+
     const restaurant = await getRestaurantBySlug(slug);
-    
-    // Get the original index.html from the SPA
+
     const response = await context.next();
-    
-    // If response is not HTML, return as-is
-    const contentType = response.headers.get('content-type') || '';
-    if (!contentType.includes('text/html')) {
+    const contentType = response.headers.get("content-type") || "";
+
+    if (!contentType.includes("text/html")) {
       return response;
     }
-    
+
     let html = await response.text();
-    
-    // Prepare OG tag values
+
     const ogTitle = restaurant ? restaurant.name : DEFAULT_OG_TITLE;
-    const ogDescription = restaurant 
+    const ogDescription = restaurant
       ? `Explore the menu of ${restaurant.name} through short videos.`
       : DEFAULT_OG_DESCRIPTION;
     const ogImage = restaurant?.profile_image_url || DEFAULT_OG_IMAGE;
     const ogUrl = request.url;
-  
-  // Replace OG tags in HTML
-  html = html
-    // Replace og:url
-    .replace(
-      /<meta property="og:url" content="[^"]*" \/>/,
-      `<meta property="og:url" content="${ogUrl}" />`
-    )
-    // Replace og:title
-    .replace(
-      /<meta property="og:title" content="[^"]*" \/>/,
-      `<meta property="og:title" content="${ogTitle}" />`
-    )
-    // Replace og:description
-    .replace(
-      /<meta property="og:description" content="[^"]*" \/>/,
-      `<meta property="og:description" content="${ogDescription}" />`
-    )
-    // Replace og:image
-    .replace(
-      /<meta property="og:image" content="[^"]*" \/>/,
-      `<meta property="og:image" content="${ogImage}" />`
-    )
-    // Replace twitter:title
-    .replace(
-      /<meta name="twitter:title" content="[^"]*" \/>/g,
-      `<meta name="twitter:title" content="${ogTitle}" />`
-    )
-    // Replace twitter:description
-    .replace(
-      /<meta name="twitter:description" content="[^"]*" \/>/g,
-      `<meta name="twitter:description" content="${ogDescription}" />`
-    )
-    // Replace twitter:image
-    .replace(
-      /<meta name="twitter:image" content="[^"]*" \/>/,
-      `<meta name="twitter:image" content="${ogImage}" />`
-    )
-    // Replace page title
-    .replace(
-      /<title>[^<]*<\/title>/,
-      `<title>${ogTitle}</title>`
-    )
-    // Replace meta description
-    .replace(
-      /<meta name="description" content="[^"]*" \/>/,
-      `<meta name="description" content="${ogDescription}" />`
-    );
-  
+
+    html = html
+      .replace(/<meta property="og:url" content="[^"]*"[^>]*>/, `<meta property="og:url" content="${ogUrl}" />`)
+      .replace(/<meta property="og:title" content="[^"]*"[^>]*>/, `<meta property="og:title" content="${ogTitle}" />`)
+      .replace(/<meta property="og:description" content="[^"]*"[^>]*>/, `<meta property="og:description" content="${ogDescription}" />`)
+      .replace(/<meta property="og:image" content="[^"]*"[^>]*>/, `<meta property="og:image" content="${ogImage}" />`)
+      .replace(/<meta name="twitter:title" content="[^"]*"[^>]*>/g, `<meta name="twitter:title" content="${ogTitle}" />`)
+      .replace(/<meta name="twitter:description" content="[^"]*"[^>]*>/g, `<meta name="twitter:description" content="${ogDescription}" />`)
+      .replace(/<meta name="twitter:image" content="[^"]*"[^>]*>/, `<meta name="twitter:image" content="${ogImage}" />`)
+      .replace(/<title>[^<]*<\/title>/, `<title>${ogTitle}</title>`)
+      .replace(/<meta name="description" content="[^"]*"[^>]*>/, `<meta name="description" content="${ogDescription}" />`);
+
     return new Response(html, {
       headers: {
-        'content-type': 'text/html; charset=utf-8',
-        'cache-control': 'public, max-age=3600',
-        // Debug headers
-        'x-og-function': 'executed',
-        'x-og-slug': slug,
-        'x-og-restaurant-found': restaurant ? 'yes' : 'no',
-        'x-og-title': ogTitle,
-        'x-og-image': ogImage,
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "x-og-function": "executed",
+        "x-og-slug": slug,
+        "x-og-restaurant-found": restaurant ? "yes" : "no",
+        "x-og-title": ogTitle,
       },
     });
   } catch (error) {
-    // If Edge Function fails, let React app handle the route
-    console.error('Edge Function error:', error);
+    console.error("OG Edge Function error:", error);
     return context.next();
   }
 };
