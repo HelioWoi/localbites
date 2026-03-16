@@ -109,7 +109,7 @@ export default async (request, context) => {
     if (dish && partner) {
       // Dish-specific OG tags
       ogTitle = dish.name;
-      ogDescription = `Check out this ${dish.name} from ${partner.restaurant_name}! 🍽️`;
+      ogDescription = `${partner.restaurant_name} - ${dish.name}`;
       ogImage = dish.thumbnail_url || dish.video_url || partner.photo_url || partner.logo_url || partner.cover_photo_url || DEFAULT_OG_IMAGE;
     } else if (partner) {
       // Restaurant OG tags
