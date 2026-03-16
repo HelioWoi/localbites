@@ -37,9 +37,6 @@ async function getPartnerBySlug(slug: string): Promise<Partner | null> {
 }
 
 export default async (request, context) => {
-  const debugHeaders = new Headers();
-  debugHeaders.set("x-og-debug-1", "function-started");
-  
   try {
     const url = new URL(request.url);
     const path = url.pathname;
@@ -49,28 +46,20 @@ export default async (request, context) => {
     }
 
     const slug = path.replace("/r/", "").split("?")[0];
-    debugHeaders.set("x-og-debug-2", `slug-extracted:${slug}`);
     
     if (!slug) {
       return context.next();
     }
 
     const partner = await getPartnerBySlug(slug);
-    debugHeaders.set("x-og-debug-3", `partner:${partner ? "found" : "not-found"}`);
-    
     const response = await context.next();
-    debugHeaders.set("x-og-debug-4", "response-received");
-    
     const contentType = response.headers.get("content-type") || "";
 
     if (!contentType.includes("text/html")) {
-      const passthrough = new Response(response.body, response);
-      debugHeaders.forEach((value, key) => passthrough.headers.set(key, value));
-      return passthrough;
+      return response;
     }
 
     let html = await response.text();
-    debugHeaders.set("x-og-debug-5", "html-extracted");
 
     const ogTitle = partner ? partner.restaurant_name : DEFAULT_OG_TITLE;
     const ogDescription = partner
@@ -93,14 +82,6 @@ export default async (request, context) => {
     const newHeaders = new Headers(response.headers);
     newHeaders.set("content-type", "text/html; charset=utf-8");
     newHeaders.set("cache-control", "public, max-age=0, must-revalidate");
-    newHeaders.set("x-og-function", "executed");
-    newHeaders.set("x-og-slug", slug);
-    newHeaders.set("x-og-partner-found", partner ? "yes" : "no");
-    // Encode title to ASCII-safe string for header
-    newHeaders.set("x-og-title", encodeURIComponent(ogTitle));
-    
-    debugHeaders.forEach((value, key) => newHeaders.set(key, value));
-    newHeaders.set("x-og-debug-6", "returning-modified-html");
 
     return new Response(html, {
       status: response.status,
@@ -109,9 +90,6 @@ export default async (request, context) => {
     });
   } catch (error) {
     console.error("OG Edge Function error:", error);
-    const errorResponse = await context.next();
-    debugHeaders.set("x-og-error", String(error));
-    debugHeaders.forEach((value, key) => errorResponse.headers.set(key, value));
-    return errorResponse;
+    return context.next();
   }
 };
