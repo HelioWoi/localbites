@@ -2,13 +2,14 @@ const DEFAULT_OG_IMAGE = "https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/ob
 const DEFAULT_OG_TITLE = "MenuLove™ - Video Menus for Restaurants";
 const DEFAULT_OG_DESCRIPTION = "Transform your restaurant menu with engaging video content.";
 
-interface Restaurant {
-  name: string;
+interface Partner {
+  restaurant_name: string;
   slug: string;
-  main_photo_url?: string;
+  logo_url?: string;
+  cover_photo_url?: string;
 }
 
-async function getRestaurantBySlug(slug: string): Promise<Restaurant | null> {
+async function getPartnerBySlug(slug: string): Promise<Partner | null> {
   try {
     const supabaseUrl = "https://quybuvapflnzcaedjbkl.supabase.co";
     const supabaseKey = Deno.env.get("VITE_SUPABASE_ANON_KEY") || "";
@@ -16,7 +17,7 @@ async function getRestaurantBySlug(slug: string): Promise<Restaurant | null> {
     if (!supabaseKey) return null;
 
     const response = await fetch(
-      `${supabaseUrl}/rest/v1/restaurants?slug=eq.${slug}&select=name,slug,main_photo_url`,
+      `${supabaseUrl}/rest/v1/partners?slug=eq.${slug}&select=restaurant_name,slug,logo_url,cover_photo_url`,
       {
         headers: {
           "apikey": supabaseKey,
@@ -29,7 +30,7 @@ async function getRestaurantBySlug(slug: string): Promise<Restaurant | null> {
     const data = await response.json();
     return data && data.length > 0 ? data[0] : null;
   } catch (error) {
-    console.error("Error fetching restaurant:", error);
+    console.error("Error fetching partner:", error);
     return null;
   }
 }
@@ -53,8 +54,8 @@ export default async (request, context) => {
       return context.next();
     }
 
-    const restaurant = await getRestaurantBySlug(slug);
-    debugHeaders.set("x-og-debug-3", `restaurant:${restaurant ? "found" : "not-found"}`);
+    const partner = await getPartnerBySlug(slug);
+    debugHeaders.set("x-og-debug-3", `partner:${partner ? "found" : "not-found"}`);
     
     const response = await context.next();
     debugHeaders.set("x-og-debug-4", "response-received");
@@ -70,11 +71,11 @@ export default async (request, context) => {
     let html = await response.text();
     debugHeaders.set("x-og-debug-5", "html-extracted");
 
-    const ogTitle = restaurant ? restaurant.name : DEFAULT_OG_TITLE;
-    const ogDescription = restaurant
-      ? `Explore the menu of ${restaurant.name} through short videos.`
+    const ogTitle = partner ? partner.restaurant_name : DEFAULT_OG_TITLE;
+    const ogDescription = partner
+      ? `Explore the menu of ${partner.restaurant_name} through short videos.`
       : DEFAULT_OG_DESCRIPTION;
-    const ogImage = restaurant?.main_photo_url || DEFAULT_OG_IMAGE;
+    const ogImage = partner?.logo_url || partner?.cover_photo_url || DEFAULT_OG_IMAGE;
     const ogUrl = request.url;
 
     html = html
@@ -93,7 +94,7 @@ export default async (request, context) => {
     newHeaders.set("cache-control", "public, max-age=0, must-revalidate");
     newHeaders.set("x-og-function", "executed");
     newHeaders.set("x-og-slug", slug);
-    newHeaders.set("x-og-restaurant-found", restaurant ? "yes" : "no");
+    newHeaders.set("x-og-partner-found", partner ? "yes" : "no");
     // Encode title to ASCII-safe string for header
     newHeaders.set("x-og-title", encodeURIComponent(ogTitle));
     
