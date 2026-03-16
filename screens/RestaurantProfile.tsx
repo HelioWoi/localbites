@@ -391,19 +391,26 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
     if (restaurant.isSubscribed) {
       const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const dishId = dishesWithVideo[startIndex]?.id;
+      const category = dishesWithVideo[startIndex]?.category;
+      
+      // Build URL params
+      const params = new URLSearchParams();
+      if (dishId) params.append('dish', dishId);
+      if (category) params.append('category', category);
+      const queryString = params.toString() ? `?${params.toString()}` : '';
       
       // Check if we're in demo mode
       const isDemoMode = window.location.pathname.startsWith('/demo/');
       
       if (isDemoMode) {
         // Demo route - navigate to /demo/:slug/menu
-        window.location.href = `/demo/${slug}/menu${dishId ? `?dish=${dishId}` : ''}`;
+        window.location.href = `/demo/${slug}/menu${queryString}`;
       } else if (isStandalone) {
         // QR code standalone - navigate to /r/:slug/menu
-        window.location.href = `/r/${slug}/menu${dishId ? `?dish=${dishId}` : ''}`;
+        window.location.href = `/r/${slug}/menu${queryString}`;
       } else {
         // App feed - navigate to /:slug/menu (no /r/ prefix)
-        window.location.href = `/${slug}/menu${dishId ? `?dish=${dishId}` : ''}`;
+        window.location.href = `/${slug}/menu${queryString}`;
       }
     } else {
       // Fallback to modal for non-partner restaurants

@@ -67,6 +67,12 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
       setShowSavedOnly(true);
     }
     
+    // Check if URL has ?category parameter to filter by category
+    const categoryParam = urlParams.get('category');
+    if (categoryParam) {
+      setActiveCategory(categoryParam);
+    }
+    
     // Check if URL has ?dish=id parameter to open specific video
     const dishId = urlParams.get('dish');
     if (dishId) {
