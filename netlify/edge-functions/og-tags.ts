@@ -10,6 +10,13 @@ interface Partner {
   cover_photo_url?: string;
 }
 
+interface Dish {
+  id: string;
+  name: string;
+  video_url?: string;
+  thumbnail_url?: string;
+}
+
 async function getPartnerBySlug(slug: string): Promise<Partner | null> {
   try {
     const supabaseUrl = "https://quybuvapflnzcaedjbkl.supabase.co";
@@ -36,6 +43,32 @@ async function getPartnerBySlug(slug: string): Promise<Partner | null> {
   }
 }
 
+async function getDishById(dishId: string): Promise<Dish | null> {
+  try {
+    const supabaseUrl = "https://quybuvapflnzcaedjbkl.supabase.co";
+    const supabaseKey = Deno.env.get("VITE_SUPABASE_ANON_KEY") || "";
+    
+    if (!supabaseKey) return null;
+
+    const response = await fetch(
+      `${supabaseUrl}/rest/v1/menu_items?id=eq.${dishId}&select=id,name,video_url,thumbnail_url`,
+      {
+        headers: {
+          "apikey": supabaseKey,
+          "Authorization": `Bearer ${supabaseKey}`,
+        },
+      }
+    );
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data && data.length > 0 ? data[0] : null;
+  } catch (error) {
+    console.error("Error fetching dish:", error);
+    return null;
+  }
+}
+
 export default async (request, context) => {
   try {
     const url = new URL(request.url);
@@ -52,6 +85,11 @@ export default async (request, context) => {
     }
 
     const partner = await getPartnerBySlug(slug);
+    
+    // Check if URL has ?dish=id parameter for dish-specific OG tags
+    const dishId = url.searchParams.get("dish");
+    const dish = dishId ? await getDishById(dishId) : null;
+    
     const response = await context.next();
     const contentType = response.headers.get("content-type") || "";
 
@@ -61,11 +99,28 @@ export default async (request, context) => {
 
     let html = await response.text();
 
-    const ogTitle = partner ? partner.restaurant_name : DEFAULT_OG_TITLE;
-    const ogDescription = partner
-      ? `Explore the menu of ${partner.restaurant_name} through short videos.`
-      : DEFAULT_OG_DESCRIPTION;
-    const ogImage = partner?.photo_url || partner?.logo_url || partner?.cover_photo_url || DEFAULT_OG_IMAGE;
+    // Use dish-specific OG tags if dish is found, otherwise use restaurant OG tags
+    let ogTitle: string;
+    let ogDescription: string;
+    let ogImage: string;
+    
+    if (dish && partner) {
+      // Dish-specific OG tags
+      ogTitle = dish.name;
+      ogDescription = `Check out this ${dish.name} from ${partner.restaurant_name}! 🍽️`;
+      ogImage = dish.thumbnail_url || dish.video_url || partner.photo_url || partner.logo_url || partner.cover_photo_url || DEFAULT_OG_IMAGE;
+    } else if (partner) {
+      // Restaurant OG tags
+      ogTitle = partner.restaurant_name;
+      ogDescription = `Explore the menu of ${partner.restaurant_name} through short videos.`;
+      ogImage = partner.photo_url || partner.logo_url || partner.cover_photo_url || DEFAULT_OG_IMAGE;
+    } else {
+      // Default OG tags
+      ogTitle = DEFAULT_OG_TITLE;
+      ogDescription = DEFAULT_OG_DESCRIPTION;
+      ogImage = DEFAULT_OG_IMAGE;
+    }
+    
     const ogUrl = request.url;
 
     html = html
