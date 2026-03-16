@@ -78,7 +78,9 @@ export default async (request, context) => {
       return context.next();
     }
 
-    const slug = path.replace("/r/", "").split("?")[0];
+    // Extract slug from path like /r/slug or /r/slug/menu
+    const pathParts = path.replace("/r/", "").split("/");
+    const slug = pathParts[0];
     
     if (!slug) {
       return context.next();
