@@ -111,9 +111,8 @@ export default async (request, context) => {
       // Dish-specific OG tags
       ogTitle = dish.name;
       ogDescription = `${partner.restaurant_name} - ${dish.name}`;
-      // Use thumbnail if available, otherwise use first banner image, then restaurant photos
-      const firstBanner = partner.banner_images && partner.banner_images.length > 0 ? partner.banner_images[0] : null;
-      ogImage = dish.thumbnail_url || firstBanner || partner.photo_url || partner.logo_url || partner.cover_photo_url || DEFAULT_OG_IMAGE;
+      // Use dish thumbnail if available, otherwise use restaurant photo (facade)
+      ogImage = dish.thumbnail_url || partner.photo_url || partner.logo_url || partner.cover_photo_url || DEFAULT_OG_IMAGE;
     } else if (partner) {
       // Restaurant OG tags
       ogTitle = partner.restaurant_name;
