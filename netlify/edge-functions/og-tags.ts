@@ -1,8 +1,8 @@
 import type { Context } from "https://edge.netlify.com";
 
-// Environment variables (set in Netlify dashboard)
-const SUPABASE_URL = Deno.env.get("VITE_SUPABASE_URL") || "https://quybuvapflnzcaedjbkl.supabase.co";
-const SUPABASE_ANON_KEY = Deno.env.get("VITE_SUPABASE_ANON_KEY") || "";
+// Environment variables - uses separate names to avoid overriding Vite build vars
+const SUPABASE_URL = Deno.env.get("SUPABASE_EDGE_URL") || Deno.env.get("VITE_SUPABASE_URL") || "https://quybuvapflnzcaedjbkl.supabase.co";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_EDGE_ANON_KEY") || Deno.env.get("VITE_SUPABASE_ANON_KEY") || "";
 
 const DEFAULT_OG_IMAGE = "https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/img-site.jpg";
 const DEFAULT_OG_TITLE = "MenuLove™ - Video Menus for Restaurants";
