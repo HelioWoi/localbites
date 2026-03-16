@@ -38,31 +38,44 @@ async function getRestaurantBySlug(slug: string): Promise<Restaurant | null> {
 }
 
 export default async (request: Request, context: Context) => {
-  const url = new URL(request.url);
-  const path = url.pathname;
+  try {
+    const url = new URL(request.url);
+    const path = url.pathname;
 
-  // Only handle /r/:slug routes
-  if (!path.startsWith('/r/')) {
-    return context.next();
-  }
+    // Only handle /r/:slug routes
+    if (!path.startsWith('/r/')) {
+      return context.next();
+    }
 
-  // Extract slug from path
-  const slug = path.replace('/r/', '').split('?')[0]; // Remove query params
-  
-  // Fetch restaurant data
-  const restaurant = await getRestaurantBySlug(slug);
-  
-  // Get the original index.html from the SPA
-  const response = await context.next();
-  let html = await response.text();
-  
-  // Prepare OG tag values
-  const ogTitle = restaurant ? restaurant.name : DEFAULT_OG_TITLE;
-  const ogDescription = restaurant 
-    ? `Explore the menu of ${restaurant.name} through short videos.`
-    : DEFAULT_OG_DESCRIPTION;
-  const ogImage = restaurant?.profile_image_url || DEFAULT_OG_IMAGE;
-  const ogUrl = request.url;
+    // Extract slug from path
+    const slug = path.replace('/r/', '').split('?')[0]; // Remove query params
+    
+    // If no slug, let React handle it
+    if (!slug) {
+      return context.next();
+    }
+    
+    // Fetch restaurant data
+    const restaurant = await getRestaurantBySlug(slug);
+    
+    // Get the original index.html from the SPA
+    const response = await context.next();
+    
+    // If response is not HTML, return as-is
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('text/html')) {
+      return response;
+    }
+    
+    let html = await response.text();
+    
+    // Prepare OG tag values
+    const ogTitle = restaurant ? restaurant.name : DEFAULT_OG_TITLE;
+    const ogDescription = restaurant 
+      ? `Explore the menu of ${restaurant.name} through short videos.`
+      : DEFAULT_OG_DESCRIPTION;
+    const ogImage = restaurant?.profile_image_url || DEFAULT_OG_IMAGE;
+    const ogUrl = request.url;
   
   // Replace OG tags in HTML
   html = html
@@ -112,16 +125,21 @@ export default async (request: Request, context: Context) => {
       `<meta name="description" content="${ogDescription}" />`
     );
   
-  return new Response(html, {
-    headers: {
-      'content-type': 'text/html; charset=utf-8',
-      'cache-control': 'public, max-age=3600',
-      // Debug headers
-      'x-og-function': 'executed',
-      'x-og-slug': slug,
-      'x-og-restaurant-found': restaurant ? 'yes' : 'no',
-      'x-og-title': ogTitle,
-      'x-og-image': ogImage,
-    },
-  });
+    return new Response(html, {
+      headers: {
+        'content-type': 'text/html; charset=utf-8',
+        'cache-control': 'public, max-age=3600',
+        // Debug headers
+        'x-og-function': 'executed',
+        'x-og-slug': slug,
+        'x-og-restaurant-found': restaurant ? 'yes' : 'no',
+        'x-og-title': ogTitle,
+        'x-og-image': ogImage,
+      },
+    });
+  } catch (error) {
+    // If Edge Function fails, let React app handle the route
+    console.error('Edge Function error:', error);
+    return context.next();
+  }
 };
