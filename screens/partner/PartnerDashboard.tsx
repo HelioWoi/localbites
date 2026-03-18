@@ -2067,16 +2067,29 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                         <h3 className="font-semibold text-zinc-900">{category}</h3>
                         <p className="text-xs text-zinc-500">{categoryItems.length} items</p>
                       </div>
-                      <button
-                        onClick={() => {
-                          setEditingCategory(category);
-                          setEditCategoryName(category);
-                        }}
-                        className="p-2 text-zinc-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors"
-                        title="Edit category"
-                      >
-                        <Edit2 size={16} />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setMenuItemCategory(category);
+                            setShowMenuUploadModal(true);
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-lg transition-colors"
+                          title="Add item to this category"
+                        >
+                          <Plus size={16} />
+                          <span>Add Item</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingCategory(category);
+                            setEditCategoryName(category);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors"
+                          title="Edit category"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                      </div>
                     </div>
                     <div className="p-4 grid grid-cols-3 sm:grid-cols-4 gap-3">
                       {categoryItems.map(item => {
