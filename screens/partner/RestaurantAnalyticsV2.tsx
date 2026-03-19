@@ -18,7 +18,7 @@ import {
 import {
   Eye, Video, Heart, Bookmark, ShoppingBag, QrCode, User,
   Smartphone, Monitor, Clock, TrendingUp, Loader2, Info, CheckCircle2,
-  Share2, Navigation, Phone
+  Share2, Navigation, Phone, Download
 } from 'lucide-react';
 import {
   getPartnerSummaryV2,
@@ -68,7 +68,7 @@ const RestaurantAnalyticsV2: React.FC<RestaurantAnalyticsV2Props> = ({ restauran
       const [summaryData, itemsData, videosData, hoursData, deviceData, funnelData] = await Promise.all([
         getPartnerSummaryV2(restaurantId, start, end),
         getTopItemsV2(restaurantId, start, end, 10),
-        getMostWatchedVideosV2(restaurantId, start, end, 8),
+        getMostWatchedVideosV2(restaurantId, start, end, 10),
         getPeakHoursV2(restaurantId, start, end),
         getDeviceBreakdownV2(restaurantId, start, end),
         getConversionFunnelV2(restaurantId, start, end)
@@ -92,6 +92,44 @@ const RestaurantAnalyticsV2: React.FC<RestaurantAnalyticsV2Props> = ({ restauran
     if (hour === 12) return '12 PM';
     if (hour < 12) return `${hour} AM`;
     return `${hour - 12} PM`;
+  };
+
+  const downloadCSV = () => {
+    if (!topItems.length) return;
+
+    // CSV headers
+    const headers = ['Dish Name', 'Category', 'Views', 'Plays', 'Likes', 'Saves', 'Shares', 'Orders', 'Directions', 'Phone Calls'];
+    
+    // CSV rows
+    const rows = topItems.map(item => [
+      `"${item.item_name}"`,
+      `"${item.category || 'N/A'}"`,
+      item.views,
+      item.plays,
+      item.likes,
+      item.saves,
+      item.shares,
+      item.order_clicks,
+      item.directions_clicks,
+      item.phone_calls
+    ]);
+
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `analytics_${period}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   if (loading) {
@@ -160,6 +198,15 @@ const RestaurantAnalyticsV2: React.FC<RestaurantAnalyticsV2Props> = ({ restauran
               {p === 'today' ? 'Today' : p === '7days' ? 'Last 7 Days' : 'Last 30 Days'}
             </button>
           ))}
+          <button
+            onClick={downloadCSV}
+            disabled={!topItems.length}
+            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-zinc-100 text-zinc-700 hover:bg-zinc-200 disabled:bg-zinc-50 disabled:text-zinc-300 disabled:cursor-not-allowed flex items-center gap-2 border border-zinc-200"
+            title="Download full analytics report as CSV"
+          >
+            <Download className="w-4 h-4" />
+            Export CSV
+          </button>
         </div>
       </div>
 
@@ -260,10 +307,10 @@ const RestaurantAnalyticsV2: React.FC<RestaurantAnalyticsV2Props> = ({ restauran
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Most Watched Videos */}
         <div className="bg-white rounded-xl border border-zinc-200 p-6">
-          <h3 className="text-lg font-bold text-zinc-900 mb-4">Most Watched Videos</h3>
+          <h3 className="text-lg font-bold text-zinc-900 mb-4">Top 5 Most Watched Videos</h3>
           {mostWatchedVideos.length > 0 ? (
             <div className="grid grid-cols-2 gap-3">
-              {mostWatchedVideos.map((item, index) => (
+              {mostWatchedVideos.slice(0, 5).map((item, index) => (
                 <div key={item.item_id} className="relative group">
                   <div className="aspect-[9/16] bg-zinc-100 rounded-lg overflow-hidden relative">
                     {item.video_url ? (
@@ -306,7 +353,7 @@ const RestaurantAnalyticsV2: React.FC<RestaurantAnalyticsV2Props> = ({ restauran
 
         {/* Top Performing Items */}
         <div className="bg-white rounded-xl border border-zinc-200 p-6">
-          <h3 className="text-lg font-bold text-zinc-900 mb-4">Top Performing Items</h3>
+          <h3 className="text-lg font-bold text-zinc-900 mb-4">Top 5 Performing Items</h3>
           {topItems.length > 0 ? (
             <div className="space-y-3">
               {topItems.slice(0, 5).map((item, index) => (
@@ -344,7 +391,7 @@ const RestaurantAnalyticsV2: React.FC<RestaurantAnalyticsV2Props> = ({ restauran
           <div className="bg-white rounded-xl border border-zinc-200 p-5">
             <div className="flex items-center gap-2 mb-3">
               <Heart className="w-4 h-4 text-red-500" />
-              <h4 className="text-sm font-bold text-zinc-900">Most Liked</h4>
+              <h4 className="text-sm font-bold text-zinc-900">Top 5 Most Liked</h4>
             </div>
             {topItems.filter(i => i.likes > 0).length > 0 ? (
               <div className="space-y-2">
@@ -364,7 +411,7 @@ const RestaurantAnalyticsV2: React.FC<RestaurantAnalyticsV2Props> = ({ restauran
           <div className="bg-white rounded-xl border border-zinc-200 p-5">
             <div className="flex items-center gap-2 mb-3">
               <Bookmark className="w-4 h-4 text-purple-500" />
-              <h4 className="text-sm font-bold text-zinc-900">Most Saved</h4>
+              <h4 className="text-sm font-bold text-zinc-900">Top 5 Most Saved</h4>
             </div>
             {topItems.filter(i => i.saves > 0).length > 0 ? (
               <div className="space-y-2">
@@ -384,7 +431,7 @@ const RestaurantAnalyticsV2: React.FC<RestaurantAnalyticsV2Props> = ({ restauran
           <div className="bg-white rounded-xl border border-zinc-200 p-5">
             <div className="flex items-center gap-2 mb-3">
               <Share2 className="w-4 h-4 text-cyan-500" />
-              <h4 className="text-sm font-bold text-zinc-900">Most Shared</h4>
+              <h4 className="text-sm font-bold text-zinc-900">Top 5 Most Shared</h4>
             </div>
             {topItems.filter(i => i.shares > 0).length > 0 ? (
               <div className="space-y-2">
@@ -404,7 +451,7 @@ const RestaurantAnalyticsV2: React.FC<RestaurantAnalyticsV2Props> = ({ restauran
           <div className="bg-white rounded-xl border border-zinc-200 p-5">
             <div className="flex items-center gap-2 mb-3">
               <ShoppingBag className="w-4 h-4 text-orange-500" />
-              <h4 className="text-sm font-bold text-zinc-900">Most Ordered</h4>
+              <h4 className="text-sm font-bold text-zinc-900">Top 5 Most Ordered</h4>
             </div>
             {topItems.filter(i => i.order_clicks > 0).length > 0 ? (
               <div className="space-y-2">

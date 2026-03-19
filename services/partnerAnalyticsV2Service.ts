@@ -27,6 +27,7 @@ export interface PartnerSummaryV2 {
 export interface TopItemV2 {
   item_id: string;
   item_name: string;
+  category?: string;
   video_url?: string;
   views: number;
   plays: number;
@@ -34,6 +35,8 @@ export interface TopItemV2 {
   saves: number;
   shares: number;
   order_clicks: number;
+  directions_clicks: number;
+  phone_calls: number;
   has_video: boolean;
 }
 
@@ -143,6 +146,8 @@ export const getTopItemsV2 = async (
       saves: number;
       shares: number;
       order_clicks: number;
+      directions_clicks: number;
+      phone_calls: number;
     }>();
 
     (events || []).forEach(event => {
@@ -156,6 +161,8 @@ export const getTopItemsV2 = async (
           saves: 0,
           shares: 0,
           order_clicks: 0,
+          directions_clicks: 0,
+          phone_calls: 0,
         });
       }
 
@@ -180,6 +187,12 @@ export const getTopItemsV2 = async (
         case 'order_click':
           stats.order_clicks++;
           break;
+        case 'directions_click':
+          stats.directions_clicks++;
+          break;
+        case 'phone_call':
+          stats.phone_calls++;
+          break;
       }
     });
 
@@ -189,7 +202,7 @@ export const getTopItemsV2 = async (
 
     const { data: menuItems, error: menuError } = await supabase
       .from('menu_items')
-      .select('id, name, video_url')
+      .select('id, name, category, video_url')
       .in('id', itemIds);
 
     if (menuError) throw menuError;
@@ -200,6 +213,7 @@ export const getTopItemsV2 = async (
       return {
         item_id: item.id,
         item_name: item.name,
+        category: item.category || undefined,
         video_url: item.video_url || undefined,
         views: stats.views,
         plays: stats.plays,
@@ -207,6 +221,8 @@ export const getTopItemsV2 = async (
         saves: stats.saves,
         shares: stats.shares,
         order_clicks: stats.order_clicks,
+        directions_clicks: stats.directions_clicks,
+        phone_calls: stats.phone_calls,
         has_video: !!item.video_url,
       };
     });
