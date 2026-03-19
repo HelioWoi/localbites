@@ -3,13 +3,16 @@ import {
   LogOut, Plus, Play, Trash2, Eye, Heart, MapPin,
   Loader2, X, Upload, Check, Settings, BarChart3,
   Video, Crown, AlertCircle, ChevronRight, Calendar,
-  TrendingUp, Clock, Edit2, Save, QrCode, Copy, ExternalLink, Menu, Camera, Image, Star, CreditCard, Search, CheckCircle
+  TrendingUp, Clock, Edit2, Save, QrCode, Copy, ExternalLink, Menu, Camera, Image, Star, CreditCard, Search, CheckCircle, ChevronDown
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { PartnerUser } from './PartnerPortal';
 import SubscriptionManager from './SubscriptionManager';
 import OnboardingModal from './OnboardingModal';
-import RestaurantAnalytics from './RestaurantAnalytics';
+// Analytics V2 - Fresh start analytics system (cutover: 2026-03-19)
+import RestaurantAnalyticsV2 from './RestaurantAnalyticsV2';
+// Legacy analytics (kept as fallback reference)
+// import RestaurantAnalytics from './RestaurantAnalytics';
 import MenuImportModal from '../../components/MenuImportModal';
 import { compressVideo, shouldCompressVideo } from '../../utils/videoCompression';
 import { QRCodeSVG } from 'qrcode.react';
@@ -97,6 +100,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  
+  // Accordion state for categories
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   
   // Menu upload state
   const [showMenuUploadModal, setShowMenuUploadModal] = useState(false);
@@ -1682,9 +1688,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           />
         )}
 
-        {/* Analytics Tab */}
+        {/* Analytics Tab - Analytics V2 */}
         {activeTab === 'analytics' && partnerData && (
-          <RestaurantAnalytics restaurantId={partnerData.id} />
+          <RestaurantAnalyticsV2 restaurantId={partnerData.id} />
         )}
 
         {/* Menu Tab - QR Code Menu Items */}
@@ -1697,7 +1703,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                 <div className="w-20 h-20 bg-white rounded-xl flex items-center justify-center flex-shrink-0 p-1.5">
                   {partnerData?.slug ? (
                     <QRCodeSVG 
-                      value={`${window.location.origin}/r/${partnerData.slug}`}
+                      value={`${window.location.origin}/r/${partnerData.slug}?qr=1`}
                       size={68}
                       fgColor="#f97316"
                       bgColor="#ffffff"
@@ -2060,14 +2066,25 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                   // Skip empty categories when search is active
                   if (categoryItems.length === 0) return null;
                   
+                  const isExpanded = expandedCategory === category;
+                  
                   return (
                   <div key={category} className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-                    <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold text-zinc-900">{category}</h3>
-                        <p className="text-xs text-zinc-500">{categoryItems.length} items</p>
+                    <div 
+                      className="px-5 py-3 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between cursor-pointer hover:bg-zinc-100 transition-colors"
+                      onClick={() => setExpandedCategory(isExpanded ? null : category)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <ChevronDown 
+                          size={20} 
+                          className={`text-zinc-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        />
+                        <div>
+                          <h3 className="font-semibold text-zinc-900">{category}</h3>
+                          <p className="text-xs text-zinc-500">{categoryItems.length} items</p>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => {
                             setMenuItemCategory(category);
@@ -2091,6 +2108,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                         </button>
                       </div>
                     </div>
+                    {isExpanded && (
                     <div className="p-4 grid grid-cols-3 sm:grid-cols-4 gap-3">
                       {categoryItems.map(item => {
                         const hasVideo = item.video_url && item.video_url !== '';
@@ -2169,6 +2187,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                         );
                       })}
                     </div>
+                    )}
                   </div>
                   );
                 })}

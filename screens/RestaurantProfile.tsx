@@ -4,6 +4,7 @@ import { ChevronLeft, Globe, MapPin, Navigation, Bookmark, PlayCircle, Camera, X
 import BannerSlider from '../components/BannerSlider';
 import { getPlaceDetails, textSearchRestaurants } from '../services/googlePlacesProxy';
 import { trackEvent } from '../services/eventsService';
+import { trackAnalyticsEvent } from '../services/analyticsV2Service';
 import { getMenuItemViewCounts } from '../services/partnerAnalyticsService';
 
 interface RestaurantProfileProps {
@@ -35,6 +36,17 @@ const saveDishesToStorage = (restaurantId: string, dishIds: Set<string>) => {
 };
 
 const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBack, isSaved, onToggleSave, openReviews = false, onNavigateToPartner, onOpenAI, onOpenSearch, onOpenFilter, isStandalone = false, onRequestRemoval }) => {
+  // Analytics V2: Track profile view on mount + QR scan only if ?qr=1 param present
+  useEffect(() => {
+    if (restaurant.id) {
+      trackAnalyticsEvent({ eventType: 'profile_view', restaurantId: restaurant.id }).catch(() => {});
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('qr') === '1') {
+        trackAnalyticsEvent({ eventType: 'qr_scan', restaurantId: restaurant.id }).catch(() => {});
+      }
+    }
+  }, [restaurant.id]);
+
   const [showVideoReels, setShowVideoReels] = useState(false);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [swipeHintCounts, setSwipeHintCounts] = useState<number[]>([]);
@@ -350,6 +362,8 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
       itemId: dish.id,
       itemType: dish.category,
     });
+    // Analytics V2: Track order click
+    trackAnalyticsEvent({ eventType: 'order_click', restaurantId: restaurant.id, itemId: dish.id }).catch(() => {});
 
     // Open ordering URL in same page
     window.location.href = orderUrl;
@@ -757,11 +771,14 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
             )}
 
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-3">
-              {filteredVideos.map((dish, index) => (
+              {filteredVideos.map((dish, index) => {
+                // Find the correct index in the unfiltered dishesWithVideo array
+                const realIndex = dishesWithVideo.findIndex(d => d.id === dish.id);
+                return (
                 <button 
                   key={dish.id} 
                   className="relative aspect-square rounded-xl overflow-hidden bg-zinc-100 group text-left"
-                  onClick={() => openVideoReels(index)}
+                  onClick={() => openVideoReels(realIndex >= 0 ? realIndex : index)}
                 >
                   {/* Video with 3-second auto-play cycles */}
                   {dish.videoUrl ? (
@@ -813,7 +830,8 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                     )}
                   </div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}
@@ -852,6 +870,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         {restaurant.phone && (
           <a 
             href={`tel:${restaurant.phone}`}
+            onClick={() => trackAnalyticsEvent({ eventType: 'phone_call', restaurantId: restaurant.id }).catch(() => {})}
             className="w-full bg-white rounded-2xl border border-zinc-200 p-4 flex items-center gap-3 active:bg-zinc-50 transition-colors"
           >
             <Phone size={20} className="text-orange-500 flex-shrink-0" />
@@ -899,6 +918,8 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                 eventType: 'directions_click',
                 restaurantId: restaurant.id 
               });
+              // Analytics V2: Track directions click
+              trackAnalyticsEvent({ eventType: 'directions_click', restaurantId: restaurant.id }).catch(() => {});
             }}
             className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white font-semibold py-3 rounded-xl text-sm active:scale-95 transition-all"
           >
@@ -914,6 +935,9 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         {/* Share button */}
         <button
           onClick={async () => {
+            // Analytics V2: Track share
+            trackAnalyticsEvent({ eventType: 'share', restaurantId: restaurant.id }).catch(() => {});
+            
             const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
             // Public share link uses /restaurant-name (not /r/ - that's QR code only)
             const shareUrl = restaurant.isSubscribed 

@@ -3,6 +3,7 @@ import { ChevronLeft, Heart, Bookmark, Share2, Phone, MapPin, Star, Clock, Video
 import { Restaurant } from '../types';
 import FullMenuModal from './FullMenuModal';
 import { trackEvent } from '../services/eventsService';
+import { trackAnalyticsEvent } from '../services/analyticsV2Service';
 import { getMenuItemViewCounts } from '../services/partnerAnalyticsService';
 
 interface DesktopRestaurantProfileProps {
@@ -33,6 +34,13 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showAllHours, setShowAllHours] = useState(true); // Always show hours by default
   const [showFullMenu, setShowFullMenu] = useState(false);
+
+  // Analytics V2: Track profile view on mount
+  useEffect(() => {
+    if (restaurant.id) {
+      trackAnalyticsEvent({ eventType: 'profile_view', restaurantId: restaurant.id }).catch(() => {});
+    }
+  }, [restaurant.id]);
   const [selectedDishId, setSelectedDishId] = useState<string | null>(null);
   const [likedVideos, setLikedVideos] = useState<Set<string>>(new Set());
   const [savedVideos, setSavedVideos] = useState<Set<string>>(() => {
@@ -82,6 +90,8 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
       eventType: 'order_button_click',
       eventValue: dish.id,
     });
+    // Analytics V2: Track order click
+    trackAnalyticsEvent({ eventType: 'order_click', restaurantId: restaurant.id, itemId: dish.id }).catch(() => {});
 
     window.location.href = orderUrl;
   };
@@ -126,6 +136,9 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
   const savedCount = savedVideos.size;
 
   const handleShare = () => {
+    // Analytics V2: Track share
+    trackAnalyticsEvent({ eventType: 'share', restaurantId: restaurant.id }).catch(() => {});
+    
     // Create shareable URL with restaurant ID
     const shareUrl = `${window.location.origin}${window.location.pathname}?restaurant=${encodeURIComponent(restaurant.id)}`;
     
@@ -176,7 +189,12 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
             {!isQRRoute && (
               <>
                 <button
-                  onClick={onToggleLike}
+                  onClick={() => {
+                    onToggleLike?.();
+                    if (!isLiked) {
+                      trackAnalyticsEvent({ eventType: 'like', restaurantId: restaurant.id }).catch(() => {});
+                    }
+                  }}
                   className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
                     isLiked ? 'bg-red-50' : 'bg-zinc-100 hover:bg-zinc-200'
                   }`}
@@ -185,7 +203,12 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
                   <Heart size={18} className={isLiked ? 'text-red-500 fill-red-500' : 'text-zinc-600'} />
                 </button>
                 <button
-                  onClick={onToggleSave}
+                  onClick={() => {
+                    onToggleSave();
+                    if (!isSaved) {
+                      trackAnalyticsEvent({ eventType: 'save', restaurantId: restaurant.id }).catch(() => {});
+                    }
+                  }}
                   className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
                     isSaved ? 'bg-orange-500 hover:bg-orange-600' : 'bg-zinc-100 hover:bg-zinc-200'
                   }`}
@@ -346,6 +369,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
               {restaurant.phone && (
                 <a
                   href={`tel:${restaurant.phone}`}
+                  onClick={() => trackAnalyticsEvent({ eventType: 'phone_call', restaurantId: restaurant.id }).catch(() => {})}
                   className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-2xl transition-colors text-sm flex items-center justify-center gap-2 whitespace-nowrap"
                 >
                   <Phone size={16} />
@@ -357,6 +381,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
                   href={restaurant.googleMapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => trackAnalyticsEvent({ eventType: 'directions_click', restaurantId: restaurant.id }).catch(() => {})}
                   className="px-5 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold rounded-2xl transition-colors text-sm flex items-center justify-center gap-2 whitespace-nowrap"
                 >
                   <MapPin size={16} />
@@ -439,6 +464,9 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
                     onClick={() => {
                       setSelectedDishId(dish.id);
                       setShowFullMenu(true);
+                      // Analytics V2: Track play/view when dish is clicked
+                      trackAnalyticsEvent({ eventType: 'play', restaurantId: restaurant.id, itemId: dish.id }).catch(() => {});
+                      trackAnalyticsEvent({ eventType: 'view', restaurantId: restaurant.id, itemId: dish.id }).catch(() => {});
                     }}
                     className="w-full h-full cursor-pointer"
                   >
@@ -501,6 +529,8 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
                             next.delete(dish.id);
                           } else {
                             next.add(dish.id);
+                            // Analytics V2: Track like
+                            trackAnalyticsEvent({ eventType: 'like', restaurantId: restaurant.id, itemId: dish.id }).catch(() => {});
                           }
                           return next;
                         });
@@ -525,6 +555,8 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
                             next.delete(dish.id);
                           } else {
                             next.add(dish.id);
+                            // Analytics V2: Track save
+                            trackAnalyticsEvent({ eventType: 'save', restaurantId: restaurant.id, itemId: dish.id }).catch(() => {});
                           }
                           // Sync with localStorage (shared with FullMenuModal)
                           localStorage.setItem(`saved_dishes_${restaurant.id}`, JSON.stringify([...next]));

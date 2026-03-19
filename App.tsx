@@ -1831,6 +1831,7 @@ const App: React.FC = () => {
                   isActive={activeRestaurantIndex === i && state === 'FEED' && !isLoading && !isDesktop}
                   isSubscribed={res.isSubscribed}
                   restaurantId={res.id}
+                  itemId={res.dishes[0]?.id}
                   onSwipeUp={() => feedRef.current?.scrollBy({ top: window.innerHeight, behavior: 'smooth' })}
                   onPartialSwipeUp={() => {
                     const slug = (res as any).slug;
@@ -2166,6 +2167,8 @@ const App: React.FC = () => {
                         photoUrl={res!.mainPhotoUrl}
                         isActive={true}
                         isSubscribed={res!.isSubscribed}
+                        restaurantId={res!.id}
+                        itemId={res!.dishes[0]?.id}
                         onSwipeUp={() => {}}
                         onPartialSwipeUp={() => {}}
                       />

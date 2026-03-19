@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Search, ChevronDown, ChevronUp, Video, Image as ImageIcon, Bookmark, Share2, Utensils, Coffee, Wine, IceCream, Pizza, Fish, ShoppingBag } from 'lucide-react';
 import { Restaurant, Dish } from '../types';
 import { trackEvent } from '../services/eventsService';
+import { trackAnalyticsEvent } from '../services/analyticsV2Service';
 
 interface FullMenuModalProps {
   restaurant: Restaurant;
@@ -42,6 +43,8 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
       eventType: 'order_button_click',
       eventValue: dish.id,
     });
+    // Analytics V2: Track order click
+    trackAnalyticsEvent({ eventType: 'order_click', restaurantId: restaurant.id, itemId: dish.id }).catch(() => {});
 
     window.location.href = orderUrl;
   };
@@ -55,6 +58,8 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
       newSaved.delete(dishId);
     } else {
       newSaved.add(dishId);
+      // Analytics V2: Track save
+      trackAnalyticsEvent({ eventType: 'save', restaurantId: restaurant.id, itemId: dishId }).catch(() => {});
     }
     setSavedDishes(newSaved);
     localStorage.setItem(`saved_dishes_${restaurant.id}`, JSON.stringify([...newSaved]));
@@ -96,17 +101,6 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
       window.removeEventListener('openYourPicks', handleOpenYourPicks);
     };
   }, []);
-
-  // Debug: Log dishes to check thumbnailUrl
-  useEffect(() => {
-    console.log('[FullMenuModal] Dishes:', restaurant.dishes?.map(d => ({
-      name: d.name,
-      hasVideo: !!d.videoUrl,
-      hasPhoto: !!d.photoUrl,
-      thumbnailUrl: d.thumbnailUrl,
-      category: d.category
-    })));
-  }, [restaurant.dishes]);
 
   // Auto-scroll to selected dish
   useEffect(() => {
@@ -368,19 +362,17 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
                               </button>
                             )}
                             
-                            {/* Bookmark Button - Hidden for QR routes */}
-                            {!isQRRoute && (
-                              <button
-                                onClick={(e) => toggleSaveDish(dish.id, e)}
-                                className="p-2 hover:bg-zinc-100 rounded-lg transition-colors group"
-                                title={savedDishes.has(dish.id) ? 'Remove from Your Picks' : 'Save to Your Picks'}
-                              >
-                                <Bookmark
-                                  size={20}
-                                  className={savedDishes.has(dish.id) ? 'text-orange-500 fill-orange-500' : 'text-zinc-400 group-hover:text-orange-500'}
-                                />
-                              </button>
-                            )}
+                            {/* Bookmark Button */}
+                            <button
+                              onClick={(e) => toggleSaveDish(dish.id, e)}
+                              className="p-2 hover:bg-zinc-100 rounded-lg transition-colors group"
+                              title={savedDishes.has(dish.id) ? 'Remove from Your Picks' : 'Save to Your Picks'}
+                            >
+                              <Bookmark
+                                size={20}
+                                className={savedDishes.has(dish.id) ? 'text-orange-500 fill-orange-500' : 'text-zinc-400 group-hover:text-orange-500'}
+                              />
+                            </button>
                           </div>
                         </div>
                       ))}
@@ -465,6 +457,10 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
                         eventType: 'order_button_click',
                         eventValue: dish?.id || 'enlarged_photo',
                       });
+                      // Analytics V2: Track order click
+                      if (dish?.id) {
+                        trackAnalyticsEvent({ eventType: 'order_click', restaurantId: restaurant.id, itemId: dish.id }).catch(() => {});
+                      }
                       window.location.href = orderUrl;
                     }
                   }}

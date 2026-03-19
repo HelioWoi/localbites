@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, Play, Search, Bookmark, X, ShoppingBag } from 'lucide-react';
 import { trackEvent } from '../services/eventsService';
+import { trackAnalyticsEvent } from '../services/analyticsV2Service';
 
 // Component to generate a thumbnail from a video
 const VideoThumbnail: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
@@ -76,6 +77,14 @@ interface FullMenuPageProps {
 }
 
 const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
+  // Analytics V2: Track QR scan on mount only if ?qr=1 param present (real QR code scan)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('qr') === '1' && restaurant.id) {
+      trackAnalyticsEvent({ eventType: 'qr_scan', restaurantId: restaurant.id }).catch(() => {});
+    }
+  }, [restaurant.id]);
+
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [savedItems, setSavedItems] = useState<Set<string>>(() => {
@@ -113,6 +122,8 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
       itemId: item.id,
       itemType: item.category,
     });
+    // Analytics V2: Track order click
+    trackAnalyticsEvent({ eventType: 'order_click', restaurantId: restaurant.id, itemId: item.id }).catch(() => {});
 
     window.location.href = orderUrl;
   };

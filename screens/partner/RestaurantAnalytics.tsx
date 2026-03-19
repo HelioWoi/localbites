@@ -7,21 +7,23 @@ import {
   Eye, Video, Heart, Bookmark, Share2, Navigation, QrCode, TrendingUp, 
   Sparkles, Clock, Smartphone, Monitor, Tablet, Loader2, AlertCircle, Download, X, ShoppingBag
 } from 'lucide-react';
+// Analytics V2 - Fresh start analytics system (cutover: 2026-03-19)
 import {
-  getPartnerSummary,
-  getPartnerFunnel,
-  getPartnerTopItems,
-  getPartnerPeakHours,
-  getPartnerInsights,
+  getPartnerSummaryV2,
+  getTopItemsV2,
+  getMostWatchedVideosV2,
+  getPeakHoursV2,
+  getDeviceBreakdownV2,
+  getConversionFunnelV2,
   getDateRange,
-  formatHour,
-  getPeakWindow,
-  PartnerSummary,
-  FunnelStep,
-  TopItem,
-  PeakHour,
-  Insight
-} from '../../services/partnerAnalyticsService';
+  PartnerSummaryV2,
+  TopItemV2,
+  PeakHourV2,
+  DeviceBreakdownV2,
+  ConversionFunnelV2
+} from '../../services/partnerAnalyticsV2Service';
+import { ANALYTICS_V2_START_DATE } from '../../services/analyticsV2Service';
+import { supabase } from '../../lib/supabase';
 
 const COLORS = ['#f97316', '#fb923c', '#fdba74', '#fed7aa'];
 
@@ -36,11 +38,12 @@ const RestaurantAnalytics: React.FC<RestaurantAnalyticsProps> = ({ restaurantId 
   const [period, setPeriod] = useState<DatePeriod>('7days');
   const [loading, setLoading] = useState(true);
   
-  const [summary, setSummary] = useState<PartnerSummary | null>(null);
-  const [funnel, setFunnel] = useState<FunnelStep[]>([]);
-  const [topItems, setTopItems] = useState<TopItem[]>([]);
-  const [peakHours, setPeakHours] = useState<PeakHour[]>([]);
-  const [insights, setInsights] = useState<Insight[]>([]);
+  const [summary, setSummary] = useState<PartnerSummaryV2 | null>(null);
+  const [funnel, setFunnel] = useState<ConversionFunnelV2 | null>(null);
+  const [topItems, setTopItems] = useState<TopItemV2[]>([]);
+  const [mostWatchedVideos, setMostWatchedVideos] = useState<TopItemV2[]>([]);
+  const [peakHours, setPeakHours] = useState<PeakHourV2[]>([]);
+  const [deviceBreakdown, setDeviceBreakdown] = useState<DeviceBreakdownV2 | null>(null);
   
   const [selectedMetric, setSelectedMetric] = useState<MetricType>(null);
 
@@ -201,19 +204,22 @@ const RestaurantAnalytics: React.FC<RestaurantAnalyticsProps> = ({ restaurantId 
     try {
       const { start, end } = getDateRange(period);
       
-      const [summaryData, funnelData, itemsData, hoursData, insightsData] = await Promise.all([
-        getPartnerSummary(restaurantId, start, end),
-        getPartnerFunnel(restaurantId, start, end),
-        getPartnerTopItems(restaurantId, start, end, 10),
-        getPartnerPeakHours(restaurantId, start, end),
-        getPartnerInsights(restaurantId, start, end)
+      // Analytics V2 - Load from analytics_events table only
+      const [summaryData, funnelData, itemsData, videosData, hoursData, deviceData] = await Promise.all([
+        getPartnerSummaryV2(restaurantId, start, end),
+        getConversionFunnelV2(restaurantId, start, end),
+        getTopItemsV2(restaurantId, start, end, 10),
+        getMostWatchedVideosV2(restaurantId, start, end, 8),
+        getPeakHoursV2(restaurantId, start, end),
+        getDeviceBreakdownV2(restaurantId, start, end)
       ]);
 
       setSummary(summaryData);
       setFunnel(funnelData);
       setTopItems(itemsData);
+      setMostWatchedVideos(videosData);
       setPeakHours(hoursData);
-      setInsights(insightsData);
+      setDeviceBreakdown(deviceData);
     } catch (error) {
       console.error('[RestaurantAnalytics] Error loading analytics:', error);
     } finally {
@@ -482,18 +488,29 @@ const RestaurantAnalytics: React.FC<RestaurantAnalyticsProps> = ({ restaurantId 
             <h3 className="text-lg font-bold text-zinc-900 mb-2">Most Watched Videos</h3>
             <p className="text-sm text-zinc-500 mb-4">See which dish videos customers are watching</p>
             
-            {topItems.length > 0 ? (
+            {topItemsWithMedia.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {topItems.slice(0, 8).map((item, index) => (
+                {topItemsWithMedia.slice(0, 8).map((item, index) => (
                   <div key={item.item_id} className="group relative">
                     <div className="aspect-[9/16] bg-zinc-100 rounded-xl overflow-hidden relative">
-                      {item.item_id && (
+                      {item.video_url ? (
                         <video
-                          src={`${item.item_id}#t=0.5`}
+                          src={`${item.video_url}#t=0.5`}
                           className="w-full h-full object-cover"
                           muted
                           playsInline
+                          preload="metadata"
                         />
+                      ) : item.photo_url ? (
+                        <img
+                          src={item.photo_url}
+                          className="w-full h-full object-cover"
+                          alt={item.item_name}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-zinc-200">
+                          <Video size={32} className="text-zinc-400" />
+                        </div>
                       )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                       <div className="absolute top-2 left-2 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">

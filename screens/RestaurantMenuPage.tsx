@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, ChevronUp, Star, MapPin, Globe, Navigation, Heart, Bookmark, X, ChevronLeft, MessageSquare, Home, Search, Sparkles, Filter, Clock, Send, Video, UtensilsCrossed, ShoppingBag, Eye } from 'lucide-react';
 import { trackEvent } from '../services/eventsService';
+import { trackAnalyticsEvent } from '../services/analyticsV2Service';
 import { getMenuItemViewCounts } from '../services/partnerAnalyticsService';
 
 interface MenuItem {
@@ -52,6 +53,14 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   const [viewCounts, setViewCounts] = useState<Map<string, number>>(new Map());
   const [videoErrors, setVideoErrors] = useState<Set<number>>(new Set());
   
+  // Analytics V2: Track QR scan on mount only if ?qr=1 param present (real QR code scan)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('qr') === '1' && restaurant.id) {
+      trackAnalyticsEvent({ eventType: 'qr_scan', restaurantId: restaurant.id }).catch(() => {});
+    }
+  }, [restaurant.id]);
+
   // Load saved items from localStorage and check URL params
   useEffect(() => {
     const saved = localStorage.getItem(`saved_dishes_${restaurant.id}`);
@@ -151,6 +160,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
       itemId: item.id,
       itemType: item.category,
     });
+    // Analytics V2: Track order click
+    trackAnalyticsEvent({ eventType: 'order_click', restaurantId: restaurant.id, itemId: item.id }).catch(() => {});
 
     // Open ordering URL in same page
     window.location.href = orderUrl;
@@ -158,6 +169,9 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
 
   // Share dish
   const shareDish = async (item: MenuItem) => {
+    // Analytics V2: Track share
+    trackAnalyticsEvent({ eventType: 'share', restaurantId: restaurant.id, itemId: item.id }).catch(() => {});
+    
     const shareUrl = `${window.location.origin}/r/${restaurant.slug}/menu?dish=${item.id}`;
     const shareText = `Check out this ${item.name} from ${restaurant.name}! 🍽️`;
 
@@ -205,6 +219,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
       } else {
         next.add(itemId);
         likeRestaurant(restaurant.id, itemId, item?.category);
+        // Analytics V2: Track like
+        trackAnalyticsEvent({ eventType: 'like', restaurantId: restaurant.id, itemId }).catch(() => {});
         // Update count
         const currentCount = likesCounts.get(itemId) || 0;
         const newCounts = new Map(likesCounts);
@@ -230,6 +246,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
       } else {
         next.add(itemId);
         saveRestaurant(restaurant.id, itemId, item?.category);
+        // Analytics V2: Track save
+        trackAnalyticsEvent({ eventType: 'save', restaurantId: restaurant.id, itemId }).catch(() => {});
         console.log('[RestaurantMenuPage] Added to saved');
       }
       localStorage.setItem(`saved_dishes_${restaurant.id}`, JSON.stringify([...next]));
@@ -323,6 +341,15 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     return () => clearInterval(retryInterval);
   }, [activeVideoIndex, isMuted, isPlaying, filteredItems]);
   
+  // Analytics V2: Track play and view when active video changes
+  const currentActiveItemId = filteredItems[activeVideoIndex]?.id;
+  useEffect(() => {
+    if (currentActiveItemId && restaurant.id) {
+      trackAnalyticsEvent({ eventType: 'play', restaurantId: restaurant.id, itemId: currentActiveItemId }).catch(() => {});
+      trackAnalyticsEvent({ eventType: 'view', restaurantId: restaurant.id, itemId: currentActiveItemId }).catch(() => {});
+    }
+  }, [currentActiveItemId, restaurant.id]);
+
   // Auto-play next video when current ends
   useEffect(() => {
     const currentVideo = videoRefs.current[activeVideoIndex];
@@ -555,7 +582,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               ref={el => videoRefs.current[index] = el}
               className="absolute inset-0 w-full h-full object-cover"
               loop
-              muted
+              muted={isMuted}
               playsInline
               preload={index === activeVideoIndex ? "auto" : Math.abs(index - activeVideoIndex) === 1 ? "metadata" : "none"}
               onCanPlay={() => {
@@ -735,6 +762,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                         eventType: 'directions_click',
                         restaurantId: restaurant.id 
                       });
+                      // Analytics V2: Track directions click
+                      trackAnalyticsEvent({ eventType: 'directions_click', restaurantId: restaurant.id }).catch(() => {});
                     }}
                     className="flex items-center justify-center gap-2 bg-white text-black font-bold py-4 px-6 rounded-2xl"
                   >

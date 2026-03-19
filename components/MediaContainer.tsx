@@ -1,6 +1,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { trackEvent } from '../services/eventsService';
+import { trackAnalyticsEvent } from '../services/analyticsV2Service';
 
 interface MediaContainerProps {
   videoUrl?: string;
@@ -8,6 +9,7 @@ interface MediaContainerProps {
   isActive: boolean;
   isSubscribed: boolean;
   restaurantId?: string;
+  itemId?: string;
   onSwipeUp?: () => void;
   onPartialSwipeUp?: () => void;
 }
@@ -18,6 +20,7 @@ const MediaContainer: React.FC<MediaContainerProps> = ({
   isActive, 
   isSubscribed,
   restaurantId,
+  itemId,
   onSwipeUp,
   onPartialSwipeUp
 }) => {
@@ -38,25 +41,40 @@ const MediaContainer: React.FC<MediaContainerProps> = ({
   }, [isLoaded]);
 
   useEffect(() => {
-    if (isSubscribed && videoRef.current) {
+    if (videoRef.current) {
       if (isActive) {
-        videoRef.current.play().catch(() => {});
+        // Only play video if subscribed
+        if (isSubscribed) {
+          videoRef.current.play().catch(() => {});
+        }
         
-        // Track video play event (only once per video)
-        if (!hasTrackedPlay && restaurantId) {
+        // Track video play event (only once per video) - works for all restaurants
+        if (!hasTrackedPlay && restaurantId && itemId) {
+          // Legacy tracking (keep for backward compatibility)
           trackEvent({ 
             eventType: 'video_play',
-            restaurantId 
+            restaurantId,
+            itemId
           });
+          
+          // Analytics V2 tracking (new system) - track for ALL restaurants
+          trackAnalyticsEvent({
+            eventType: 'play',
+            restaurantId,
+            itemId
+          }).catch(err => console.error('[MediaContainer] Analytics V2 error:', err));
+          
           setHasTrackedPlay(true);
         }
       } else {
-        videoRef.current.pause();
-        videoRef.current.currentTime = 0;
+        if (isSubscribed && videoRef.current) {
+          videoRef.current.pause();
+          videoRef.current.currentTime = 0;
+        }
         setHasTrackedPlay(false);
       }
     }
-  }, [isActive, isSubscribed, restaurantId, hasTrackedPlay]);
+  }, [isActive, isSubscribed, restaurantId, itemId, hasTrackedPlay]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;

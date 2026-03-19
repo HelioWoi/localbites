@@ -3,6 +3,7 @@ import { Search, MapPin, Star, Heart, Bookmark, Share2, ChevronRight, Play, Filt
 import { Restaurant } from '../types';
 import { calculateIsOpenNow } from '../utils/filterHelpers';
 import { supabase } from '../lib/supabase';
+import { trackAnalyticsEvent } from '../services/analyticsV2Service';
 
 interface DesktopFeedProps {
   restaurants: Restaurant[];
@@ -93,7 +94,22 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
         video.currentTime = 0;
       }
     });
-  }, [hoveredCard]);
+    
+    // Analytics V2: Track play/view on hover (separate from video playback)
+    if (hoveredCard) {
+      const res = restaurants.find(r => r.id === hoveredCard);
+      if (res) {
+        const itemId = res.dishes?.[0]?.id;
+        if (itemId) {
+          trackAnalyticsEvent({ eventType: 'play', restaurantId: res.id, itemId }).catch(() => {});
+          trackAnalyticsEvent({ eventType: 'view', restaurantId: res.id, itemId }).catch(() => {});
+        } else {
+          // Track profile_view if no dish ID available
+          trackAnalyticsEvent({ eventType: 'profile_view', restaurantId: res.id }).catch(() => {});
+        }
+      }
+    }
+  }, [hoveredCard, restaurants]);
 
   // Google Places autocomplete (same as mobile)
   const handleSearchChange = (value: string) => {
