@@ -2,6 +2,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { trackEvent } from '../services/eventsService';
 import { trackAnalyticsEvent } from '../services/analyticsV2Service';
+import { getCDNUrl } from '../utils/cdnHelper';
 
 interface MediaContainerProps {
   videoUrl?: string;
@@ -110,7 +111,7 @@ const MediaContainer: React.FC<MediaContainerProps> = ({
       {isSubscribed && videoUrl ? (
         <video
           ref={videoRef}
-          src={videoUrl}
+          src={getCDNUrl(videoUrl)}
           className={`h-full w-full object-cover transition-opacity duration-500 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
           loop
           playsInline

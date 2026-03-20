@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, Play, Search, Bookmark, X, ShoppingBag } from 'lucide-react';
 import { trackEvent } from '../services/eventsService';
 import { trackAnalyticsEvent } from '../services/analyticsV2Service';
+import { getCDNUrl } from '../utils/cdnHelper';
 
 // Component to generate a thumbnail from a video
 const VideoThumbnail: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
@@ -274,7 +275,7 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
                         className="w-full h-full object-cover"
                       />
                     ) : item.videoUrl ? (
-                      <VideoThumbnail src={item.videoUrl} alt={item.name} />
+                      <VideoThumbnail src={getCDNUrl(item.videoUrl)} alt={item.name} />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-zinc-100">
                         <span className="text-2xl">🍽️</span>
@@ -384,7 +385,7 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
                     className="w-full h-full object-cover"
                   />
                 ) : selectedItem.videoUrl ? (
-                  <VideoThumbnail src={selectedItem.videoUrl} alt={selectedItem.name} />
+                  <VideoThumbnail src={getCDNUrl(selectedItem.videoUrl)} alt={selectedItem.name} />
                 ) : null}
                 {/* Name & Price overlay */}
                 <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">

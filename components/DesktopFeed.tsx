@@ -4,6 +4,7 @@ import { Restaurant } from '../types';
 import { calculateIsOpenNow } from '../utils/filterHelpers';
 import { supabase } from '../lib/supabase';
 import { trackAnalyticsEvent } from '../services/analyticsV2Service';
+import { getCDNUrl } from '../utils/cdnHelper';
 
 interface DesktopFeedProps {
   restaurants: Restaurant[];
@@ -1138,7 +1139,7 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({
             {/* Video (always visible for partners) */}
             <video
               ref={videoRef}
-              src={firstValidVideo?.videoUrl}
+              src={getCDNUrl(firstValidVideo?.videoUrl)}
               className="absolute inset-0 w-full h-full object-cover"
               muted
               loop

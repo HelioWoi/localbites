@@ -3,6 +3,7 @@ import { Play, Pause, Volume2, VolumeX, ChevronUp, Star, MapPin, Globe, Navigati
 import { trackEvent } from '../services/eventsService';
 import { trackAnalyticsEvent } from '../services/analyticsV2Service';
 import { getMenuItemViewCounts } from '../services/partnerAnalyticsService';
+import { getCDNUrl } from '../utils/cdnHelper';
 
 interface MenuItem {
   id: string;
@@ -37,6 +38,7 @@ interface RestaurantMenuPageProps {
 }
 
 const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) => {
+  const isQRRoute = window.location.pathname.startsWith('/r/');
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(true); // Start muted, user clicks to unmute
@@ -44,7 +46,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   const [showSavedOnly, setShowSavedOnly] = useState(false); // Filter for saved videos
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [videoReady, setVideoReady] = useState<Set<number>>(new Set()); // Track which videos are ready to play
+  const [videoReady, setVideoReady] = useState<Set<number>>(new Set());
+  const isInitialMount = useRef(true); // Track which videos are ready to play
   
   // Likes and saves state
   const [likedItems, setLikedItems] = useState<Set<string>>(new Set());
@@ -52,6 +55,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   const [likesCounts, setLikesCounts] = useState<Map<string, number>>(new Map());
   const [viewCounts, setViewCounts] = useState<Map<string, number>>(new Map());
   const [videoErrors, setVideoErrors] = useState<Set<number>>(new Set());
+  const [videoTimedOut, setVideoTimedOut] = useState<Set<number>>(new Set());
   
   // Analytics V2: Track QR scan on mount only if ?qr=1 param present (real QR code scan)
   useEffect(() => {
@@ -271,49 +275,60 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     filteredItems = filteredItems.filter(item => savedItems.has(item.id));
   }
 
+  // Get next category helper
+  const getNextCategory = (): string | null | false => {
+    if (activeCategory === null) {
+      // "All" view → go to first category
+      return restaurant.categories.length > 0 ? restaurant.categories[0] : false;
+    }
+    const currentIdx = restaurant.categories.indexOf(activeCategory);
+    const nextIdx = currentIdx + 1;
+    if (nextIdx < restaurant.categories.length) return restaurant.categories[nextIdx];
+    return false; // no more categories
+  };
+
   // Handle scroll to update active video
   const handleScroll = () => {
     if (!scrollRef.current) return;
     const scrollTop = scrollRef.current.scrollTop;
     const itemHeight = window.innerHeight;
     const newIndex = Math.round(scrollTop / itemHeight);
+
+    // On /r/ routes: auto-advance to next category when scrolling past last video
+    if (isQRRoute && newIndex >= filteredItems.length && filteredItems.length > 0) {
+      const next = getNextCategory();
+      if (next !== false) {
+        setActiveCategory(next);
+        return;
+      }
+    }
+
     if (newIndex !== activeVideoIndex && newIndex >= 0 && newIndex < filteredItems.length) {
       setActiveVideoIndex(newIndex);
     }
   };
 
-  // Play/pause and load management based on active index
-  // Only keep videos within ±1 of active index loaded to save memory on mobile
+  // Play/pause management and memory cleanup
+  // Video src is set directly in JSX for instant loading - useEffect only handles playback
   useEffect(() => {
     videoRefs.current.forEach((video, index) => {
-      if (!video) return;
+      if (!video || index >= filteredItems.length) return;
       const distance = Math.abs(index - activeVideoIndex);
       
-      if (distance > 1) {
+      if (distance > 2) {
         // FAR AWAY: unload to free memory
         video.pause();
         video.removeAttribute('src');
-        video.load(); // triggers unload of buffered data
+        video.load();
+        setVideoReady(prev => { const next = new Set(prev); next.delete(index); return next; });
       } else if (index === activeVideoIndex) {
-        // ACTIVE VIDEO: force load and play
-        const videoUrl = filteredItems[index]?.videoUrl || '';
-        if (video.src !== videoUrl) {
-          video.src = videoUrl;
-          video.load();
-        }
+        // ACTIVE VIDEO: play
         video.muted = isMuted;
         if (isPlaying && video.readyState >= 2) {
-          video.play().catch(() => {
-            // Silently handle play errors
-          });
+          video.play().catch(() => {});
         }
       } else {
-        // ADJACENT (±1): preload metadata only, pause playback
-        const videoUrl = filteredItems[index]?.videoUrl || '';
-        if (video.src !== videoUrl) {
-          video.src = videoUrl;
-          video.load();
-        }
+        // ADJACENT: pause (src is set in JSX)
         video.pause();
       }
     });
@@ -403,12 +418,27 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     };
   }, []);
 
-  // Reset video index when category changes
+  // Timeout fallback: show retry UI after 6s if video doesn't load
   useEffect(() => {
+    if (videoReady.has(activeVideoIndex)) return;
+    const timeout = setTimeout(() => {
+      setVideoTimedOut(prev => new Set(prev).add(activeVideoIndex));
+    }, 6000);
+    return () => clearTimeout(timeout);
+  }, [activeVideoIndex, videoReady]);
+
+  // Reset video index and state when category changes (skip initial mount to preserve URL dish params)
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     setActiveVideoIndex(0);
-    setVideoReady(new Set()); // Reset ready state
+    setVideoReady(new Set());
+    setVideoErrors(new Set());
+    setVideoTimedOut(new Set());
     if (scrollRef.current) {
-      scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      scrollRef.current.scrollTo({ top: 0 });
     }
   }, [activeCategory]);
 
@@ -445,7 +475,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                 if (from === 'full-menu') {
                   window.location.href = `/r/${restaurant.slug}/full-menu`;
                 } else if (from === 'saved') {
-                  window.location.href = `/demo/${restaurant.slug}/saved`;
+                  window.location.href = `/r/${restaurant.slug}/saved`;
                 } else {
                   window.location.href = `/r/${restaurant.slug}`;
                 }
@@ -484,7 +514,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               if (from === 'full-menu') {
                 window.location.href = `/r/${restaurant.slug}/full-menu`;
               } else if (from === 'saved') {
-                window.location.href = `/demo/${restaurant.slug}/saved`;
+                window.location.href = `/r/${restaurant.slug}/saved`;
               } else {
                 window.location.href = `/r/${restaurant.slug}`;
               }
@@ -574,17 +604,46 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
             {/* Video */}
             {/* Loading spinner */}
             {!videoReady.has(index) && index === activeVideoIndex && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
-                <div className="w-10 h-10 border-3 border-zinc-700 border-t-orange-500 rounded-full animate-spin" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-10">
+                {restaurant.coverPhotoUrl && (
+                  <img src={restaurant.coverPhotoUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />
+                )}
+                {videoTimedOut.has(index) || videoErrors.has(index) ? (
+                  <button
+                    onClick={() => {
+                      const video = videoRefs.current[index];
+                      if (video) {
+                        setVideoTimedOut(prev => { const n = new Set(prev); n.delete(index); return n; });
+                        setVideoErrors(prev => { const n = new Set(prev); n.delete(index); return n; });
+                        video.src = getCDNUrl(filteredItems[index]?.videoUrl) || '';
+                        video.load();
+                        video.play().catch(() => {});
+                      }
+                    }}
+                    className="relative z-10 flex flex-col items-center gap-3"
+                  >
+                    <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center">
+                      <Play size={24} className="text-white ml-1" fill="white" />
+                    </div>
+                    <span className="text-white/70 text-xs">Tap to play</span>
+                  </button>
+                ) : (
+                  <div className="relative z-10 flex flex-col items-center">
+                    <div className="w-8 h-8 border-2 border-zinc-700 border-t-orange-500 rounded-full animate-spin mb-3" />
+                    <span className="text-zinc-500 text-xs">Loading video...</span>
+                  </div>
+                )}
               </div>
             )}
             <video
               ref={el => videoRefs.current[index] = el}
+              src={Math.abs(index - activeVideoIndex) <= 2 ? getCDNUrl(item.videoUrl) : undefined}
+              poster={restaurant.coverPhotoUrl || undefined}
               className="absolute inset-0 w-full h-full object-cover"
               loop
               muted={isMuted}
               playsInline
-              preload={index === activeVideoIndex ? "auto" : Math.abs(index - activeVideoIndex) === 1 ? "metadata" : "none"}
+              preload={index === activeVideoIndex ? "auto" : Math.abs(index - activeVideoIndex) <= 2 ? "metadata" : "none"}
               onCanPlay={() => {
                 setVideoReady(prev => new Set(prev).add(index));
                 // Auto-play if this is the active video
@@ -593,6 +652,9 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                   video.play().catch(() => {});
                 }
               }}
+              onLoadedData={() => {
+                setVideoReady(prev => new Set(prev).add(index));
+              }}
               onError={(e) => {
                 console.error('Video failed to load:', item.videoUrl);
                 const video = e.currentTarget;
@@ -600,7 +662,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                   setVideoErrors(prev => new Set(prev).add(index));
                   setTimeout(() => {
                     if (Math.abs(index - activeVideoIndex) <= 1) {
-                      video.src = item.videoUrl;
+                      video.src = getCDNUrl(item.videoUrl);
                       video.load();
                       if (index === activeVideoIndex) {
                         video.play().catch(() => {});
@@ -718,8 +780,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               </button>
             </div>
 
-            {/* Swipe indicator */}
-            {index < filteredItems.length - 1 && index === activeVideoIndex && (
+            {/* Swipe indicator - on /r/ routes, also show on last video if there's a next category */}
+            {index === activeVideoIndex && (index < filteredItems.length - 1 || (isQRRoute && getNextCategory() !== false)) && (
               <div className="absolute bottom-24 left-1/2 -translate-x-1/2">
                 <ChevronUp className="w-6 h-6 text-white/50 animate-bounce" />
               </div>
@@ -727,8 +789,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
           </div>
         ))}
 
-        {/* End card */}
-        {filteredItems.length > 0 && (
+        {/* End card - on /r/ routes, only show when no more categories to advance to */}
+        {filteredItems.length > 0 && !(isQRRoute && getNextCategory() !== false) && (
           <div className="h-screen w-full snap-start flex flex-col items-center justify-center p-8 bg-gradient-to-b from-black to-zinc-900">
             <div className="text-center">
               {restaurant.logoUrl ? (
@@ -742,11 +804,10 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               <p className="text-white/60 text-sm mb-8">Thanks for watching our menu!</p>
               
               <div className="flex flex-col gap-3 w-full max-w-xs mx-auto">
-                {/* Show trial CTA only on /demo/ routes or if coming from demo (sessionStorage) */}
-                {(window.location.pathname.startsWith('/demo/') || sessionStorage.getItem('isDemoMode') === 'true') ? (
+                {/* Show trial CTA only on /demo/ routes */}
+                {window.location.pathname.startsWith('/demo/') ? (
                   <a 
                     href="/partner?step=2"
-                    onClick={() => sessionStorage.removeItem('isDemoMode')}
                     className="flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl transition-all"
                   >
                     <Sparkles size={18} />

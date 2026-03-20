@@ -3,6 +3,7 @@ import { X, Search, ChevronDown, ChevronUp, Video, Image as ImageIcon, Bookmark,
 import { Restaurant, Dish } from '../types';
 import { trackEvent } from '../services/eventsService';
 import { trackAnalyticsEvent } from '../services/analyticsV2Service';
+import { getCDNUrl } from '../utils/cdnHelper';
 
 interface FullMenuModalProps {
   restaurant: Restaurant;
@@ -288,7 +289,7 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
                             {isVideo(dish) && dish.videoUrl ? (
                               <>
                                 <video
-                                  src={dish.videoUrl}
+                                  src={getCDNUrl(dish.videoUrl)}
                                   className="w-full h-full object-cover"
                                   muted
                                   playsInline

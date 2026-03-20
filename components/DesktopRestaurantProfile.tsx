@@ -5,6 +5,7 @@ import FullMenuModal from './FullMenuModal';
 import { trackEvent } from '../services/eventsService';
 import { trackAnalyticsEvent } from '../services/analyticsV2Service';
 import { getMenuItemViewCounts } from '../services/partnerAnalyticsService';
+import { getCDNUrl } from '../utils/cdnHelper';
 
 interface DesktopRestaurantProfileProps {
   restaurant: Restaurant;
@@ -472,7 +473,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
                   >
                     {dish.videoUrl ? (
                       <video
-                        src={dish.videoUrl}
+                        src={getCDNUrl(dish.videoUrl)}
                         className="w-full h-full object-cover bg-zinc-900"
                         playsInline
                         loop

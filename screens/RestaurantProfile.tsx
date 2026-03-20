@@ -6,6 +6,7 @@ import { getPlaceDetails, textSearchRestaurants } from '../services/googlePlaces
 import { trackEvent } from '../services/eventsService';
 import { trackAnalyticsEvent } from '../services/analyticsV2Service';
 import { getMenuItemViewCounts } from '../services/partnerAnalyticsService';
+import { getCDNUrl } from '../utils/cdnHelper';
 
 interface RestaurantProfileProps {
   restaurant: Restaurant;
@@ -485,7 +486,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
               <div key={dish.id} className="h-screen w-full snap-start relative flex items-center justify-center">
                 <video
                   ref={el => videoRefs.current[idx] = el}
-                  src={dish.videoUrl}
+                  src={getCDNUrl(dish.videoUrl)}
                   className="w-full h-full object-cover"
                   autoPlay={idx === activeVideoIndex}
                   loop
@@ -784,7 +785,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                   {dish.videoUrl ? (
                     <video 
                       ref={(el) => (gridVideoRefs.current[index] = el)}
-                      src={dish.videoUrl} 
+                      src={getCDNUrl(dish.videoUrl)} 
                       className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" 
                       muted 
                       playsInline
