@@ -15,6 +15,7 @@ import RestaurantAnalyticsV2 from './RestaurantAnalyticsV2';
 // import RestaurantAnalytics from './RestaurantAnalytics';
 import MenuImportModal from '../../components/MenuImportModal';
 import { compressVideo, shouldCompressVideo } from '../../utils/videoCompression';
+import { ensureFaststart } from '../../utils/mp4Faststart';
 import { QRCodeSVG } from 'qrcode.react';
 import { sanitizeFileName } from '../../utils/fileUtils';
 import ChatWidget from '../../components/chat/ChatWidget';
@@ -948,6 +949,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         setUploadProgress(30);
       }
 
+      // Ensure moov atom is at the beginning for instant playback
+      fileToUpload = await ensureFaststart(fileToUpload);
+
       // Sanitizar nome do arquivo para garantir URLs seguras
       const sanitizedName = sanitizeFileName(fileToUpload.name, menuItemName.trim());
       const fileName = `${partnerData.id}/${sanitizedName}`;
@@ -1057,17 +1061,12 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       if (mediaType === 'video' && uploadFile) {
         setUploadProgress(20);
         
-        // TEMPORARY: Skip compression to test if that's the issue
         let fileToUpload = uploadFile;
-        console.log('Skipping compression for testing - uploading original video');
+        setUploadProgress(40);
+
+        // Ensure moov atom is at the beginning for instant playback
+        fileToUpload = await ensureFaststart(fileToUpload);
         setUploadProgress(50);
-        
-        // let fileToUpload = uploadFile;
-        // if (shouldCompressVideo(uploadFile)) {
-        //   setUploadProgress(30);
-        //   fileToUpload = await compressVideo(uploadFile);
-        //   setUploadProgress(50);
-        // }
 
         const timestamp = Date.now();
         // Get original file extension
