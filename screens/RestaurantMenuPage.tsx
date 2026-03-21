@@ -322,9 +322,10 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
         video.load();
         setVideoReady(prev => { const next = new Set(prev); next.delete(index); return next; });
       } else if (index === activeVideoIndex) {
-        // ACTIVE VIDEO: play
+        // ACTIVE VIDEO: play immediately
+        // Mobile Safari ignores preload="auto" — calling play() forces it to start loading
         video.muted = isMuted;
-        if (isPlaying && video.readyState >= 2) {
+        if (isPlaying) {
           video.play().catch(() => {});
         }
       } else {
@@ -345,7 +346,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
         return;
       }
       
-      if (activeVideo && isPlaying && activeVideo.paused && activeVideo.readyState >= 2) {
+      if (activeVideo && isPlaying && activeVideo.paused) {
         activeVideo.play().catch(() => {});
       }
       if (activeVideo && !activeVideo.paused) {
