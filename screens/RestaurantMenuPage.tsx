@@ -602,7 +602,6 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
       >
         {filteredItems.map((item, index) => (
           <div key={item.id} className="h-screen w-full snap-start relative">
-            {/* Video */}
             {/* Loading spinner */}
             {!videoReady.has(index) && index === activeVideoIndex && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-10">
