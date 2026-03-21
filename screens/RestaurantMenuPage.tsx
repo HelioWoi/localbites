@@ -308,51 +308,37 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     }
   };
 
-  // Play/pause management and memory cleanup
-  // Video src is set directly in JSX for instant loading - useEffect only handles playback
+  // Play/pause management — only active video gets src and plays
   useEffect(() => {
+    const activeVideo = videoRefs.current[activeVideoIndex];
+    
+    // Pause all other videos and clear far-away src
     videoRefs.current.forEach((video, index) => {
-      if (!video || index >= filteredItems.length) return;
-      const distance = Math.abs(index - activeVideoIndex);
-      
-      if (distance > 2) {
-        // FAR AWAY: unload to free memory
-        video.pause();
-        video.removeAttribute('src');
-        video.load();
-        setVideoReady(prev => { const next = new Set(prev); next.delete(index); return next; });
-      } else if (index === activeVideoIndex) {
-        // ACTIVE VIDEO: play immediately
-        // Mobile Safari ignores preload="auto" — calling play() forces it to start loading
-        video.muted = isMuted;
-        if (isPlaying) {
-          video.play().catch(() => {});
-        }
-      } else {
-        // ADJACENT: pause (src is set in JSX)
-        video.pause();
-      }
+      if (!video || index === activeVideoIndex) return;
+      video.pause();
     });
     
-    // Retry play with timeout limit (max 5 attempts = 5 seconds)
+    // Play active video
+    if (activeVideo) {
+      activeVideo.muted = isMuted; // React muted prop bug workaround
+      if (isPlaying) {
+        const playPromise = activeVideo.play();
+        if (playPromise) playPromise.catch(() => {});
+      }
+    }
+    
+    // Retry play (mobile Safari sometimes needs multiple attempts)
     let retryCount = 0;
-    const maxRetries = 5;
     const retryInterval = setInterval(() => {
-      const activeVideo = videoRefs.current[activeVideoIndex];
+      const video = videoRefs.current[activeVideoIndex];
       retryCount++;
-      
-      if (retryCount >= maxRetries) {
-        clearInterval(retryInterval);
-        return;
+      if (retryCount >= 10) { clearInterval(retryInterval); return; }
+      if (video && isPlaying && video.paused) {
+        video.muted = true;
+        video.play().catch(() => {});
       }
-      
-      if (activeVideo && isPlaying && activeVideo.paused) {
-        activeVideo.play().catch(() => {});
-      }
-      if (activeVideo && !activeVideo.paused) {
-        clearInterval(retryInterval);
-      }
-    }, 1000);
+      if (video && !video.paused) clearInterval(retryInterval);
+    }, 500);
     
     return () => clearInterval(retryInterval);
   }, [activeVideoIndex, isMuted, isPlaying, filteredItems]);
@@ -636,15 +622,18 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               </div>
             )}
             <video
-              ref={el => videoRefs.current[index] = el}
-              src={Math.abs(index - activeVideoIndex) <= 2 ? getCDNUrl(item.videoUrl) : undefined}
+              ref={el => {
+                videoRefs.current[index] = el;
+                if (el) el.muted = true; // Force muted on mount (React bug workaround)
+              }}
+              src={index === activeVideoIndex ? getCDNUrl(item.videoUrl) : undefined}
               poster={restaurant.coverPhotoUrl || undefined}
               className="absolute inset-0 w-full h-full object-cover"
               loop
               muted
               autoPlay={index === activeVideoIndex}
               playsInline
-              preload={index === activeVideoIndex ? "auto" : Math.abs(index - activeVideoIndex) <= 2 ? "metadata" : "none"}
+              preload={index === activeVideoIndex ? "auto" : "none"}
               onPlaying={() => {
                 setVideoReady(prev => new Set(prev).add(index));
               }}
@@ -658,21 +647,9 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               onLoadedData={() => {
                 setVideoReady(prev => new Set(prev).add(index));
               }}
-              onError={(e) => {
+              onError={() => {
                 console.error('Video failed to load:', item.videoUrl);
-                const video = e.currentTarget;
-                if (!videoErrors.has(index)) {
-                  setVideoErrors(prev => new Set(prev).add(index));
-                  setTimeout(() => {
-                    if (Math.abs(index - activeVideoIndex) <= 1) {
-                      video.src = getCDNUrl(item.videoUrl);
-                      video.load();
-                      if (index === activeVideoIndex) {
-                        video.play().catch(() => {});
-                      }
-                    }
-                  }, 2000);
-                }
+                setVideoErrors(prev => new Set(prev).add(index));
               }}
             />
 
