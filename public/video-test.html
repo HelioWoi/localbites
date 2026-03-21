@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Video Test</title>
+  <style>
+    body { margin: 0; background: #000; color: #fff; font-family: sans-serif; padding: 20px; }
+    video { width: 100%; max-height: 60vh; background: #222; }
+    .status { padding: 10px; margin: 10px 0; background: #111; border-radius: 8px; font-size: 14px; }
+    .ok { color: #4ade80; }
+    .err { color: #f87171; }
+    button { padding: 12px 24px; font-size: 16px; background: #f97316; color: white; border: none; border-radius: 8px; margin: 5px; }
+  </style>
+</head>
+<body>
+  <h2>MenuLove Video Test</h2>
+  <div id="log"></div>
+  
+  <video id="vid" playsinline muted loop
+    poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3C/svg%3E">
+  </video>
+  
+  <div>
+    <button onclick="testVideo()">Test Supabase Direct</button>
+    <button onclick="testCDN()">Test Bunny CDN</button>
+    <button onclick="document.getElementById('vid').play()">Manual Play</button>
+  </div>
+
+  <script>
+    const log = document.getElementById('log');
+    const vid = document.getElementById('vid');
+    const testUrl = 'https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/menu-videos/25a74f93-ad80-4c7b-a322-e5c4a7b49d40/egg-benedict-1770599329880.mp4';
+    const cdnUrl = 'https://menulove.b-cdn.net/storage/v1/object/public/menu-videos/25a74f93-ad80-4c7b-a322-e5c4a7b49d40/egg-benedict-1770599329880.mp4';
+
+    function addLog(msg, ok) {
+      const d = document.createElement('div');
+      d.className = 'status ' + (ok ? 'ok' : 'err');
+      d.textContent = new Date().toLocaleTimeString() + ' - ' + msg;
+      log.prepend(d);
+    }
+
+    vid.addEventListener('loadstart', () => addLog('loadstart', true));
+    vid.addEventListener('loadedmetadata', () => addLog('loadedmetadata - duration: ' + vid.duration.toFixed(1) + 's', true));
+    vid.addEventListener('loadeddata', () => addLog('loadeddata - readyState: ' + vid.readyState, true));
+    vid.addEventListener('canplay', () => addLog('canplay - readyState: ' + vid.readyState, true));
+    vid.addEventListener('canplaythrough', () => addLog('canplaythrough', true));
+    vid.addEventListener('playing', () => addLog('PLAYING!', true));
+    vid.addEventListener('waiting', () => addLog('waiting (buffering)', false));
+    vid.addEventListener('stalled', () => addLog('stalled', false));
+    vid.addEventListener('error', () => addLog('ERROR: ' + (vid.error ? vid.error.message : 'unknown'), false));
+
+    function testVideo() {
+      addLog('Loading from Supabase direct...', true);
+      const start = Date.now();
+      vid.src = testUrl;
+      vid.play().then(() => {
+        addLog('play() resolved in ' + (Date.now() - start) + 'ms', true);
+      }).catch(e => {
+        addLog('play() rejected: ' + e.message, false);
+      });
+    }
+
+    function testCDN() {
+      addLog('Loading from Bunny CDN...', true);
+      const start = Date.now();
+      vid.src = cdnUrl;
+      vid.play().then(() => {
+        addLog('play() resolved in ' + (Date.now() - start) + 'ms', true);
+      }).catch(e => {
+        addLog('play() rejected: ' + e.message, false);
+      });
+    }
+  </script>
+</body>
+</html>
