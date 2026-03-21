@@ -309,25 +309,32 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   };
 
   // Play/pause management — only active video gets src and plays
+  // IMPORTANT: Do NOT call video.load() here — JSX src already triggers loading
   useEffect(() => {
     const activeVideo = videoRefs.current[activeVideoIndex];
     
-    // Pause all other videos and clear far-away src
+    // Pause all other videos
     videoRefs.current.forEach((video, index) => {
       if (!video || index === activeVideoIndex) return;
       video.pause();
     });
     
-    // Play active video
+    // Play active video (src is set in JSX, browser is already loading)
     if (activeVideo) {
-      activeVideo.muted = isMuted; // React muted prop bug workaround
+      activeVideo.muted = isMuted;
       if (isPlaying) {
-        const playPromise = activeVideo.play();
-        if (playPromise) playPromise.catch(() => {});
+        // Small delay to let browser process the src attribute from JSX
+        setTimeout(() => {
+          const v = videoRefs.current[activeVideoIndex];
+          if (v && isPlaying) {
+            v.muted = true; // Ensure muted for autoplay policy
+            v.play().catch(() => {});
+          }
+        }, 100);
       }
     }
     
-    // Retry play (mobile Safari sometimes needs multiple attempts)
+    // Retry play every 500ms (mobile Safari sometimes needs multiple attempts)
     let retryCount = 0;
     const retryInterval = setInterval(() => {
       const video = videoRefs.current[activeVideoIndex];
@@ -337,7 +344,10 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
         video.muted = true;
         video.play().catch(() => {});
       }
-      if (video && !video.paused) clearInterval(retryInterval);
+      if (video && !video.paused) {
+        clearInterval(retryInterval);
+        setVideoReady(prev => new Set(prev).add(activeVideoIndex));
+      }
     }, 500);
     
     return () => clearInterval(retryInterval);
