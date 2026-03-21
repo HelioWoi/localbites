@@ -308,30 +308,14 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     }
   };
 
-  // Play/pause management — only active video gets src and plays
-  // IMPORTANT: Do NOT call video.load() here — JSX src already triggers loading
+  // Play active video — only ONE <video> element exists at a time (rendered in JSX)
   useEffect(() => {
     const activeVideo = videoRefs.current[activeVideoIndex];
+    if (!activeVideo) return;
     
-    // Pause all other videos
-    videoRefs.current.forEach((video, index) => {
-      if (!video || index === activeVideoIndex) return;
-      video.pause();
-    });
-    
-    // Play active video (src is set in JSX, browser is already loading)
-    if (activeVideo) {
-      activeVideo.muted = isMuted;
-      if (isPlaying) {
-        // Small delay to let browser process the src attribute from JSX
-        setTimeout(() => {
-          const v = videoRefs.current[activeVideoIndex];
-          if (v && isPlaying) {
-            v.muted = true; // Ensure muted for autoplay policy
-            v.play().catch(() => {});
-          }
-        }, 100);
-      }
+    activeVideo.muted = isMuted;
+    if (isPlaying) {
+      activeVideo.play().catch(() => {});
     }
     
     // Retry play every 500ms (mobile Safari sometimes needs multiple attempts)
@@ -598,70 +582,72 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
       >
         {filteredItems.map((item, index) => (
           <div key={item.id} className="h-screen w-full snap-start relative">
-            {/* Loading spinner */}
-            {!videoReady.has(index) && index === activeVideoIndex && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-10">
-                {restaurant.coverPhotoUrl && (
-                  <img src={restaurant.coverPhotoUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />
-                )}
-                {videoTimedOut.has(index) || videoErrors.has(index) ? (
-                  <button
-                    onClick={() => {
-                      const video = videoRefs.current[index];
-                      if (video) {
-                        setVideoTimedOut(prev => { const n = new Set(prev); n.delete(index); return n; });
-                        setVideoErrors(prev => { const n = new Set(prev); n.delete(index); return n; });
-                        video.src = getCDNUrl(filteredItems[index]?.videoUrl) || '';
-                        video.load();
-                        video.play().catch(() => {});
-                      }
-                    }}
-                    className="relative z-10 flex flex-col items-center gap-3"
-                  >
-                    <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center">
-                      <Play size={24} className="text-white ml-1" fill="white" />
-                    </div>
-                    <span className="text-white/70 text-xs">Tap to play</span>
-                  </button>
-                ) : (
-                  <div className="relative z-10 flex flex-col items-center">
-                    <div className="w-8 h-8 border-2 border-zinc-700 border-t-orange-500 rounded-full animate-spin mb-3" />
-                    <span className="text-zinc-500 text-xs">Loading video...</span>
+            {/* Only render <video> for active video — multiple video elements kill mobile Safari */}
+            {index === activeVideoIndex ? (
+              <>
+                {/* Loading spinner */}
+                {!videoReady.has(index) && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-10">
+                    {restaurant.coverPhotoUrl && (
+                      <img src={restaurant.coverPhotoUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />
+                    )}
+                    {videoTimedOut.has(index) || videoErrors.has(index) ? (
+                      <button
+                        onClick={() => {
+                          const video = videoRefs.current[index];
+                          if (video) {
+                            setVideoTimedOut(prev => { const n = new Set(prev); n.delete(index); return n; });
+                            setVideoErrors(prev => { const n = new Set(prev); n.delete(index); return n; });
+                            video.play().catch(() => {});
+                          }
+                        }}
+                        className="relative z-10 flex flex-col items-center gap-3"
+                      >
+                        <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center">
+                          <Play size={24} className="text-white ml-1" fill="white" />
+                        </div>
+                        <span className="text-white/70 text-xs">Tap to play</span>
+                      </button>
+                    ) : (
+                      <div className="relative z-10 flex flex-col items-center">
+                        <div className="w-8 h-8 border-2 border-zinc-700 border-t-orange-500 rounded-full animate-spin mb-3" />
+                        <span className="text-zinc-500 text-xs">Loading video...</span>
+                      </div>
+                    )}
                   </div>
+                )}
+                <video
+                  ref={el => {
+                    videoRefs.current[index] = el;
+                    if (el) el.muted = true;
+                  }}
+                  src={getCDNUrl(item.videoUrl)}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  loop
+                  muted
+                  autoPlay
+                  playsInline
+                  preload="auto"
+                  onPlaying={() => setVideoReady(prev => new Set(prev).add(index))}
+                  onCanPlay={() => {
+                    setVideoReady(prev => new Set(prev).add(index));
+                    const video = videoRefs.current[index];
+                    if (video && isPlaying) video.play().catch(() => {});
+                  }}
+                  onLoadedData={() => setVideoReady(prev => new Set(prev).add(index))}
+                  onError={() => {
+                    console.error('Video failed to load:', item.videoUrl);
+                    setVideoErrors(prev => new Set(prev).add(index));
+                  }}
+                />
+              </>
+            ) : (
+              <div className="absolute inset-0 bg-black">
+                {restaurant.coverPhotoUrl && (
+                  <img src={restaurant.coverPhotoUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40" />
                 )}
               </div>
             )}
-            <video
-              ref={el => {
-                videoRefs.current[index] = el;
-                if (el) el.muted = true; // Force muted on mount (React bug workaround)
-              }}
-              src={index === activeVideoIndex ? getCDNUrl(item.videoUrl) : undefined}
-              poster={restaurant.coverPhotoUrl || undefined}
-              className="absolute inset-0 w-full h-full object-cover"
-              loop
-              muted
-              autoPlay={index === activeVideoIndex}
-              playsInline
-              preload={index === activeVideoIndex ? "auto" : "none"}
-              onPlaying={() => {
-                setVideoReady(prev => new Set(prev).add(index));
-              }}
-              onCanPlay={() => {
-                setVideoReady(prev => new Set(prev).add(index));
-                const video = videoRefs.current[index];
-                if (index === activeVideoIndex && isPlaying && video) {
-                  video.play().catch(() => {});
-                }
-              }}
-              onLoadedData={() => {
-                setVideoReady(prev => new Set(prev).add(index));
-              }}
-              onError={() => {
-                console.error('Video failed to load:', item.videoUrl);
-                setVideoErrors(prev => new Set(prev).add(index));
-              }}
-            />
 
             {/* Gradient overlay */}
             <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none" />
