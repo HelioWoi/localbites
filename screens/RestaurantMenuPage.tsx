@@ -419,12 +419,12 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     };
   }, []);
 
-  // Timeout fallback: show retry UI after 6s if video doesn't load
+  // Timeout fallback: show retry UI after 4s if video doesn't load
   useEffect(() => {
     if (videoReady.has(activeVideoIndex)) return;
     const timeout = setTimeout(() => {
       setVideoTimedOut(prev => new Set(prev).add(activeVideoIndex));
-    }, 6000);
+    }, 4000);
     return () => clearTimeout(timeout);
   }, [activeVideoIndex, videoReady]);
 
@@ -642,12 +642,15 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               poster={restaurant.coverPhotoUrl || undefined}
               className="absolute inset-0 w-full h-full object-cover"
               loop
-              muted={isMuted}
+              muted
+              autoPlay={index === activeVideoIndex}
               playsInline
               preload={index === activeVideoIndex ? "auto" : Math.abs(index - activeVideoIndex) <= 2 ? "metadata" : "none"}
+              onPlaying={() => {
+                setVideoReady(prev => new Set(prev).add(index));
+              }}
               onCanPlay={() => {
                 setVideoReady(prev => new Set(prev).add(index));
-                // Auto-play if this is the active video
                 const video = videoRefs.current[index];
                 if (index === activeVideoIndex && isPlaying && video) {
                   video.play().catch(() => {});
