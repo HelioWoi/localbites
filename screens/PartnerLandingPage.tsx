@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Smartphone, 
   TrendingUp, 
@@ -21,6 +21,19 @@ import PromoPopup from '../components/PromoPopup';
 
 const PartnerLandingPage: React.FC = () => {
   const [formSubmitted, setFormSubmitted] = useState(false);
+
+  // Capture affiliate referral code from URL (?ref=CODE)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const refCode = urlParams.get('ref');
+    if (refCode) {
+      localStorage.setItem('affiliate_ref_code', refCode.trim().toUpperCase());
+      localStorage.setItem('affiliate_ref_timestamp', Date.now().toString());
+      // Clean URL without reloading
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, '', cleanUrl);
+    }
+  }, []);
 
   const scrollToForm = () => {
     const formSection = document.getElementById('signup-form');

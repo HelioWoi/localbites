@@ -374,6 +374,51 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
           }
         }
 
+        // Track affiliate referral if present
+        const affiliateRefCode = localStorage.getItem('affiliate_ref_code');
+        const affiliateRefTimestamp = localStorage.getItem('affiliate_ref_timestamp');
+        if (affiliateRefCode) {
+          try {
+            // Check ref code is not older than 30 days
+            const isValid = affiliateRefTimestamp && (Date.now() - parseInt(affiliateRefTimestamp)) < 30 * 24 * 60 * 60 * 1000;
+            if (isValid) {
+              const { data: affiliateData } = await supabase
+                .from('affiliates')
+                .select('id')
+                .eq('referral_code', affiliateRefCode)
+                .eq('status', 'active')
+                .single();
+
+              if (affiliateData) {
+                // Create referral record
+                await supabase.from('referrals').insert({
+                  affiliate_id: affiliateData.id,
+                  partner_id: data.user.id,
+                  partner_email: email.trim(),
+                  status: 'signed_up',
+                  signed_up_at: new Date().toISOString(),
+                });
+
+                // Update partner with affiliate reference
+                await supabase
+                  .from('partners')
+                  .update({ referred_by_affiliate_id: affiliateData.id })
+                  .eq('id', data.user.id);
+
+                // Update affiliate totals
+                await supabase.rpc('update_affiliate_totals', { aff_id: affiliateData.id });
+
+                console.log('[Signup] Affiliate referral tracked:', affiliateRefCode, '->', affiliateData.id);
+              }
+            }
+            // Clear ref code after use
+            localStorage.removeItem('affiliate_ref_code');
+            localStorage.removeItem('affiliate_ref_timestamp');
+          } catch (refErr) {
+            console.warn('[Signup] Affiliate referral tracking failed (non-blocking):', refErr);
+          }
+        }
+
         // Send confirmation email
         try {
           const { data: emailData, error: emailError } = await supabase.functions.invoke('send-confirmation-email', {

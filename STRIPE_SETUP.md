@@ -4,8 +4,8 @@
 This guide will help you set up Stripe for partner subscriptions in LocalBites.
 
 **Subscription Plans:**
-- 💳 Monthly: $29/month
-- 💎 Annual: $299/year (save $49)
+- 💳 Monthly: $39/month
+- 💎 Annual: $390/year (save $78)
 
 ---
 
@@ -39,7 +39,7 @@ This guide will help you set up Stripe for partner subscriptions in LocalBites.
    Name: LocalBites Premium - Monthly
    Description: Premium subscription for restaurant partners
    Pricing model: Recurring
-   Price: $29
+   Price: $39
    Billing period: Monthly
    ```
 3. Click **Save product**
@@ -50,9 +50,9 @@ This guide will help you set up Stripe for partner subscriptions in LocalBites.
 2. Fill in:
    ```
    Name: LocalBites Premium - Annual
-   Description: Premium subscription for restaurant partners (save 14%)
+   Description: Premium subscription for restaurant partners (save 17%)
    Pricing model: Recurring
-   Price: $299
+   Price: $390
    Billing period: Yearly
    ```
 3. Click **Save product**

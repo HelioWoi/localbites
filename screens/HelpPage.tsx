@@ -19,7 +19,7 @@ const HelpPage: React.FC = () => {
     },
     {
       question: "How does the 30-day free trial work?",
-      answer: "When you sign up, you get 30 days of full Premium access with no credit card required. You can upload unlimited videos, access analytics, and use all features. After the trial, choose to subscribe for $29.90/month or your account will revert to free tier (limited features)."
+      answer: "When you sign up, you get 30 days of full Premium access with no credit card required. You can upload unlimited videos, access analytics, and use all features. After the trial, choose to subscribe for $39/month or your account will revert to free tier (limited features)."
     },
     {
       question: "Can I cancel my subscription anytime?",

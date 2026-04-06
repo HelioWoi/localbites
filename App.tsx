@@ -16,6 +16,7 @@ import PrivacyPolicyPage from './screens/PrivacyPolicyPage';
 import TermsOfServicePage from './screens/TermsOfServicePage';
 import FAQPage from './screens/FAQPage';
 import SuperAdminPortal from './screens/admin/SuperAdminPortal';
+import AffiliatePortal from './screens/affiliate/AffiliatePortal';
 import AdminSetup from './screens/admin/AdminSetup';
 import RestaurantMenuLoader from './components/RestaurantMenuLoader';
 import RestaurantProfileLoader from './components/RestaurantProfileLoader';
@@ -52,6 +53,9 @@ const isPartnerLandingRoute = window.location.pathname === '/become-a-partner' |
 
 // Check if we're on the partner route
 const isPartnerRoute = window.location.pathname === '/partner' || window.location.pathname.startsWith('/partner');
+
+// Check if we're on the affiliate route
+const isAffiliateRoute = window.location.pathname === '/affiliate' || window.location.pathname.startsWith('/affiliate');
 
 // Check if we're on legal pages routes
 const isLegalRoute = window.location.pathname === '/policy' || 
@@ -150,6 +154,7 @@ const App: React.FC = () => {
                                  !pathname.startsWith('/r/') && 
                                  !pathname.startsWith('/partner') && 
                                  !pathname.startsWith('/admin') &&
+                                 !pathname.startsWith('/affiliate') &&
                                  pathname !== '/confirm-email' &&
                                  pathParts.length === 1; // Only /:slug
   const isAppFeedMenuRoute = pathname !== '/' &&
@@ -226,6 +231,11 @@ const App: React.FC = () => {
   // If on admin route, render Super Admin Portal
   if (isAdminRoute) {
     return <SuperAdminPortal />;
+  }
+
+  // If on affiliate route, render Affiliate Portal
+  if (isAffiliateRoute) {
+    return <AffiliatePortal />;
   }
 
   // If on partner landing page, render Partner Landing Page

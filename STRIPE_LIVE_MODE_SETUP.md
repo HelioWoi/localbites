@@ -57,7 +57,7 @@ Antes de começar, certifique-se:
 1. Products → Create Product
    - Name: LocalBites Pro - Monthly
    - Description: Monthly subscription for restaurant partners
-   - Price: $29 AUD / month
+   - Price: $39 AUD / month
    - Billing period: Monthly
    - Save product
    - Copy Price ID (ex: price_LIVE_XXXXXXXXX)
@@ -68,7 +68,7 @@ Antes de começar, certifique-se:
 1. Products → Create Product
    - Name: LocalBites Pro - Annual
    - Description: Annual subscription for restaurant partners (2 months free)
-   - Price: $290 AUD / year
+   - Price: $390 AUD / year
    - Billing period: Yearly
    - Save product
    - Copy Price ID (ex: price_LIVE_YYYYYYYYY)

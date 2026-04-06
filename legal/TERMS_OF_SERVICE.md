@@ -58,8 +58,8 @@ These Terms constitute a legally binding agreement between you and MenuLove unde
 
 ### 5.1 Subscription Plans
 - **14-Day Free Trial** - Full access, no credit card required
-- **Monthly Plan** - $29 AUD/month
-- **Annual Plan** - $290 AUD/year (save 17%)
+- **Monthly Plan** - $39 AUD/month
+- **Annual Plan** - $390 AUD/year (save 17%)
 
 ### 5.2 Billing
 - Subscriptions auto-renew unless cancelled

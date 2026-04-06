@@ -45,8 +45,8 @@ MenuLove provides:
 - Cancel anytime during trial with no charges
 
 ### 3.2 Paid Subscriptions
-- **Monthly Plan:** $29 AUD/month (inc. GST)
-- **Annual Plan:** $290 AUD/year (inc. GST)
+- **Monthly Plan:** $39 AUD/month (inc. GST)
+- **Annual Plan:** $390 AUD/year (inc. GST)
 - Auto-renewal unless cancelled
 - Prices subject to change with 30 days notice
 

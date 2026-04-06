@@ -13,9 +13,9 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: 'monthly',
     name: 'Monthly Premium',
-    price: 29.90,
+    price: 39,
     interval: 'month',
-    priceId: 'price_1SvzbsIG1T8Ip1Z0zLOzEVBR',
+    priceId: 'price_1TJ1EwIG1T8Ip1Z0n23ZgsZF',
     features: [
       'Unlimited video uploads',
       'Premium profile badge',
@@ -27,16 +27,16 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: 'annual',
     name: 'Annual Premium',
-    price: 308.90,
+    price: 390,
     interval: 'year',
-    priceId: 'price_1SvzdrIG1T8Ip1Z0EQGKZjer',
+    priceId: 'price_1SxxDjIG1T8Ip1Z0cgTPEV7Z',
     features: [
       'Unlimited video uploads',
       'Premium profile badge',
       'Featured in search results',
       'Analytics dashboard',
       'Priority support',
-      'Save $49.90/year (14% off)',
+      'Save $78/year (17% off)',
     ],
   },
 ];

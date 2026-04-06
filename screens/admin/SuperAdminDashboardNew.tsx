@@ -4,9 +4,10 @@ import {
   Users, Video, DollarSign, TrendingUp, Search, Bell, LogOut,
   Home, FileText, Settings, BarChart3, Crown, Clock, CheckCircle,
   MoreVertical, TrendingDown, Activity, Menu, X, ShieldAlert, Trash2, Check,
-  ChevronLeft, ChevronRight, UserPlus, MessageCircle
+  ChevronLeft, ChevronRight, UserPlus, MessageCircle, Link2, Banknote
 } from 'lucide-react';
 import SuperAdminAnalytics from './SuperAdminAnalytics';
+import AffiliatesAdminTab from './AffiliatesAdminTab';
 import ConfirmationModal from '../../components/ConfirmationModal';
 import GoogleAnalyticsWidget from '../../components/GoogleAnalyticsWidget';
 import { getOnlineVisitors } from '../../services/eventsService';
@@ -61,7 +62,7 @@ interface TeamMember {
   sms_notifications_enabled: boolean;
 }
 
-type TabType = 'overview' | 'partners' | 'revenue' | 'content' | 'analytics' | 'team' | 'chat';
+type TabType = 'overview' | 'partners' | 'revenue' | 'content' | 'analytics' | 'team' | 'chat' | 'affiliates';
 
 interface SuperAdminDashboardNewProps {
   user: any;
@@ -335,7 +336,7 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
       const activeCount = processedPartners.filter(p => p.subscription_status === 'active').length;
       const trialCount = processedPartners.filter(p => p.subscription_status === 'trial').length;
       const totalVideos = processedPartners.reduce((sum, p) => sum + p.total_videos, 0);
-      const monthlyRevenue = activeCount * 29;
+      const monthlyRevenue = activeCount * 39;
       const totalRevenue = monthlyRevenue;
       const totalConverted = activeCount;
       const totalEligible = processedPartners.length;
@@ -868,6 +869,7 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
             { id: 'content', label: 'Content', icon: Video },
             { id: 'analytics', label: 'Analytics', icon: BarChart3 },
             { id: 'team', label: 'Team', icon: UserPlus },
+            { id: 'affiliates', label: 'Affiliates', icon: Link2 },
             { id: 'chat', label: 'Live Chat', icon: MessageCircle, badge: activeChatsCount },
           ].map((item) => (
             <button
@@ -1173,6 +1175,7 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
               { id: 'revenue', label: 'Revenue', icon: DollarSign },
               { id: 'content', label: 'Content', icon: Video },
               { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+              { id: 'affiliates', label: 'Affiliates', icon: Link2 },
               { id: 'chat', label: 'Live Chat', icon: MessageCircle, badge: activeChatsCount },
             ].map((tab) => (
               <button
@@ -1887,7 +1890,7 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                     </div>
                     <div className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg">
                       <span className="text-sm text-zinc-600">Plan Price</span>
-                      <span className="text-sm font-bold text-zinc-900">$29/month</span>
+                      <span className="text-sm font-bold text-zinc-900">$39/month</span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg">
                       <span className="text-sm text-zinc-600">Trial Period</span>
@@ -1930,7 +1933,7 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                           <td className="py-3 px-4 text-center">
                             <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">Active</span>
                           </td>
-                          <td className="py-3 px-4 text-right text-sm font-bold text-zinc-900">$29.00</td>
+                          <td className="py-3 px-4 text-right text-sm font-bold text-zinc-900">$39.00</td>
                           <td className="py-3 px-4 text-center">
                             <button
                               onClick={() => handlePartnerAction(partner.id, 'stripe')}
@@ -2187,6 +2190,11 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Affiliates Tab */}
+          {activeTab === 'affiliates' && (
+            <AffiliatesAdminTab />
           )}
         </div>
       </div>

@@ -226,11 +226,16 @@
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-846VMWZYX5', {
-    'send_page_view': true,
-    'anonymize_ip': true
-  });
+  try {
+    gtag('js', new Date());
+    gtag('config', 'G-846VMWZYX5', {
+      'send_page_view': true,
+      'anonymize_ip': true
+    });
+  } catch (e) {
+    // Analytics failed to load - continue silently
+    console.warn('Analytics initialization failed:', e);
+  }
 </script>
 <!-- End Google Analytics 4 -->
 

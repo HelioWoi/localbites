@@ -21,8 +21,8 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
   const [wasCanceled, setWasCanceled] = useState(false);
 
   const PRICE_IDS = {
-    monthly: 'price_1SxxClIG1T8Ip1Z0i9rOM0gj', // Live Mode - Monthly $29.90
-    annual: 'price_1SxxDjIG1T8Ip1Z0cgTPEV7Z',  // Live Mode - Annual $308.90
+    monthly: 'price_1TJ1EwIG1T8Ip1Z0n23ZgsZF', // Stripe Monthly $39 Price ID
+    annual: 'price_1SxxDjIG1T8Ip1Z0cgTPEV7Z',  // Stripe Annual Price ID
   };
 
   useEffect(() => {
@@ -247,7 +247,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
 
           {isTrialing && (
             <p className="text-white/70 text-sm mb-4">
-              Your card will be charged A${subscription.plan === 'Monthly' ? '29.90/month' : '290/year'} after the trial ends. You can cancel anytime.
+              Your card will be charged A${subscription.plan === 'Monthly' ? '39/month' : '390/year'} after the trial ends. You can cancel anytime.
             </p>
           )}
           
@@ -287,7 +287,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
               <div className="text-center mb-6">
                 <h3 className="text-2xl font-bold text-zinc-900 mb-2">Monthly</h3>
                 <div className="flex items-baseline justify-center gap-1">
-                  <span className="text-5xl font-bold text-zinc-900">$29.90</span>
+                  <span className="text-5xl font-bold text-zinc-900">$39</span>
                   <span className="text-zinc-500">/month</span>
                 </div>
               </div>

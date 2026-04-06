@@ -168,6 +168,122 @@ serve(async (req) => {
       });
 
     console.log(`[Webhook] Recorded payment for partner ${partner.id}: $${invoice.amount_paid / 100}`);
+
+    // Process affiliate commission if applicable
+    await handleAffiliateCommission(invoice, partner.id);
+  }
+
+  async function handleAffiliateCommission(invoice: any, partnerId: string) {
+    try {
+      // Check if partner was referred by an affiliate
+      const { data: partner } = await supabase
+        .from("partners")
+        .select("id, referred_by_affiliate_id")
+        .eq("id", partnerId)
+        .single();
+
+      if (!partner?.referred_by_affiliate_id) {
+        console.log("[Webhook] No affiliate referral for partner:", partnerId);
+        return;
+      }
+
+      const affiliateId = partner.referred_by_affiliate_id;
+      console.log("[Webhook] Processing affiliate commission for affiliate:", affiliateId);
+
+      // Get the referral record
+      const { data: referral } = await supabase
+        .from("referrals")
+        .select("id, first_payment_at")
+        .eq("affiliate_id", affiliateId)
+        .eq("partner_id", partnerId)
+        .single();
+
+      if (!referral) {
+        console.log("[Webhook] No referral record found for affiliate/partner pair");
+        return;
+      }
+
+      // Check if invoice amount is 0 (trial invoice) - skip commission
+      if (invoice.amount_paid === 0) {
+        console.log("[Webhook] Skipping commission for $0 trial invoice");
+        return;
+      }
+
+      // Count existing commissions for this referral
+      const { count: existingCommissions } = await supabase
+        .from("affiliate_commissions")
+        .select("id", { count: "exact" })
+        .eq("referral_id", referral.id);
+
+      const commissionCount = existingCommissions || 0;
+
+      // Check if duplicate invoice
+      const { data: existingInvoice } = await supabase
+        .from("affiliate_commissions")
+        .select("id")
+        .eq("stripe_invoice_id", invoice.id)
+        .single();
+
+      if (existingInvoice) {
+        console.log("[Webhook] Commission already exists for invoice:", invoice.id);
+        return;
+      }
+
+      // Max 7 commissions: 1 first payment + 6 recurring months
+      if (commissionCount >= 7) {
+        console.log("[Webhook] Max commissions reached for referral:", referral.id);
+        return;
+      }
+
+      const invoiceAmountDollars = invoice.amount_paid / 100;
+      const isFirstPayment = !referral.first_payment_at;
+      
+      let commissionAmount: number;
+      let commissionType: string;
+      let commissionRate: number | null;
+
+      if (isFirstPayment) {
+        // First payment: fixed $39
+        commissionAmount = 39.00;
+        commissionType = "first_payment";
+        commissionRate = null;
+
+        // Update referral status and first_payment_at
+        await supabase
+          .from("referrals")
+          .update({ 
+            status: "subscribed", 
+            first_payment_at: new Date().toISOString() 
+          })
+          .eq("id", referral.id);
+      } else {
+        // Recurring: 25% of payment for 6 months
+        commissionAmount = Math.round(invoiceAmountDollars * 0.25 * 100) / 100;
+        commissionType = "recurring";
+        commissionRate = 25.00;
+      }
+
+      // Create commission record
+      await supabase.from("affiliate_commissions").insert({
+        affiliate_id: affiliateId,
+        referral_id: referral.id,
+        partner_id: partnerId,
+        stripe_invoice_id: invoice.id,
+        type: commissionType,
+        amount: commissionAmount,
+        invoice_amount: invoiceAmountDollars,
+        commission_rate: commissionRate,
+        payment_number: commissionCount + 1,
+        status: "pending",
+      });
+
+      // Update affiliate totals
+      await supabase.rpc("update_affiliate_totals", { aff_id: affiliateId });
+
+      console.log(`[Webhook] Affiliate commission created: ${commissionType} $${commissionAmount} for affiliate ${affiliateId}`);
+    } catch (err) {
+      console.error("[Webhook] Affiliate commission error (non-blocking):", err);
+    }
   }
 
   async function handlePaymentFailed(invoice: any) {

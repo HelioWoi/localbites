@@ -101,6 +101,14 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  // Email change modal
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [newEmailInput, setNewEmailInput] = useState('');
+  const [confirmEmailInput, setConfirmEmailInput] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [isChangingEmail, setIsChangingEmail] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState(user.email || '');
   
   // Accordion state for categories
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
@@ -197,6 +205,10 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const [subscriptionDaysLeft, setSubscriptionDaysLeft] = useState(0);
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
   const [hasPaidSubscription, setHasPaidSubscription] = useState(false); // Stripe subscription
+
+  useEffect(() => {
+    setCurrentUserEmail(user.email || '');
+  }, [user.email]);
   
   useEffect(() => {
     const loadSubscriptionStatus = async () => {
@@ -515,6 +527,67 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     } finally {
       console.log('loadData finished, setting isLoading false');
       setIsLoading(false);
+    }
+  };
+
+  const handleChangeEmail = async () => {
+    setEmailError('');
+
+    const normalizedNewEmail = newEmailInput.trim().toLowerCase();
+    const normalizedConfirmEmail = confirmEmailInput.trim().toLowerCase();
+    const normalizedCurrentEmail = (currentUserEmail || '').trim().toLowerCase();
+
+    if (!normalizedNewEmail || !normalizedConfirmEmail) {
+      setEmailError('Please fill in all fields');
+      return;
+    }
+
+    if (normalizedNewEmail !== normalizedConfirmEmail) {
+      setEmailError('Emails do not match');
+      return;
+    }
+
+    if (normalizedNewEmail === normalizedCurrentEmail) {
+      setEmailError('Please enter a different email');
+      return;
+    }
+
+    setIsChangingEmail(true);
+
+    try {
+      const { data, error: authError } = await supabase.auth.updateUser({
+        email: normalizedNewEmail,
+      });
+
+      if (authError) throw authError;
+
+      const { error: partnerEmailError } = await supabase
+        .from('partners')
+        .update({ email: normalizedNewEmail })
+        .eq('id', user.id);
+
+      if (partnerEmailError) {
+        console.error('Partner email sync error:', partnerEmailError);
+      }
+
+      setCurrentUserEmail(normalizedNewEmail);
+      setShowEmailModal(false);
+      setNewEmailInput('');
+      setConfirmEmailInput('');
+
+      const pendingNewEmail = (data?.user as any)?.new_email;
+      if (pendingNewEmail) {
+        alert('Confirmation email sent to your new address. Please confirm it, then sign in again.');
+      } else {
+        alert('Email updated successfully! Please sign in again.');
+      }
+
+      await supabase.auth.signOut();
+      window.location.href = '/partner';
+    } catch (error: any) {
+      setEmailError(error.message || 'Failed to update email');
+    } finally {
+      setIsChangingEmail(false);
     }
   };
 
@@ -1648,6 +1721,91 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         </div>
       )}
 
+      {/* Email Change Modal */}
+      {showEmailModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-zinc-900">Change Email</h2>
+              <button
+                onClick={() => {
+                  setShowEmailModal(false);
+                  setEmailError('');
+                  setNewEmailInput('');
+                  setConfirmEmailInput('');
+                }}
+                className="text-zinc-400 hover:text-zinc-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-2">
+                  New Email
+                </label>
+                <input
+                  type="email"
+                  value={newEmailInput}
+                  onChange={(e) => setNewEmailInput(e.target.value)}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="your@email.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-2">
+                  Confirm New Email
+                </label>
+                <input
+                  type="email"
+                  value={confirmEmailInput}
+                  onChange={(e) => setConfirmEmailInput(e.target.value)}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Re-enter new email"
+                />
+              </div>
+
+              {emailError && (
+                <div className="bg-red-50 border border-red-200 p-3 rounded-lg flex items-start gap-2">
+                  <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-900">{emailError}</p>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setShowEmailModal(false);
+                    setEmailError('');
+                    setNewEmailInput('');
+                    setConfirmEmailInput('');
+                  }}
+                  className="flex-1 px-4 py-3 bg-zinc-100 text-zinc-700 rounded-xl font-medium hover:bg-zinc-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleChangeEmail}
+                  disabled={isChangingEmail}
+                  className="flex-1 px-4 py-3 bg-orange-500 text-white rounded-xl font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isChangingEmail ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Email'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="bg-white border-b border-zinc-200">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
@@ -2491,7 +2649,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                   </p>
                   <p className="text-xs text-zinc-500">
                     {hasPaidSubscription 
-                      ? '$29.90/month • Renews automatically' 
+                      ? '$39/month • Renews automatically' 
                       : isTrialActive 
                         ? `${subscriptionDaysLeft} days remaining`
                         : 'Trial ended'}
@@ -2520,7 +2678,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                 <div className={`p-4 rounded-lg border ${hasPaidSubscription ? 'border-amber-300 bg-amber-50' : isTrialActive ? 'border-orange-200 bg-orange-50' : 'border-zinc-200'}`}>
                   <p className="font-semibold text-zinc-900 mb-2">
                     {hasPaidSubscription ? 'Pro Plan Active' : isTrialActive ? 'Trial Period' : 'No Active Plan'}
-                    {hasPaidSubscription && <span className="text-amber-600 ml-2">$29.90/month</span>}
+                    {hasPaidSubscription && <span className="text-amber-600 ml-2">$39/month</span>}
                   </p>
                   <ul className="text-xs text-zinc-600 space-y-1">
                     <li>• Unlimited videos</li>
@@ -2611,7 +2769,18 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-medium text-zinc-500 mb-1">Email</label>
-                  <p className="text-sm text-zinc-900">{user.email}</p>
+                  <p className="text-sm text-zinc-900">{currentUserEmail}</p>
+                  <button
+                    onClick={() => {
+                      setShowEmailModal(true);
+                      setEmailError('');
+                      setNewEmailInput(currentUserEmail);
+                      setConfirmEmailInput(currentUserEmail);
+                    }}
+                    className="mt-1 text-sm text-orange-500 font-medium hover:underline"
+                  >
+                    Change email
+                  </button>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-zinc-500 mb-1">Password</label>

@@ -102,6 +102,13 @@ serve(async (req) => {
 
     console.log("[Checkout] Creating checkout session with customer:", customerId);
     
+    // Check if partner was referred by an affiliate
+    let affiliateId: string | null = null;
+    if (partner.referred_by_affiliate_id) {
+      affiliateId = partner.referred_by_affiliate_id;
+      console.log("[Checkout] Partner was referred by affiliate:", affiliateId);
+    }
+
     // Create checkout session (no Stripe trial - partner already had 30-day in-app trial)
     const sessionParams = new URLSearchParams({
       customer: customerId,
@@ -114,6 +121,12 @@ serve(async (req) => {
       'metadata[partner_id]': partnerId,
       'subscription_data[metadata][partner_id]': partnerId,
     });
+
+    // Add affiliate metadata if present
+    if (affiliateId) {
+      sessionParams.set('metadata[affiliate_id]', affiliateId);
+      sessionParams.set('subscription_data[metadata][affiliate_id]', affiliateId);
+    }
     
     const sessionRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
