@@ -108,6 +108,20 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
     return () => subscription.unsubscribe();
   }, [onAuthSuccess, mode]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const refCode = params.get('ref');
+    if (!refCode) return;
+
+    const normalizedRef = refCode.trim().toUpperCase();
+    const nowTs = Date.now().toString();
+
+    localStorage.setItem('affiliate_ref_code', normalizedRef);
+    localStorage.setItem('affiliate_ref_timestamp', nowTs);
+    localStorage.setItem('menulove_ref', normalizedRef);
+    localStorage.setItem('menulove_ref_timestamp', nowTs);
+  }, []);
+
   // Pre-fill form with data from landing page (Step 1)
   useEffect(() => {
     // Check for email_not_confirmed parameter
@@ -374,46 +388,33 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
           }
         }
 
-        // Track affiliate referral if present
-        const affiliateRefCode = localStorage.getItem('affiliate_ref_code');
-        const affiliateRefTimestamp = localStorage.getItem('affiliate_ref_timestamp');
-        if (affiliateRefCode) {
+        // Track affiliate referral if present (non-blocking)
+        const affiliateRefCode = localStorage.getItem('affiliate_ref_code') || localStorage.getItem('menulove_ref');
+        const affiliateRefTimestamp = localStorage.getItem('affiliate_ref_timestamp') || localStorage.getItem('menulove_ref_timestamp');
+        if (affiliateRefCode && affiliateRefTimestamp) {
           try {
             // Check ref code is not older than 30 days
-            const isValid = affiliateRefTimestamp && (Date.now() - parseInt(affiliateRefTimestamp)) < 30 * 24 * 60 * 60 * 1000;
+            const isValid = (Date.now() - parseInt(affiliateRefTimestamp, 10)) < 30 * 24 * 60 * 60 * 1000;
             if (isValid) {
-              const { data: affiliateData } = await supabase
-                .from('affiliates')
-                .select('id')
-                .eq('referral_code', affiliateRefCode)
-                .eq('status', 'active')
-                .single();
+              const { data: referralTrackResult, error: referralTrackError } = await supabase.rpc('track_partner_referral', {
+                p_referral_code: affiliateRefCode,
+                p_partner_id: data.user.id,
+                p_partner_email: email.trim().toLowerCase(),
+              });
 
-              if (affiliateData) {
-                // Create referral record
-                await supabase.from('referrals').insert({
-                  affiliate_id: affiliateData.id,
-                  partner_id: data.user.id,
-                  partner_email: email.trim(),
-                  status: 'signed_up',
-                  signed_up_at: new Date().toISOString(),
-                });
-
-                // Update partner with affiliate reference
-                await supabase
-                  .from('partners')
-                  .update({ referred_by_affiliate_id: affiliateData.id })
-                  .eq('id', data.user.id);
-
-                // Update affiliate totals
-                await supabase.rpc('update_affiliate_totals', { aff_id: affiliateData.id });
-
-                console.log('[Signup] Affiliate referral tracked:', affiliateRefCode, '->', affiliateData.id);
+              if (referralTrackError) {
+                console.warn('[Signup] track_partner_referral error (non-blocking):', referralTrackError.message);
+              } else if (referralTrackResult?.tracked) {
+                console.log('[Signup] Affiliate referral tracked:', affiliateRefCode, '->', referralTrackResult?.affiliate_id);
+              } else {
+                console.log('[Signup] Referral not tracked:', referralTrackResult?.reason || 'unknown');
               }
             }
             // Clear ref code after use
             localStorage.removeItem('affiliate_ref_code');
             localStorage.removeItem('affiliate_ref_timestamp');
+            localStorage.removeItem('menulove_ref');
+            localStorage.removeItem('menulove_ref_timestamp');
           } catch (refErr) {
             console.warn('[Signup] Affiliate referral tracking failed (non-blocking):', refErr);
           }

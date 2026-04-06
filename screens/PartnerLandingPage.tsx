@@ -27,11 +27,15 @@ const PartnerLandingPage: React.FC = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const refCode = urlParams.get('ref');
     if (refCode) {
-      localStorage.setItem('affiliate_ref_code', refCode.trim().toUpperCase());
-      localStorage.setItem('affiliate_ref_timestamp', Date.now().toString());
-      // Clean URL without reloading
-      const cleanUrl = window.location.pathname;
-      window.history.replaceState({}, '', cleanUrl);
+      const normalizedRef = refCode.trim().toUpperCase();
+      const nowTs = Date.now().toString();
+
+      localStorage.setItem('affiliate_ref_code', normalizedRef);
+      localStorage.setItem('affiliate_ref_timestamp', nowTs);
+      localStorage.setItem('menulove_ref', normalizedRef);
+      localStorage.setItem('menulove_ref_timestamp', nowTs);
+
+      window.location.href = `/partner?step=2&ref=${encodeURIComponent(normalizedRef)}`;
     }
   }, []);
 

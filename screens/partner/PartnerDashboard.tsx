@@ -21,6 +21,7 @@ import { sanitizeFileName } from '../../utils/fileUtils';
 import ChatWidget from '../../components/chat/ChatWidget';
 import WelcomeBanner from '../../components/WelcomeBanner';
 import GuidedTour from '../../components/GuidedTour';
+import CheckoutSuccessOverlay from '../../components/CheckoutSuccessOverlay';
 
 interface PartnerDashboardProps {
   user: PartnerUser;
@@ -182,6 +183,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(false);
   const [showGuidedTour, setShowGuidedTour] = useState(false);
 
+  // Checkout success celebration
+  const [showSuccessCelebration, setShowSuccessCelebration] = useState(false);
+
   // Edit category state
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editCategoryName, setEditCategoryName] = useState('');
@@ -311,6 +315,13 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     console.log('Current user:', user);
     loadData();
     
+    // Check if returning from successful checkout
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success') === 'true') {
+      setShowSuccessCelebration(true);
+      window.history.replaceState({}, '', '/partner');
+    }
+
     // Check if user is first-time visitor (show welcome banner)
     const hasSeenWelcome = localStorage.getItem(`welcome_seen_${user.id}`);
     if (!hasSeenWelcome) {
@@ -1635,6 +1646,10 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
   return (
     <div className="min-h-screen bg-zinc-50 partner-portal">
+      {showSuccessCelebration && (
+        <CheckoutSuccessOverlay onDismiss={() => setShowSuccessCelebration(false)} />
+      )}
+
       {/* Onboarding Modal */}
       <OnboardingModal
         isOpen={showOnboarding}

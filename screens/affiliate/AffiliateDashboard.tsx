@@ -75,6 +75,7 @@ const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ affiliateId, on
   const [editBankBSB, setEditBankBSB] = useState('');
   const [editBankAccount, setEditBankAccount] = useState('');
   const [editBankName, setEditBankName] = useState('');
+  const [editABN, setEditABN] = useState('');
   const [editPaymentMethod, setEditPaymentMethod] = useState('bank_transfer');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState('');
@@ -94,6 +95,7 @@ const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ affiliateId, on
         setEditBankBSB(affiliate.payment_details.bsb || '');
         setEditBankAccount(affiliate.payment_details.account_number || '');
         setEditBankName(affiliate.payment_details.account_name || '');
+        setEditABN(affiliate.payment_details.abn || '');
       }
     }
   }, [affiliate]);
@@ -141,7 +143,7 @@ const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ affiliateId, on
 
   const copyReferralLink = () => {
     if (!affiliate) return;
-    const link = `${window.location.origin}/become-a-partner?ref=${affiliate.referral_code}`;
+    const link = `${window.location.origin}/partner?step=2&ref=${affiliate.referral_code}`;
     navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -162,6 +164,7 @@ const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ affiliateId, on
             bsb: editBankBSB.trim(),
             account_number: editBankAccount.trim(),
             account_name: editBankName.trim(),
+            abn: editABN.trim() || null,
           },
         })
         .eq('id', affiliateId);
@@ -210,6 +213,10 @@ const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ affiliateId, on
 
   const statusBadge = (status: string) => {
     const colors: Record<string, string> = {
+      tracked: 'bg-zinc-100 text-zinc-700',
+      trial: 'bg-indigo-100 text-indigo-700',
+      qualified: 'bg-emerald-100 text-emerald-700',
+      paid_out: 'bg-green-100 text-green-700',
       pending: 'bg-yellow-100 text-yellow-700',
       signed_up: 'bg-blue-100 text-blue-700',
       subscribed: 'bg-green-100 text-green-700',
@@ -288,7 +295,7 @@ const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ affiliateId, on
           <div className="flex items-center gap-2">
             <div className="flex-1 bg-white rounded-xl px-4 py-2.5 text-sm text-zinc-700 font-mono overflow-hidden border border-orange-200">
               <span className="truncate block">
-                {window.location.origin}/become-a-partner?ref={affiliate.referral_code}
+                {window.location.origin}/partner?step=2&ref={affiliate.referral_code}
               </span>
             </div>
             <button
@@ -365,8 +372,8 @@ const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ affiliateId, on
               <div className="space-y-4">
                 {[
                   { n: '1', title: 'Share your link', desc: 'Share your unique referral link with restaurants and cafes' },
-                  { n: '2', title: 'They sign up & subscribe', desc: 'When a restaurant signs up via your link and subscribes to MenuLove' },
-                  { n: '3', title: 'Earn $39 + 25% for 6 months', desc: 'You get $39 on their first payment, then 25% of each monthly payment for 6 months' },
+                  { n: '2', title: 'They sign up & start trial', desc: 'A referral is tracked when the restaurant registers through your link' },
+                  { n: '3', title: 'Commission after first paid invoice', desc: 'You earn after trial converts to paid: $39 first payment + 25% monthly for 6 months' },
                 ].map(step => (
                   <div key={step.n} className="flex gap-3">
                     <div className="w-7 h-7 bg-orange-100 rounded-full flex items-center justify-center shrink-0">
@@ -607,6 +614,10 @@ const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ affiliateId, on
                   <input type="text" value={editBankAccount} onChange={e => setEditBankAccount(e.target.value)} className={inputClass} placeholder="XXXX XXXX" />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-2">ABN <span className="text-zinc-400 font-normal">(optional)</span></label>
+                  <input type="text" value={editABN} onChange={e => setEditABN(e.target.value)} className={inputClass} placeholder="XX XXX XXX XXX" maxLength={14} />
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-zinc-700 mb-2">Payment Method</label>
                   <select value={editPaymentMethod} onChange={e => setEditPaymentMethod(e.target.value)} className={inputClass}>
                     <option value="bank_transfer">Bank Transfer (AUD)</option>
@@ -674,7 +685,8 @@ const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ affiliateId, on
               <div>
                 <h3 className="text-sm font-bold text-zinc-900 mb-2">1. Commission Structure</h3>
                 <ul className="text-sm text-zinc-600 space-y-1 list-disc list-inside">
-                  <li><strong>$39 AUD</strong> for the first successful payment of each referred restaurant</li>
+                  <li>Commission is only generated after the referred restaurant completes their first paid subscription (after trial).</li>
+                  <li><strong>$39 AUD</strong> on the first successful paid invoice.</li>
                   <li><strong>25%</strong> recurring commission on each monthly payment for <strong>6 months</strong></li>
                   <li>Maximum of 7 commissions per referral (1 first + 6 recurring)</li>
                 </ul>

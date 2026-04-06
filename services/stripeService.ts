@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { STRIPE_PRICE_IDS } from './stripeConfig';
 
 export interface SubscriptionPlan {
   id: string;
@@ -15,7 +16,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     name: 'Monthly Premium',
     price: 39,
     interval: 'month',
-    priceId: 'price_1TJ1EwIG1T8Ip1Z0n23ZgsZF',
+    priceId: STRIPE_PRICE_IDS.monthly,
     features: [
       'Unlimited video uploads',
       'Premium profile badge',
@@ -29,7 +30,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     name: 'Annual Premium',
     price: 390,
     interval: 'year',
-    priceId: 'price_1SxxDjIG1T8Ip1Z0cgTPEV7Z',
+    priceId: STRIPE_PRICE_IDS.annual,
     features: [
       'Unlimited video uploads',
       'Premium profile badge',

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Check, Loader2, Crown, Calendar, DollarSign } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { STRIPE_PRICE_IDS } from '../../services/stripeConfig';
 
 interface SubscriptionManagerProps {
   partnerId: string;
@@ -21,8 +22,8 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
   const [wasCanceled, setWasCanceled] = useState(false);
 
   const PRICE_IDS = {
-    monthly: 'price_1TJ1EwIG1T8Ip1Z0n23ZgsZF', // Stripe Monthly $39 Price ID
-    annual: 'price_1SxxDjIG1T8Ip1Z0cgTPEV7Z',  // Stripe Annual Price ID
+    monthly: STRIPE_PRICE_IDS.monthly,
+    annual: STRIPE_PRICE_IDS.annual,
   };
 
   useEffect(() => {
@@ -35,9 +36,6 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
       setTimeout(() => {
         loadSubscription();
       }, 2000);
-      
-      // Clean up URL
-      window.history.replaceState({}, '', '/partner');
     }
   }, [partnerId]);
 

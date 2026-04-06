@@ -138,6 +138,16 @@ serve(async (req) => {
       // Check if this is a trial (amount is 0 for trial invoices)
       const isTrial = invoice.amount_paid === 0;
       
+      if (isTrial) {
+        await supabase
+          .from("referrals")
+          .update({ status: "trial" })
+          .eq("partner_id", partner.id)
+          .in("status", ["pending", "signed_up", "tracked"]);
+
+        console.log(`[Webhook] Referral moved to trial status for partner ${partner.id}`);
+      }
+
       console.log(`[Webhook] Updating subscription for partner ${partner.id}: ${subscriptionId}, isTrial: ${isTrial}`);
       
       await supabase
@@ -252,7 +262,7 @@ serve(async (req) => {
         await supabase
           .from("referrals")
           .update({ 
-            status: "subscribed", 
+            status: "qualified", 
             first_payment_at: new Date().toISOString() 
           })
           .eq("id", referral.id);

@@ -445,7 +445,11 @@ const AffiliateAuth: React.FC<AffiliateAuthProps> = ({ onAuthSuccess, initialMod
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-zinc-600 text-xs">
               <div className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
-              <span><strong className="text-zinc-900">$39</strong> for the first payment of each referral</span>
+              <span>Commission is only generated after the referred restaurant completes their first paid subscription (after trial).</span>
+            </div>
+            <div className="flex items-center gap-2 text-zinc-600 text-xs">
+              <div className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
+              <span><strong className="text-zinc-900">$39</strong> on the first successful paid invoice</span>
             </div>
             <div className="flex items-center gap-2 text-zinc-600 text-xs">
               <div className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
