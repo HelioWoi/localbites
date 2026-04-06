@@ -292,7 +292,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
 
               <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-6">
                 <p className="text-orange-600 text-sm font-medium text-center">
-                  30-day free trial
+                  14-day free trial
                 </p>
               </div>
 

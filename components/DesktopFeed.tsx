@@ -820,7 +820,7 @@ const DesktopFeed: React.FC<DesktopFeedProps> = ({
               🔥 Only 10 FREE Beta Spots Left
             </p>
             <p className="text-white/80 text-sm">
-              30-day trial • No credit card required
+              14-day trial • No credit card required
             </p>
           </div>
           

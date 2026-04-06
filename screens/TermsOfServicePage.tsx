@@ -136,7 +136,7 @@ const TermsOfServicePage: React.FC = () => {
             <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-6">
               <h3 className="text-xl font-bold text-orange-600 mb-3">7.1 Free Trial</h3>
               <p className="text-zinc-700 mb-4">
-                New accounts receive a 30-day free trial. No credit card required. Trial automatically ends unless you subscribe.
+                New accounts receive a 14-day free trial. No credit card required. Trial automatically ends unless you subscribe.
               </p>
 
               <h3 className="text-xl font-bold text-orange-600 mb-3">7.2 Paid Subscriptions</h3>

@@ -18,8 +18,8 @@ const HelpPage: React.FC = () => {
       answer: "Your QR Code is automatically generated when you create your account. Go to your Dashboard and click 'Download QR Code'. Print it and display it at your restaurant so customers can scan and view your video menu!"
     },
     {
-      question: "How does the 30-day free trial work?",
-      answer: "When you sign up, you get 30 days of full Premium access with no credit card required. You can upload unlimited videos, access analytics, and use all features. After the trial, choose to subscribe for $39/month or your account will revert to free tier (limited features)."
+      question: "How does the 14-day free trial work?",
+      answer: "When you sign up, you get 14 days of full Premium access with no credit card required. You can upload unlimited videos, access analytics, and use all features. After the trial, choose to subscribe for $39/month or your account will revert to free tier (limited features)."
     },
     {
       question: "Can I cancel my subscription anytime?",
@@ -106,7 +106,7 @@ const HelpPage: React.FC = () => {
               </div>
               <div>
                 <h3 className="font-bold text-zinc-900 mb-2">Create Your Account</h3>
-                <p className="text-zinc-600">Sign up at menulove.com.au/partner with your restaurant details. Get instant access to your 30-day free trial.</p>
+                <p className="text-zinc-600">Sign up at menulove.com.au/partner with your restaurant details. Get instant access to your 14-day free trial.</p>
               </div>
             </div>
 

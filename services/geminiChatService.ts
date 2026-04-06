@@ -17,7 +17,7 @@ Key information about MenuLove:
 - Analytics shows: Profile Views, Item Views, Video Plays, Directions, QR Scans
 - Two types of links: QR code link (/r/slug) for printed QR codes, and public share link (/slug) for social media
 - Partners can download analytics reports in CSV, Excel, or PDF format
-- Subscription plans include 30-day free trial
+- Subscription plans include 14-day free trial
 - Menu items are organized by categories (Breakfast, Lunch, Dinner, Drinks, Desserts, etc.)
 
 When answering:
@@ -86,7 +86,7 @@ export const sendChatMessage = async (
     
     if (lowerMessage.includes('subscription') || lowerMessage.includes('plan') || lowerMessage.includes('billing')) {
       return {
-        response: "Your subscription includes:\n\n✅ Unlimited menu items\n✅ Unlimited video uploads\n✅ Full analytics dashboard\n✅ QR code generation\n✅ Custom restaurant profile\n✅ Priority support\n\n**30-day free trial** when you sign up!\n\nManage your subscription in the **Settings** tab.\n\nNeed help with billing?",
+        response: "Your subscription includes:\n\n✅ Unlimited menu items\n✅ Unlimited video uploads\n✅ Full analytics dashboard\n✅ QR code generation\n✅ Custom restaurant profile\n✅ Priority support\n\n**14-day free trial** when you sign up!\n\nManage your subscription in the **Settings** tab.\n\nNeed help with billing?",
         contentPanel: getTutorialContent('manage_subscription')
       };
     }
@@ -357,7 +357,7 @@ MenuLove offers a simple subscription plan with all features included.
 ✅ Priority support
 
 ## Free Trial
-- **30 days free** when you sign up
+- **14 days free** when you sign up
 - No credit card required upfront
 - Full access to all features
 - Cancel anytime during trial

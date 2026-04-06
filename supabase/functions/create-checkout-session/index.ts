@@ -109,7 +109,7 @@ serve(async (req) => {
       console.log("[Checkout] Partner was referred by affiliate:", affiliateId);
     }
 
-    // Create checkout session (no Stripe trial - partner already had 30-day in-app trial)
+    // Create checkout session (no Stripe trial - partner already had 14-day in-app trial)
     const sessionParams = new URLSearchParams({
       customer: customerId,
       mode: 'subscription',

@@ -67,7 +67,7 @@ serve(async (req) => {
                 <tr>
                   <td align="center" style="padding: 20px 0;">
                     <a href="${confirmationUrl}" style="display: inline-block; background-color: #f97316; color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 12px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 6px rgba(249, 115, 22, 0.3);">
-                      Confirm Email & Start Your 30-Day Trial
+                      Confirm Email & Start Your 14-Day Trial
                     </a>
                   </td>
                 </tr>
@@ -82,7 +82,7 @@ serve(async (req) => {
               <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fef3c7; border-radius: 12px; margin: 30px 0;">
                 <tr>
                   <td style="padding: 20px;">
-                    <h3 style="margin: 0 0 12px; color: #92400e; font-size: 16px; font-weight: 600;">✨ Your 30-Day Free Trial Includes:</h3>
+                    <h3 style="margin: 0 0 12px; color: #92400e; font-size: 16px; font-weight: 600;">✨ Your 14-Day Free Trial Includes:</h3>
                     <ul style="margin: 0; padding-left: 20px; color: #92400e; font-size: 14px; line-height: 1.8;">
                       <li>Unlimited menu items & video uploads</li>
                       <li>Full analytics dashboard</li>

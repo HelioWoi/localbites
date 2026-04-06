@@ -33,7 +33,7 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({ restaurantName, onStartTo
               Welcome to MenuLove, {restaurantName}! 🎉
             </h2>
             <p className="text-white/90 text-sm mb-4 max-w-2xl">
-              Your 30-day free trial has started! Let's get you set up with a quick tour of your dashboard. 
+              Your 14-day free trial has started! Let's get you set up with a quick tour of your dashboard. 
               We'll show you how to upload videos, track analytics, and manage your restaurant profile.
             </p>
             

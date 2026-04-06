@@ -36,7 +36,7 @@ serve(async (req) => {
         subject = `Your MenuLove trial ends in 10 days - ${partner.restaurant_name}`;
         headerColor = '#3b82f6'; // Blue
         headerText = '⏰ Trial Ending Soon';
-        mainMessage = `Your 30-day free trial will end in <strong>10 days</strong>. Don't lose access to your video menu and customer engagement tools!`;
+        mainMessage = `Your 14-day free trial will end in <strong>10 days</strong>. Don't lose access to your video menu and customer engagement tools!`;
         urgencyLevel = 'info';
         break;
       case '5_days':

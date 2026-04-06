@@ -154,7 +154,7 @@ const PartnerLandingPage: React.FC = () => {
                 🔥 Only 10 FREE Beta Spots Left
               </p>
               <p className="text-white/80 text-sm">
-                30 day trial • No credit card required • No commission fees
+                14 day trial • No credit card required • No commission fees
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -298,7 +298,7 @@ const PartnerLandingPage: React.FC = () => {
                   <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
                     <CheckCircle2 className="text-white" size={20} />
                   </div>
-                  <span className="text-lg font-semibold text-zinc-900">30-day free trial included</span>
+                  <span className="text-lg font-semibold text-zinc-900">14-day free trial included</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
@@ -374,7 +374,7 @@ const PartnerLandingPage: React.FC = () => {
                 <>
                   <div className="text-center mb-6">
                     <h3 className="text-2xl font-black text-zinc-900 mb-2">Create your account</h3>
-                    <p className="text-zinc-600">Start your 30-day free trial</p>
+                    <p className="text-zinc-600">Start your 14-day free trial</p>
                   </div>
                   <form className="space-y-4" onSubmit={(e) => { 
                     e.preventDefault(); 
@@ -669,7 +669,7 @@ const PartnerLandingPage: React.FC = () => {
             🔥 Only 10 FREE Beta Spots Left
           </p>
           <p className="text-white/80 text-sm mb-3">
-            30 day trial. No credit card required. No commission fees.
+            14 day trial. No credit card required. No commission fees.
           </p>
           <p className="mt-6 text-white/80">
             Questions? Email us at <a href="mailto:contact@menulove.com.au" className="underline font-bold hover:text-yellow-300 transition-colors">contact@menulove.com.au</a>
@@ -974,7 +974,7 @@ const PartnerLandingPage: React.FC = () => {
       {/* LoveBot Custom Chat Widget */}
       <LoveBotChat />
 
-      {/* Promo Popup - 30 Day Free Trial */}
+      {/* Promo Popup - 14 Day Free Trial */}
       <PromoPopup />
     </div>
   );

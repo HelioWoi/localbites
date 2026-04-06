@@ -87,7 +87,7 @@ const PromoPopup: React.FC = () => {
             
             {/* Subheadline */}
             <p className="text-xl font-semibold mb-6 text-white/90">
-              30 Days Free • No Credit Card Required
+              14 Days Free • No Credit Card Required
             </p>
 
             {/* Benefits */}

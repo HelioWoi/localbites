@@ -344,7 +344,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
           google_maps_url: googleMapsUrl,
           slug: uniqueSlug,
           plan: hasLifetimeAccess ? 'lifetime' : 'trial',
-          trial_ends_at: hasLifetimeAccess ? null : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          trial_ends_at: hasLifetimeAccess ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
           subscription_status: 'active',
           lifetime_access: hasLifetimeAccess,
           is_verified: false,
@@ -393,8 +393,8 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
         const affiliateRefTimestamp = localStorage.getItem('affiliate_ref_timestamp') || localStorage.getItem('menulove_ref_timestamp');
         if (affiliateRefCode && affiliateRefTimestamp) {
           try {
-            // Check ref code is not older than 30 days
-            const isValid = (Date.now() - parseInt(affiliateRefTimestamp, 10)) < 30 * 24 * 60 * 60 * 1000;
+            // Check ref code is not older than 14 days
+            const isValid = (Date.now() - parseInt(affiliateRefTimestamp, 10)) < 14 * 24 * 60 * 60 * 1000;
             if (isValid) {
               const { data: referralTrackResult, error: referralTrackError } = await supabase.rpc('track_partner_referral', {
                 p_referral_code: affiliateRefCode,
@@ -638,7 +638,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
           <p className="font-semibold text-zinc-900 mb-4">{email}</p>
           <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6">
             <p className="text-sm text-orange-900 font-medium mb-2">
-              📧 Click the link in your email to confirm and start your 30-day free trial!
+              📧 Click the link in your email to confirm and start your 14-day free trial!
             </p>
             <p className="text-xs text-orange-700">
               The link expires in 24 hours. Check your spam folder if you don't see it.
@@ -692,7 +692,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
             </h1>
             <p className="text-zinc-500 mb-6">
               {mode === 'signup' 
-                ? (isFromLandingPage ? 'Complete your registration' : 'Start your 30-day free trial')
+                ? (isFromLandingPage ? 'Complete your registration' : 'Start your 14-day free trial')
                 : mode === 'magic' 
                   ? 'We\'ll send you a login link'
                   : 'Sign in to manage your restaurant'}

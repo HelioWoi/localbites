@@ -16,7 +16,7 @@ const FAQPage: React.FC = () => {
     },
     {
       question: "How does the free trial work?",
-      answer: "New restaurants get a 30-day free trial with full access to all features. No credit card required to start. You can upload videos, generate QR codes, and access analytics. After the trial, choose a plan that fits your needs or cancel anytime."
+      answer: "New restaurants get a 14-day free trial with full access to all features. No credit card required to start. You can upload videos, generate QR codes, and access analytics. After the trial, choose a plan that fits your needs or cancel anytime."
     },
     {
       question: "Do I need technical skills to use MenuLove?",

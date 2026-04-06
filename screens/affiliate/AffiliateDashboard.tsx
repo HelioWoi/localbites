@@ -5,6 +5,7 @@ import {
   User, Phone, Mail, Building, Save, Trash2, ShieldAlert,
   AlertCircle
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from '../../lib/supabase';
 
 interface AffiliateDashboardProps {
@@ -148,6 +149,10 @@ const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ affiliateId, on
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const referralLink = affiliate
+    ? `${window.location.origin}/partner?step=2&ref=${affiliate.referral_code}`
+    : '';
 
   const handleSaveAccount = async () => {
     setIsSaving(true);
@@ -295,7 +300,7 @@ const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ affiliateId, on
           <div className="flex items-center gap-2">
             <div className="flex-1 bg-white rounded-xl px-4 py-2.5 text-sm text-zinc-700 font-mono overflow-hidden border border-orange-200">
               <span className="truncate block">
-                {window.location.origin}/partner?step=2&ref={affiliate.referral_code}
+                {referralLink}
               </span>
             </div>
             <button
@@ -313,6 +318,36 @@ const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ affiliateId, on
             Code: <span className="text-orange-600 font-mono font-medium">{affiliate.referral_code}</span> 
             &nbsp;&middot;&nbsp; Share this link with restaurants to start earning
           </p>
+        </div>
+
+        {/* Referral QR Card */}
+        <div className="bg-white border border-zinc-200 rounded-2xl p-5 mb-6">
+          <h3 className="text-zinc-900 font-semibold text-sm mb-1">Affiliate QR Card</h3>
+          <p className="text-zinc-500 text-xs mb-4">
+            Open this screen on your phone and let clients scan to register with your referral code.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center gap-5">
+            <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-3">
+              <QRCodeSVG
+                value={referralLink}
+                size={180}
+                bgColor="#ffffff"
+                fgColor="#18181b"
+                level="M"
+                includeMargin
+              />
+            </div>
+            <div className="w-full">
+              <div className="bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 mb-2">
+                <p className="text-[11px] uppercase tracking-wide text-zinc-500">Referral code</p>
+                <p className="text-base font-mono font-semibold text-orange-600">{affiliate.referral_code}</p>
+              </div>
+              <div className="bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-zinc-500 mb-1">QR destination</p>
+                <p className="text-xs text-zinc-700 break-all">{referralLink}</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -695,7 +730,7 @@ const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ affiliateId, on
               <div>
                 <h3 className="text-sm font-bold text-zinc-900 mb-2">2. Referral Tracking</h3>
                 <ul className="text-sm text-zinc-600 space-y-1 list-disc list-inside">
-                  <li>Referrals are tracked via your unique referral link for up to <strong>30 days</strong></li>
+                  <li>Referrals are tracked via your unique referral link for up to <strong>14 days</strong></li>
                   <li>The restaurant must sign up and subscribe using your referral link</li>
                   <li>Self-referrals are not allowed</li>
                 </ul>

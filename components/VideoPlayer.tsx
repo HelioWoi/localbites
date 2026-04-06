@@ -50,7 +50,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, isActive }) => {
           isLoaded && isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
         }`}
         loop
-        muted
         playsInline
         preload="auto"
         onLoadedData={() => setIsLoaded(true)}
