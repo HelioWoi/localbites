@@ -325,7 +325,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
       retryCount++;
       if (retryCount >= 10) { clearInterval(retryInterval); return; }
       if (video && isPlaying && video.paused) {
-        video.muted = true;
+        video.muted = isMuted;
         video.play().catch(() => {});
       }
       if (video && !video.paused) {
@@ -619,7 +619,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                 <video
                   ref={el => {
                     videoRefs.current[index] = el;
-                    if (el) el.muted = true;
+                    if (el) el.muted = isMuted;
                   }}
                   src={getCDNUrl(item.videoUrl)}
                   className="absolute inset-0 w-full h-full object-cover"
