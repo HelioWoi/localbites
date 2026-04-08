@@ -42,7 +42,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
     if (restaurant.id) {
       trackAnalyticsEvent({ eventType: 'profile_view', restaurantId: restaurant.id }).catch(() => {});
       const params = new URLSearchParams(window.location.search);
-      if (params.get('qr') === '1') {
+      if (params.get('qr') === '1' || params.get('source') === 'qr') {
         trackAnalyticsEvent({ eventType: 'qr_scan', restaurantId: restaurant.id }).catch(() => {});
       }
     }

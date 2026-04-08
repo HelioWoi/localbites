@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Link2, Copy, CheckCircle2, DollarSign, Users,
   LogOut, Clock, Loader2, RefreshCw, Banknote,
   User, Phone, Mail, Building, Save, Trash2, ShieldAlert,
-  AlertCircle
+  AlertCircle, Download, Share2
 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 import { supabase } from '../../lib/supabase';
 
 interface AffiliateDashboardProps {
@@ -62,6 +62,7 @@ interface Payout {
 type Tab = 'overview' | 'referrals' | 'commissions' | 'payouts' | 'account' | 'rules';
 
 const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ affiliateId, onLogout }) => {
+  const virtualCardLogoUrl = 'https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/logo%20hor%20slogan.png';
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [affiliate, setAffiliate] = useState<AffiliateData | null>(null);
   const [referrals, setReferrals] = useState<Referral[]>([]);
@@ -69,6 +70,8 @@ const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ affiliateId, on
   const [payouts, setPayouts] = useState<Payout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [isGeneratingCard, setIsGeneratingCard] = useState(false);
+  const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Account edit state
   const [editName, setEditName] = useState('');
@@ -153,6 +156,162 @@ const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ affiliateId, on
   const referralLink = affiliate
     ? `${window.location.origin}/partner?step=2&ref=${affiliate.referral_code}`
     : '';
+
+  const generateVirtualCardBlob = async (): Promise<Blob | null> => {
+    if (!affiliate || !qrCanvasRef.current) return null;
+
+    const canvas = document.createElement('canvas');
+    const width = 1080;
+    const height = 1920;
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const roundedRect = (x: number, y: number, w: number, h: number, r: number) => {
+      const radius = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.arcTo(x + w, y, x + w, y + h, radius);
+      ctx.arcTo(x + w, y + h, x, y + h, radius);
+      ctx.arcTo(x, y + h, x, y, radius);
+      ctx.arcTo(x, y, x + w, y, radius);
+      ctx.closePath();
+    };
+
+    const loadImage = (src: string) =>
+      new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+
+    const bgGradient = ctx.createLinearGradient(0, 0, width, height);
+    bgGradient.addColorStop(0, '#f59e0b');
+    bgGradient.addColorStop(0.5, '#fb7185');
+    bgGradient.addColorStop(1, '#ec4899');
+    ctx.fillStyle = bgGradient;
+    ctx.fillRect(0, 0, width, height);
+
+    const cardX = 90;
+    const cardY = 440;
+    const cardW = 900;
+    const cardH = 1060;
+    roundedRect(cardX, cardY, cardW, cardH, 42);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+
+    const qrSize = 620;
+    const qrX = cardX + (cardW - qrSize) / 2;
+    const logoTopY = cardY + 72;
+    const qrY = cardY + 250;
+
+    try {
+      const logo = await loadImage(virtualCardLogoUrl);
+      const maxLogoW = cardW - 220;
+      const maxLogoH = 110;
+      const ratio = Math.min(maxLogoW / logo.width, maxLogoH / logo.height);
+      const logoW = logo.width * ratio;
+      const logoH = logo.height * ratio;
+      const logoX = cardX + (cardW - logoW) / 2;
+      const logoY = logoTopY;
+      ctx.drawImage(logo, logoX, logoY, logoW, logoH);
+    } catch {
+      ctx.fillStyle = '#18181b';
+      ctx.font = '700 38px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('MENULOVE', cardX + cardW / 2, logoTopY + 64);
+    }
+
+    ctx.drawImage(qrCanvasRef.current, qrX, qrY, qrSize, qrSize);
+
+    const cardBottomY = cardY + cardH;
+
+    ctx.fillStyle = '#f97316';
+    ctx.font = '700 64px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('@MENULOVE.AU', width / 2, cardBottomY - 120);
+
+    ctx.fillStyle = '#9ca3af';
+    ctx.font = '600 24px Arial';
+    ctx.fillText('Referral code', width / 2, cardBottomY - 62);
+
+    ctx.fillStyle = '#374151';
+    ctx.font = '700 46px Arial';
+    ctx.fillText(affiliate.referral_code, width / 2, cardBottomY - 18);
+
+    return await new Promise(resolve => {
+      canvas.toBlob(blob => resolve(blob), 'image/png');
+    });
+  };
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(objectUrl);
+  };
+
+  const handleDownloadVirtualCard = async () => {
+    setIsGeneratingCard(true);
+    try {
+      const blob = await generateVirtualCardBlob();
+      if (!blob) return;
+      downloadBlob(blob, `menulove-qr-${affiliate?.referral_code || 'affiliate'}.png`);
+    } finally {
+      setIsGeneratingCard(false);
+    }
+  };
+
+  const handleShareVirtualCard = async () => {
+    setIsGeneratingCard(true);
+    try {
+      const blob = await generateVirtualCardBlob();
+      if (!blob) return;
+
+      const nav: any = navigator;
+      const file = new File([blob], `menulove-qr-${affiliate?.referral_code || 'affiliate'}.png`, { type: 'image/png' });
+
+      const canShareFiles = nav.share && (!nav.canShare || nav.canShare({ files: [file] }));
+
+      if (canShareFiles) {
+        try {
+          await nav.share({
+            title: 'My MenuLove Referral QR',
+            text: `Register with my referral link: ${referralLink}`,
+            files: [file],
+          });
+          return;
+        } catch (err: any) {
+          if (err?.name === 'AbortError') return;
+        }
+      }
+
+      if (nav.share) {
+        try {
+          await nav.share({
+            title: 'My MenuLove Referral Link',
+            text: `Register with my referral link: ${referralLink}`,
+            url: referralLink,
+          });
+          return;
+        } catch (err: any) {
+          if (err?.name === 'AbortError') return;
+        }
+      }
+
+      downloadBlob(blob, `menulove-qr-${affiliate?.referral_code || 'affiliate'}.png`);
+    } catch (error) {
+      console.warn('Share fallback to download due to error:', error);
+    } finally {
+      setIsGeneratingCard(false);
+    }
+  };
 
   const handleSaveAccount = async () => {
     setIsSaving(true);
@@ -326,6 +485,17 @@ const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ affiliateId, on
           <p className="text-zinc-500 text-xs mb-4">
             Open this screen on your phone and let clients scan to register with your referral code.
           </p>
+          <div className="hidden" aria-hidden>
+            <QRCodeCanvas
+              value={referralLink}
+              size={1200}
+              bgColor="#ffffff"
+              fgColor="#111827"
+              level="M"
+              includeMargin
+              ref={qrCanvasRef}
+            />
+          </div>
           <div className="flex flex-col sm:flex-row items-center gap-5">
             <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-3">
               <QRCodeSVG
@@ -345,6 +515,24 @@ const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ affiliateId, on
               <div className="bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2">
                 <p className="text-[11px] uppercase tracking-wide text-zinc-500 mb-1">QR destination</p>
                 <p className="text-xs text-zinc-700 break-all">{referralLink}</p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 mt-3">
+                <button
+                  onClick={handleShareVirtualCard}
+                  disabled={isGeneratingCard}
+                  className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-zinc-900 text-white hover:bg-zinc-800 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isGeneratingCard ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
+                  Share Card
+                </button>
+                <button
+                  onClick={handleDownloadVirtualCard}
+                  disabled={isGeneratingCard}
+                  className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-zinc-300 text-zinc-700 bg-white hover:bg-zinc-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isGeneratingCard ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                  Download Card
+                </button>
               </div>
             </div>
           </div>

@@ -43,10 +43,11 @@ interface RestaurantAnalyticsV2Props {
   restaurantId: string;
 }
 
-type DatePeriod = 'today' | '7days' | '30days';
+type DatePeriod = 'today' | '7days' | '30days' | 'custom';
 
 const RestaurantAnalyticsV2: React.FC<RestaurantAnalyticsV2Props> = ({ restaurantId }) => {
   const [period, setPeriod] = useState<DatePeriod>('7days');
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(true);
   
   const [summary, setSummary] = useState<PartnerSummaryV2 | null>(null);
@@ -58,12 +59,23 @@ const RestaurantAnalyticsV2: React.FC<RestaurantAnalyticsV2Props> = ({ restauran
 
   useEffect(() => {
     loadAnalytics();
-  }, [restaurantId, period]);
+  }, [restaurantId, period, selectedDate]);
 
   const loadAnalytics = async () => {
     setLoading(true);
     try {
-      const { start, end } = getDateRange(period);
+      let start: Date;
+      let end: Date;
+
+      if (period === 'custom') {
+        const [year, month, day] = selectedDate.split('-').map(Number);
+        start = new Date(year, month - 1, day, 0, 0, 0, 0);
+        end = new Date(year, month - 1, day, 23, 59, 59, 999);
+      } else {
+        const range = getDateRange(period);
+        start = range.start;
+        end = range.end;
+      }
       
       const [summaryData, itemsData, videosData, hoursData, deviceData, funnelData] = await Promise.all([
         getPartnerSummaryV2(restaurantId, start, end),
@@ -125,7 +137,7 @@ const RestaurantAnalyticsV2: React.FC<RestaurantAnalyticsV2Props> = ({ restauran
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `analytics_${period}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `analytics_${period === 'custom' ? selectedDate : period}_${new Date().toISOString().split('T')[0]}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -184,8 +196,8 @@ const RestaurantAnalyticsV2: React.FC<RestaurantAnalyticsV2Props> = ({ restauran
       {/* Period Selector */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-zinc-900">Analytics Dashboard</h2>
-        <div className="flex gap-2">
-          {(['today', '7days', '30days'] as DatePeriod[]).map((p) => (
+        <div className="flex gap-2 flex-wrap justify-end">
+          {(['today', '7days', '30days'] as Array<Exclude<DatePeriod, 'custom'>>).map((p) => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
@@ -198,6 +210,20 @@ const RestaurantAnalyticsV2: React.FC<RestaurantAnalyticsV2Props> = ({ restauran
               {p === 'today' ? 'Today' : p === '7days' ? 'Last 7 Days' : 'Last 30 Days'}
             </button>
           ))}
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => {
+              setSelectedDate(e.target.value);
+              setPeriod('custom');
+            }}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors border ${
+              period === 'custom'
+                ? 'bg-orange-500 text-white border-orange-500'
+                : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+            }`}
+            title="Choose exact day"
+          />
           <button
             onClick={downloadCSV}
             disabled={!topItems.length}

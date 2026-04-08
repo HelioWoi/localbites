@@ -60,7 +60,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   // Analytics V2: Track QR scan on mount only if ?qr=1 param present (real QR code scan)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('qr') === '1' && restaurant.id) {
+    if ((params.get('qr') === '1' || params.get('source') === 'qr') && restaurant.id) {
       trackAnalyticsEvent({ eventType: 'qr_scan', restaurantId: restaurant.id }).catch(() => {});
     }
   }, [restaurant.id]);

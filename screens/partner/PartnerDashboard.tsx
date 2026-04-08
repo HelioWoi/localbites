@@ -1875,7 +1875,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                 <div className="w-20 h-20 bg-white rounded-xl flex items-center justify-center flex-shrink-0 p-1.5">
                   {partnerData?.slug ? (
                     <QRCodeSVG 
-                      value={`${window.location.origin}/r/${partnerData.slug}?qr=1`}
+                      value={`${window.location.origin}/r/${partnerData.slug}?qr=1&source=qr`}
                       size={68}
                       fgColor="#f97316"
                       bgColor="#ffffff"
