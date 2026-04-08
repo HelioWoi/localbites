@@ -146,7 +146,7 @@ const PartnerLandingPage: React.FC = () => {
                 </button>
                 <a
                   href="/live-examples"
-                  className="px-7 py-4 bg-white/90 text-zinc-800 font-bold text-base sm:text-lg rounded-2xl border border-zinc-200 hover:bg-white transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 text-center"
+                  className="px-7 py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-base sm:text-lg rounded-2xl hover:from-orange-600 hover:to-amber-600 transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5 text-center"
                 >
                   See a live example
                 </a>
@@ -330,7 +330,7 @@ const PartnerLandingPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-6">
+              <div className="pt-6 flex justify-center lg:justify-start">
                 <button
                   onClick={scrollToForm}
                   className="inline-flex items-center gap-2 px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold text-lg rounded-xl transition-all transform hover:scale-105 shadow-lg"
@@ -598,6 +598,16 @@ const PartnerLandingPage: React.FC = () => {
                 <p className="text-zinc-600 text-sm mt-1">Beach bar menu experience with vibrant visual storytelling.</p>
               </div>
             </div>
+          </div>
+
+          <div className="flex justify-center mt-10">
+            <a
+              href="/live-examples"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-lg rounded-2xl hover:from-orange-600 hover:to-amber-600 transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5"
+            >
+              See a live example
+              <ArrowRight size={18} />
+            </a>
           </div>
         </div>
       </div>
