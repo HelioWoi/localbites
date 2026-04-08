@@ -112,9 +112,9 @@ const PartnerLandingPage: React.FC = () => {
               className="flex items-center gap-3 hover:opacity-80 transition-opacity"
             >
               <img
-                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/logo%20hor%20slogan.png"
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/logo%20hor%20slogan%20tm.png"
                 alt="MenuLove"
-                className="h-10 sm:h-12 w-auto"
+                className="h-11 sm:h-14 w-auto"
               />
             </a>
             <a
