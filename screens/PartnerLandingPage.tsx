@@ -103,82 +103,150 @@ const PartnerLandingPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-white">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden">
-        {/* Background Video */}
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="absolute inset-0 w-full h-full object-cover"
-        >
-          <source src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/hero_desktop.mp4" type="video/mp4" />
-        </video>
-        <div className="absolute inset-0 bg-black/60" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-48">
-          {/* Logo */}
-          <a 
-            href="https://menulove.com.au" 
-            className="absolute top-12 left-4 sm:left-6 lg:left-8 flex items-center gap-2 hover:opacity-80 transition-opacity"
-          >
-            <img 
-              src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png" 
-              alt="MenuLove" 
-              className="w-7 h-7 sm:w-8 sm:h-8"
-            />
-            <span className="text-white font-black text-xl sm:text-2xl">MenuLove™</span>
-          </a>
+      {/* Primary Hero Section */}
+      <section className="bg-gradient-to-r from-slate-50 via-zinc-50 to-white border-b border-zinc-100">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 sm:pt-12 pb-16 sm:pb-20">
+          <div className="flex items-center justify-between mb-12">
+            <a
+              href="https://menulove.com.au"
+              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+            >
+              <img
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/logo%20hor%20slogan.png"
+                alt="MenuLove"
+                className="h-10 sm:h-12 w-auto"
+              />
+            </a>
+            <a
+              href="/partner"
+              className="text-zinc-800 text-sm font-semibold hover:text-orange-600 transition-colors"
+            >
+              Partner Access
+            </a>
+          </div>
 
-          {/* Partner Access Button */}
-          <a 
-            href="/partner" 
-            className="absolute top-12 right-4 sm:right-6 lg:right-8 text-white text-sm font-semibold hover:text-yellow-300 transition-colors"
-          >
-            Partner Access
-          </a>
-          
-          <div className="text-center mt-16 sm:mt-20">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black mb-6 leading-tight">
-              <span className="text-white">The </span>
-              <span className="bg-gradient-to-r from-orange-400 via-orange-500 to-red-500 text-transparent bg-clip-text">TikTok-Style</span>
-              <br />
-              <span className="text-white">Video Menu </span>
-              <span className="bg-gradient-to-r from-orange-400 via-orange-500 to-red-500 text-transparent bg-clip-text">for Restaurants</span>
-            </h1>
-            <p className="text-base sm:text-xl text-white/90 mb-8 max-w-2xl mx-auto font-medium leading-relaxed text-center">
-              Show your dishes in short videos so customers stop guessing, decide faster, and are more likely to order your best items.
-            </p>
-            <div className="mb-8">
-              <p className="text-yellow-300 text-xl font-black mb-2 animate-pulse">
-                🔥 Only 10 FREE Beta Spots Left
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+            <div>
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-zinc-900 leading-tight mb-5">
+                Your Menu. In Video.
+                <br />
+                <span className="text-orange-600">Ready to Sell.</span>
+              </h1>
+              <p className="text-base sm:text-lg text-zinc-600 mb-8 max-w-xl leading-relaxed">
+                Show your dishes in short videos so customers decide faster and order with confidence.
+                Built for Australian restaurants, cafés, and food trucks.
               </p>
-              <p className="text-white/80 text-sm">
+              <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                <button
+                  onClick={scrollToForm}
+                  className="group px-7 py-4 bg-orange-500 text-white font-black text-base sm:text-lg rounded-2xl hover:bg-orange-600 transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                >
+                  Create My Video Menu
+                  <ArrowRight className="group-hover:translate-x-1 transition-transform" size={22} />
+                </button>
+                <a
+                  href="/live-examples"
+                  className="px-7 py-4 bg-white/90 text-zinc-800 font-bold text-base sm:text-lg rounded-2xl border border-zinc-200 hover:bg-white transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 text-center"
+                >
+                  See a live example
+                </a>
+              </div>
+              <p className="text-zinc-500 text-sm mb-8">
                 14 day trial • No credit card required • No commission fees
               </p>
+
+              <div className="mt-6 sm:mt-8 lg:mt-10">
+                <p className="text-xs sm:text-sm font-bold text-zinc-500 uppercase tracking-wider mb-4 text-center lg:text-left">
+                  Trusted by Australian hospitality venues
+                </p>
+                <div className="relative overflow-hidden">
+                  <div className="flex items-center gap-8 sm:gap-10 animate-infinite-scroll whitespace-nowrap">
+                    <img
+                      src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/bkstreet.png"
+                      alt="Backstreet Cafe"
+                      className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
+                    />
+                    <img
+                      src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/flume.png"
+                      alt="Flume by the River"
+                      className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
+                    />
+                    <img
+                      src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/brazzos.png"
+                      alt="Brazzos Smokehouse"
+                      className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
+                    />
+                    <img
+                      src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/decision.png"
+                      alt="Decisions Cafe"
+                      className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
+                    />
+                    <img
+                      src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/the%20dock.png"
+                      alt="The Dock"
+                      className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
+                    />
+                    <img
+                      src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/la%20casa.png"
+                      alt="La Casa Beach Bar"
+                      className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
+                    />
+
+                    <img
+                      src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/bkstreet.png"
+                      alt="Backstreet Cafe"
+                      className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
+                    />
+                    <img
+                      src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/flume.png"
+                      alt="Flume by the River"
+                      className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
+                    />
+                    <img
+                      src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/brazzos.png"
+                      alt="Brazzos Smokehouse"
+                      className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
+                    />
+                    <img
+                      src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/decision.png"
+                      alt="Decisions Cafe"
+                      className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
+                    />
+                    <img
+                      src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/the%20dock.png"
+                      alt="The Dock"
+                      className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
+                    />
+                    <img
+                      src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/la%20casa.png"
+                      alt="La Casa Beach Bar"
+                      className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <button
-                onClick={scrollToForm}
-                className="group px-8 py-4 bg-white text-orange-600 font-black text-lg rounded-2xl hover:bg-yellow-300 hover:text-orange-700 transition-all transform hover:scale-105 shadow-2xl flex items-center gap-2"
-              >
-                Create My Video Menu
-                <ArrowRight className="group-hover:translate-x-1 transition-transform" size={24} />
-              </button>
-              <a
-                href="/live-examples"
-                className="px-8 py-4 bg-white/10 backdrop-blur-sm text-white font-bold text-lg rounded-2xl hover:bg-white/20 transition-all border-2 border-white/30"
-              >
-                See a live example
-              </a>
+
+            <div className="flex justify-center lg:justify-end">
+              <div className="relative rounded-3xl overflow-hidden w-full max-w-[500px] bg-white">
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full h-auto"
+                >
+                  <source src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/video%20site.mp4" type="video/mp4" />
+                </video>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Stats Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-24 mb-16 relative z-10">
-        <div className="bg-white rounded-3xl shadow-2xl p-8 grid grid-cols-2 lg:grid-cols-4 gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10 mb-16 relative z-10">
+        <div className="bg-white rounded-3xl p-8 grid grid-cols-2 lg:grid-cols-4 gap-8 border border-zinc-200">
           {stats.map((stat, index) => (
             <div key={index} className="text-center">
               <div className="text-4xl sm:text-5xl font-black text-orange-600 mb-2">
@@ -488,42 +556,48 @@ const PartnerLandingPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Video Section - Minimalist */}
+      {/* Client Menus Showcase */}
       <div className="bg-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Title Section */}
           <div className="text-center mb-12">
             <h2 className="text-4xl sm:text-5xl font-black text-zinc-900 mb-4">
-              Your Menu. In Video. Ready to Sell.
+              Real Client Video Menus
             </h2>
-            <p className="text-xl text-zinc-600 max-w-2xl mx-auto">
-              A smarter video menu for hospitality venues.
+            <p className="text-xl text-zinc-600 max-w-3xl mx-auto">
+              See how hospitality venues present dishes with MenuLove across different styles and concepts.
             </p>
           </div>
 
-          {/* Video */}
-          <div className="flex justify-center mb-8">
-            <div className="relative rounded-3xl overflow-hidden w-full max-w-[500px]">
-              <video
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="w-full h-auto"
-              >
-                <source src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/final%20video.mp4" type="video/mp4" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-7 lg:gap-10">
+            <div className="bg-white rounded-3xl overflow-hidden">
+              <video autoPlay loop muted playsInline className="w-full h-auto">
+                <source src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/decision.mp4" type="video/mp4" />
               </video>
+              <div className="p-5">
+                <h3 className="text-xl font-black text-zinc-900">Decision Cafe</h3>
+                <p className="text-zinc-600 text-sm mt-1">Fast-moving café menu built for quick decisions and higher conversion.</p>
+              </div>
             </div>
-          </div>
 
-          {/* CTA Button */}
-          <div className="flex justify-center">
-            <a
-              href="/demo/backstreet-cafe/menu"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-orange-500 text-white font-bold text-lg rounded-2xl hover:bg-orange-600 transition-all transform hover:scale-105 shadow-lg"
-            >
-              See a live example →
-            </a>
+            <div className="bg-white rounded-3xl overflow-hidden">
+              <video autoPlay loop muted playsInline className="w-full h-auto">
+                <source src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/flume.mp4" type="video/mp4" />
+              </video>
+              <div className="p-5">
+                <h3 className="text-xl font-black text-zinc-900">Flume by The River</h3>
+                <p className="text-zinc-600 text-sm mt-1">Riverside dining showcased through premium short-form videos.</p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl overflow-hidden">
+              <video autoPlay loop muted playsInline className="w-full h-auto">
+                <source src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/la%20casa.mp4" type="video/mp4" />
+              </video>
+              <div className="p-5">
+                <h3 className="text-xl font-black text-zinc-900">La Casa Beach Bar</h3>
+                <p className="text-zinc-600 text-sm mt-1">Beach bar menu experience with vibrant visual storytelling.</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -665,9 +739,6 @@ const PartnerLandingPage: React.FC = () => {
             Create My Video Menu
             <ArrowRight size={24} />
           </button>
-          <p className="text-yellow-300 text-lg font-black mb-3 animate-pulse">
-            🔥 Only 10 FREE Beta Spots Left
-          </p>
           <p className="text-white/80 text-sm mb-3">
             14 day trial. No credit card required. No commission fees.
           </p>
@@ -895,6 +966,11 @@ const PartnerLandingPage: React.FC = () => {
                 <li>
                   <a href="/partner" className="text-zinc-400 hover:text-orange-500 transition-colors text-sm">
                     Partner Portal
+                  </a>
+                </li>
+                <li>
+                  <a href="/affiliate-program" className="text-zinc-400 hover:text-orange-500 transition-colors text-sm">
+                    Affiliate Program
                   </a>
                 </li>
                 <li>

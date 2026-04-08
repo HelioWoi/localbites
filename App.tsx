@@ -17,6 +17,7 @@ import TermsOfServicePage from './screens/TermsOfServicePage';
 import FAQPage from './screens/FAQPage';
 import SuperAdminPortal from './screens/admin/SuperAdminPortal';
 import AffiliatePortal from './screens/affiliate/AffiliatePortal';
+import AffiliateProgramPage from './screens/AffiliateProgramPage';
 import AdminSetup from './screens/admin/AdminSetup';
 import RestaurantMenuLoader from './components/RestaurantMenuLoader';
 import RestaurantProfileLoader from './components/RestaurantProfileLoader';
@@ -55,7 +56,8 @@ const isPartnerLandingRoute = window.location.pathname === '/become-a-partner' |
 const isPartnerRoute = window.location.pathname === '/partner' || window.location.pathname.startsWith('/partner');
 
 // Check if we're on the affiliate route
-const isAffiliateRoute = window.location.pathname === '/affiliate' || window.location.pathname.startsWith('/affiliate');
+const isAffiliateProgramRoute = window.location.pathname === '/affiliate-program';
+const isAffiliateRoute = window.location.pathname === '/affiliate' || window.location.pathname.startsWith('/affiliate/');
 
 // Check if we're on legal pages routes
 const isLegalRoute = window.location.pathname === '/policy' || 
@@ -221,6 +223,10 @@ const App: React.FC = () => {
 
   if (isHelpRoute) {
     return <HelpPage />;
+  }
+
+  if (isAffiliateProgramRoute) {
+    return <AffiliateProgramPage />;
   }
 
   // If on admin setup route, render Admin Setup
@@ -2568,9 +2574,6 @@ const App: React.FC = () => {
       {/* Restaurant Reviews Modal - Full screen swipeable feed */}
       {showRestaurantReviews && (
         <div className="fixed inset-0 z-[70] bg-black">
-          {console.log('[REVIEW MODAL] Rendering modal for restaurant:', showRestaurantReviews.name)}
-          {console.log('[REVIEW MODAL] Modal reviews count:', modalReviews.length)}
-          {console.log('[REVIEW MODAL] Loading state:', loadingModalReviews)}
           {loadingModalReviews ? (
             <div className="h-full flex flex-col items-center justify-center">
               <Loader2 className="w-8 h-8 animate-spin text-orange-500 mb-4" />
