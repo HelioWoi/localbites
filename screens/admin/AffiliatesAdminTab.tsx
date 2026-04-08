@@ -34,9 +34,20 @@ interface Commission {
   referral?: { partner_email: string | null };
 }
 
+interface Referral {
+  id: string;
+  affiliate_id: string;
+  partner_id: string | null;
+  partner_email: string | null;
+  status: string;
+  created_at: string;
+  partner?: { restaurant_name: string | null; email: string | null } | null;
+}
+
 const AffiliatesAdminTab: React.FC = () => {
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
   const [commissions, setCommissions] = useState<Commission[]>([]);
+  const [referrals, setReferrals] = useState<Referral[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedAffiliate, setExpandedAffiliate] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,6 +74,14 @@ const AffiliatesAdminTab: React.FC = () => {
         .limit(100);
 
       if (commData) setCommissions(commData as any);
+
+      const { data: refData } = await supabase
+        .from('referrals')
+        .select('id, affiliate_id, partner_id, partner_email, status, created_at, partner:partners(restaurant_name, email)')
+        .order('created_at', { ascending: false })
+        .limit(300);
+
+      if (refData) setReferrals(refData as any);
     } catch (err) {
       console.error('Error loading affiliate data:', err);
     } finally {
@@ -294,6 +313,7 @@ const AffiliatesAdminTab: React.FC = () => {
           <div className="divide-y divide-zinc-100">
             {filteredAffiliates.map(affiliate => {
               const affiliateCommissions = commissions.filter(c => c.affiliate_id === affiliate.id);
+              const affiliateReferrals = referrals.filter(r => r.affiliate_id === affiliate.id);
               const isExpanded = expandedAffiliate === affiliate.id;
 
               return (
@@ -337,6 +357,36 @@ const AffiliatesAdminTab: React.FC = () => {
 
                   {isExpanded && (
                     <div className="px-4 pb-4 bg-zinc-50">
+                      <div className="bg-white rounded-lg border border-zinc-200 p-3 mb-3">
+                        <h4 className="text-sm font-medium text-zinc-700 mb-2">
+                          Clients from Referral Link ({affiliateReferrals.length})
+                        </h4>
+                        {affiliateReferrals.length === 0 ? (
+                          <p className="text-xs text-zinc-400 py-4 text-center">No referred clients yet</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {affiliateReferrals.map(ref => {
+                              const partnerEmail = ref.partner_email || ref.partner?.email || 'Unknown';
+                              const partnerRestaurant = ref.partner?.restaurant_name || '-';
+
+                              return (
+                                <div key={ref.id} className="flex items-center justify-between py-2 px-3 bg-zinc-50 rounded-lg">
+                                  <div>
+                                    <p className="text-sm font-medium text-zinc-900">
+                                      {partnerRestaurant}
+                                    </p>
+                                    <p className="text-xs text-zinc-500">
+                                      {partnerEmail} {' '}&middot;{' '}{formatDate(ref.created_at)}
+                                    </p>
+                                  </div>
+                                  {statusBadge(ref.status)}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
                       <div className="bg-white rounded-lg border border-zinc-200 p-3">
                         <h4 className="text-sm font-medium text-zinc-700 mb-2">
                           Commissions ({affiliateCommissions.length})
