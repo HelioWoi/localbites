@@ -102,32 +102,32 @@ const PartnerLandingPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-white overflow-x-hidden lg:overflow-x-visible">
       {/* Primary Hero Section */}
       <section className="bg-gradient-to-r from-slate-50 via-zinc-50 to-white border-b border-zinc-100">
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 sm:pt-12 pb-16 sm:pb-20">
-          <div className="flex items-center justify-between mb-12">
+          <div className="flex items-center justify-between gap-3 mb-10 sm:mb-12">
             <a
               href="https://menulove.com.au"
-              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+              className="flex items-center gap-2 sm:gap-3 min-w-0 hover:opacity-80 transition-opacity"
             >
               <img
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/logo%20hor%20slogan%20tm.png"
                 alt="MenuLove"
-                className="h-11 sm:h-14 w-auto"
+                className="h-9 sm:h-14 w-auto max-w-[150px] sm:max-w-none"
               />
             </a>
             <a
               href="/partner"
-              className="text-zinc-800 text-sm font-semibold hover:text-orange-600 transition-colors"
+              className="shrink-0 whitespace-nowrap text-zinc-800 text-sm font-semibold hover:text-orange-600 transition-colors"
             >
               Partner Access
             </a>
           </div>
 
           <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-            <div>
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-zinc-900 leading-tight mb-5">
+            <div className="min-w-0">
+              <h1 className="text-[clamp(2.5rem,10vw,3rem)] sm:text-5xl lg:text-6xl font-black text-zinc-900 leading-tight mb-5">
                 Your Menu. In Video.
                 <br />
                 <span className="text-orange-600">Ready to Sell.</span>
@@ -136,17 +136,17 @@ const PartnerLandingPage: React.FC = () => {
                 Show your dishes in short videos so customers decide faster and order with confidence.
                 Built for Australian restaurants, cafés, and food trucks.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 mb-4">
+              <div className="flex flex-col sm:flex-row gap-4 mb-4 w-full sm:w-auto">
                 <button
                   onClick={scrollToForm}
-                  className="group px-7 py-4 bg-orange-500 text-white font-black text-base sm:text-lg rounded-2xl hover:bg-orange-600 transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                  className="group w-full sm:w-auto px-7 py-4 bg-orange-500 text-white font-black text-base sm:text-lg rounded-2xl hover:bg-orange-600 transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2"
                 >
                   Create My Video Menu
                   <ArrowRight className="group-hover:translate-x-1 transition-transform" size={22} />
                 </button>
                 <a
                   href="/live-examples"
-                  className="px-7 py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-base sm:text-lg rounded-2xl hover:from-orange-600 hover:to-amber-600 transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5 text-center"
+                  className="w-full sm:w-auto inline-flex items-center justify-center px-7 py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-base sm:text-lg rounded-2xl hover:from-orange-600 hover:to-amber-600 transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5 text-center"
                 >
                   See a live example
                 </a>
