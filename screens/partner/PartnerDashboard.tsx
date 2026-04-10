@@ -1146,11 +1146,29 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         setUploadProgress(20);
         
         let fileToUpload = uploadFile;
-        setUploadProgress(40);
+        const needsCompression = await shouldCompressVideo(uploadFile);
+
+        if (needsCompression) {
+          setUploadProgress(30);
+          console.log('Compressing updated video for optimal mobile playback...');
+
+          fileToUpload = await compressVideo(uploadFile, {
+            maxWidth: 720,
+            maxHeight: 1280,
+            quality: 0.8,
+            onProgress: (progress) => {
+              setUploadProgress(30 + (progress * 0.2));
+            },
+          });
+
+          console.log(`Updated video compressed: ${(uploadFile.size / 1024 / 1024).toFixed(2)}MB → ${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`);
+        }
+
+        setUploadProgress(50);
 
         // Ensure moov atom is at the beginning for instant playback
         fileToUpload = await ensureFaststart(fileToUpload);
-        setUploadProgress(50);
+        setUploadProgress(60);
 
         const timestamp = Date.now();
         // Get original file extension
@@ -1176,7 +1194,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           });
 
         if (uploadError) throw uploadError;
-        setUploadProgress(70);
+        setUploadProgress(75);
 
         const { data: { publicUrl } } = supabase.storage
           .from('menu-videos')

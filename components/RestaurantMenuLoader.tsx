@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { textSearchRestaurants } from '../services/googlePlacesProxy';
 import RestaurantMenuPage from '../screens/RestaurantMenuPage';
 import { Loader2 } from 'lucide-react';
 
@@ -68,23 +67,8 @@ const RestaurantMenuLoader: React.FC<RestaurantMenuLoaderProps> = ({ slug }) => 
         // Get unique categories from video items only
         const categories = [...new Set(videoItems.map(item => item.category))].filter(Boolean);
 
-        // Fetch real Google rating for partner restaurant
-        let googleRating = partnerData.rating || 4.5;
-        let googleTotalReviews = partnerData.total_reviews || 0;
-        if (googleTotalReviews === 0 && partnerData.restaurant_name) {
-          try {
-            const query = partnerData.address 
-              ? `${partnerData.restaurant_name} ${partnerData.address}` 
-              : partnerData.restaurant_name;
-            const results = await textSearchRestaurants(0, 0, 50000, query);
-            if (results.length > 0 && results[0].rating) {
-              googleRating = results[0].rating;
-              googleTotalReviews = results[0].totalReviews || 0;
-            }
-          } catch (e) {
-            console.error('[MenuLoader] Google rating fetch error:', e);
-          }
-        }
+        const partnerRating = partnerData.rating || 4.5;
+        const partnerTotalReviews = partnerData.total_reviews || 0;
 
         setRestaurant({
           id: partnerData.id,
@@ -92,8 +76,8 @@ const RestaurantMenuLoader: React.FC<RestaurantMenuLoaderProps> = ({ slug }) => 
           slug: partnerData.slug,
           cuisine: partnerData.cuisine || 'Restaurant',
           address: partnerData.address || '',
-          rating: googleRating,
-          totalReviews: googleTotalReviews,
+          rating: partnerRating,
+          totalReviews: partnerTotalReviews,
           logoUrl: partnerData.logo_url,
           coverPhotoUrl: partnerData.cover_photo_url,
           googleMapsUrl: partnerData.google_maps_url,
