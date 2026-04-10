@@ -70,7 +70,7 @@ serve(async (req) => {
     }
 
     // Send confirmation email via send-confirmation-email function
-    const { error: emailError } = await supabase.functions.invoke('send-confirmation-email', {
+    const { data: emailData, error: emailError } = await supabase.functions.invoke('send-confirmation-email', {
       body: {
         email: partner.email,
         restaurantName: partner.restaurant_name,
@@ -80,7 +80,8 @@ serve(async (req) => {
 
     if (emailError) {
       console.error('[Resend Confirmation] Email send error:', emailError);
-      throw emailError;
+      const detailedError = (emailData as { error?: string } | null)?.error;
+      throw new Error(detailedError || emailError.message || 'Failed to send confirmation email');
     }
 
     console.log('[Resend Confirmation] ✅ Confirmation email resent successfully');

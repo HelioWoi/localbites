@@ -2,6 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { Mail, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
+const extractEdgeFunctionErrorMessage = (err: any): string => {
+  if (err?.message && err.message !== 'Edge Function returned a non-2xx status code') {
+    return err.message;
+  }
+
+  const context = err?.context;
+  if (typeof context === 'string') {
+    try {
+      const parsed = JSON.parse(context) as { error?: string; message?: string };
+      if (parsed.error || parsed.message) {
+        return parsed.error || parsed.message || 'Failed to resend email. Please try again.';
+      }
+    } catch {
+    }
+  }
+
+  return 'Failed to resend email. Please try again.';
+};
+
 const EmailNotConfirmedPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [isResending, setIsResending] = useState(false);
@@ -28,16 +47,21 @@ const EmailNotConfirmedPage: React.FC = () => {
     setResendSuccess(false);
 
     try {
-      const { error: resendError } = await supabase.functions.invoke('resend-confirmation-email', {
+      const { data, error: resendError } = await supabase.functions.invoke('resend-confirmation-email', {
         body: { email },
       });
 
-      if (resendError) throw resendError;
+      if (resendError) {
+        const detailedError = (data as { error?: string; message?: string } | null)?.error
+          || (data as { error?: string; message?: string } | null)?.message
+          || extractEdgeFunctionErrorMessage(resendError);
+        throw new Error(detailedError);
+      }
 
       setResendSuccess(true);
     } catch (err: any) {
       console.error('Resend error:', err);
-      setError(err.message || 'Failed to resend email. Please try again.');
+      setError(extractEdgeFunctionErrorMessage(err));
     } finally {
       setIsResending(false);
     }

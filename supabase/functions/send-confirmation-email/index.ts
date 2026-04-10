@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!;
+const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -17,6 +17,13 @@ serve(async (req) => {
 
   try {
     const { email, restaurantName, confirmationToken } = await req.json();
+
+    if (!RESEND_API_KEY) {
+      return new Response(
+        JSON.stringify({ error: 'RESEND_API_KEY is not configured in Supabase Edge Function secrets' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     if (!email || !restaurantName || !confirmationToken) {
       return new Response(
@@ -136,9 +143,17 @@ serve(async (req) => {
     });
 
     if (!resendResponse.ok) {
-      const error = await resendResponse.text();
-      console.error('Resend API error:', error);
-      throw new Error(`Failed to send email: ${error}`);
+      const errorText = await resendResponse.text();
+      let errorMessage = errorText;
+
+      try {
+        const parsed = JSON.parse(errorText) as { message?: string; error?: string };
+        errorMessage = parsed.message || parsed.error || errorText;
+      } catch {
+      }
+
+      console.error('Resend API error:', errorMessage);
+      throw new Error(`Failed to send email: ${errorMessage}`);
     }
 
     const result = await resendResponse.json();
