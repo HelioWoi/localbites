@@ -3319,18 +3319,49 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         categoryName={deleteConfirmation.categoryName}
         onConfirm={async () => {
           const { type, itemId, categoryName } = deleteConfirmation;
+          const archiveTimestamp = new Date().toISOString();
+
+          const archiveItems = async (ids: string[]) => {
+            if (ids.length === 0) return;
+
+            const impersonatePartnerId = localStorage.getItem('admin_impersonate_partner_id');
+            const isAdminImpersonating = !!impersonatePartnerId;
+
+            if (isAdminImpersonating) {
+              for (const id of ids) {
+                const { data: edgeData, error: edgeError } = await supabase.functions.invoke('admin-update-menu-item', {
+                  body: {
+                    itemId: id,
+                    updateData: { deleted_at: archiveTimestamp },
+                    adminImpersonatePartnerId: impersonatePartnerId,
+                  },
+                });
+
+                if (edgeError) throw edgeError;
+                if (edgeData?.error) throw new Error(edgeData.error);
+              }
+              return;
+            }
+
+            const { data: updatedRows, error } = await supabase
+              .from('menu_items')
+              .update({ deleted_at: archiveTimestamp })
+              .in('id', ids)
+              .select('id');
+
+            if (error) throw error;
+            if (!updatedRows || updatedRows.length !== ids.length) {
+              throw new Error('Could not archive all selected items');
+            }
+          };
           
           try {
             if (type === 'item' && itemId) {
-              const { error } = await supabase.from('menu_items')
-                .update({ deleted_at: new Date().toISOString() })
-                .eq('id', itemId);
-              
-              if (error) throw error;
+              await archiveItems([itemId]);
               
               // Update menuItems with deleted_at timestamp
               const updatedItems = menuItems.map(i => 
-                i.id === itemId ? { ...i, deleted_at: new Date().toISOString() } : i
+                i.id === itemId ? { ...i, deleted_at: archiveTimestamp } : i
               );
               setMenuItems(updatedItems);
               
@@ -3347,29 +3378,19 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               alert('Item archived successfully');
             } else if (type === 'category' && categoryName) {
               const itemsToDelete = menuItems.filter(i => i.category === categoryName && !i.deleted_at);
-              const { error } = await supabase
-                .from('menu_items')
-                .update({ deleted_at: new Date().toISOString() })
-                .in('id', itemsToDelete.map(i => i.id));
-              
-              if (error) throw error;
+              await archiveItems(itemsToDelete.map(i => i.id));
               
               setMenuItems(menuItems.map(i => 
-                i.category === categoryName ? { ...i, deleted_at: new Date().toISOString() } : i
+                i.category === categoryName ? { ...i, deleted_at: archiveTimestamp } : i
               ));
               setCategories(categories.filter(c => c !== categoryName));
               setEditingCategory(null);
               alert('Category archived successfully');
             } else if (type === 'menu') {
-              const { error } = await supabase
-                .from('menu_items')
-                .update({ deleted_at: new Date().toISOString() })
-                .eq('partner_id', partnerData?.id)
-                .is('deleted_at', null);
+              const itemsToDelete = menuItems.filter(i => !i.deleted_at);
+              await archiveItems(itemsToDelete.map(i => i.id));
               
-              if (error) throw error;
-              
-              setMenuItems(menuItems.map(i => ({ ...i, deleted_at: new Date().toISOString() })));
+              setMenuItems(menuItems.map(i => ({ ...i, deleted_at: archiveTimestamp })));
               setCategories([]);
               alert('Menu archived successfully');
             }

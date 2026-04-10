@@ -19,6 +19,30 @@ interface ParsedMenuItem {
   errors: string[];
 }
 
+const parseCurrencyPrice = (raw: unknown): number | undefined => {
+  if (raw === null || raw === undefined || raw === '') return undefined;
+
+  const rawText = String(raw)
+    .trim()
+    .replace(/\s+/g, ' ');
+
+  // Handle values like "4.30 / 4.90" by taking the first numeric amount
+  const firstMatch = rawText.match(/-?\d+(?:[.,]\d+)?/);
+  if (!firstMatch) return undefined;
+
+  const cleaned = firstMatch[0].replace(',', '.');
+
+  if (!cleaned) return undefined;
+
+  const numeric = Number(cleaned);
+  if (!Number.isFinite(numeric)) return undefined;
+
+  return Math.trunc(numeric * 100) / 100;
+};
+
+const normalizeMenuKey = (name: string, category: string): string =>
+  `${name.trim().toLowerCase()}||${category.trim().toLowerCase()}`;
+
 const MenuImportModal: React.FC<MenuImportModalProps> = ({ isOpen, onClose, partnerId, onImportComplete }) => {
   const [file, setFile] = useState<File | null>(null);
   const [parsedItems, setParsedItems] = useState<ParsedMenuItem[]>([]);
@@ -30,6 +54,80 @@ const MenuImportModal: React.FC<MenuImportModalProps> = ({ isOpen, onClose, part
 
   if (!isOpen) return null;
 
+  const insertMenuItem = async (insertData: any) => {
+    const impersonatePartnerId = localStorage.getItem('admin_impersonate_partner_id');
+    const isAdminImpersonating = !!impersonatePartnerId;
+
+    if (isAdminImpersonating) {
+      const { data: edgeData, error: edgeError } = await supabase.functions.invoke('admin-update-menu-item', {
+        body: {
+          insertData,
+          adminImpersonatePartnerId: impersonatePartnerId,
+        },
+      });
+
+      if (edgeError) {
+        throw new Error(edgeError.message || 'Failed to import item via admin function');
+      }
+
+      if (edgeData?.error) {
+        throw new Error(edgeData.error);
+      }
+
+      return edgeData?.data;
+    }
+
+    const { data, error } = await supabase
+      .from('menu_items')
+      .insert(insertData)
+      .select('*')
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  };
+
+  const updateMenuItem = async (itemId: string, updateData: any) => {
+    const impersonatePartnerId = localStorage.getItem('admin_impersonate_partner_id');
+    const isAdminImpersonating = !!impersonatePartnerId;
+
+    if (isAdminImpersonating) {
+      const { data: edgeData, error: edgeError } = await supabase.functions.invoke('admin-update-menu-item', {
+        body: {
+          itemId,
+          updateData,
+          adminImpersonatePartnerId: impersonatePartnerId,
+        },
+      });
+
+      if (edgeError) {
+        throw new Error(edgeError.message || 'Failed to update item via admin function');
+      }
+
+      if (edgeData?.error) {
+        throw new Error(edgeData.error);
+      }
+
+      return edgeData?.data;
+    }
+
+    const { data, error } = await supabase
+      .from('menu_items')
+      .update(updateData)
+      .eq('id', itemId)
+      .select('*')
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
@@ -40,56 +138,58 @@ const MenuImportModal: React.FC<MenuImportModalProps> = ({ isOpen, onClose, part
 
     try {
       const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase();
-      
+      let data: unknown[][];
+
       if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-        // Parse Excel file
+        // Parse Excel file directly – no intermediate CSV conversion
         const arrayBuffer = await selectedFile.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const csvText = XLSX.utils.sheet_to_csv(firstSheet);
-        const items = parseCSV(csvText);
-        setParsedItems(items);
+        data = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' }) as unknown[][];
       } else {
         // Parse CSV file
         const text = await selectedFile.text();
-        const items = parseCSV(text);
-        setParsedItems(items);
+        const workbook = XLSX.read(text, { type: 'string' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        data = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' }) as unknown[][];
       }
+
+      const items = parseRows(data);
+      setParsedItems(items);
     } catch (err) {
       setError('Failed to read file. Please make sure it\'s a valid CSV or Excel file.');
       console.error('File parse error:', err);
     }
   };
 
-  const parseCSV = (text: string): ParsedMenuItem[] => {
-    // Use xlsx library to properly parse CSV with quoted fields
-    // This respects commas inside quoted fields like "Pineapple, pear, green apple"
-    const workbook = XLSX.read(text, { type: 'string', raw: true });
-    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' }) as string[][];
-    
+  const parseRows = (data: unknown[][]): ParsedMenuItem[] => {
     if (data.length === 0) return [];
 
     // Get headers (first row)
-    const headers = data[0].map(h => String(h).trim().toLowerCase());
+    const headers = (data[0] as unknown[]).map(h => String(h ?? '').trim().toLowerCase());
     
-    // Find column indices
-    const nameIndex = headers.findIndex(h => h.includes('name') || h.includes('item') || h.includes('dish'));
-    const categoryIndex = headers.findIndex(h => h.includes('category') || h.includes('type'));
-    const descriptionIndex = headers.findIndex(h => h.includes('description') || h.includes('desc'));
-    const priceIndex = headers.findIndex(h => h.includes('price') || h.includes('cost'));
+    // Find column indices – accept common aliases
+    const nameIndex = headers.findIndex(h => h.includes('name') || h.includes('item') || h.includes('dish') || h.includes('product'));
+    const categoryIndex = headers.findIndex(h => h.includes('category') || h.includes('type') || h.includes('section') || h.includes('group'));
+    const descriptionIndex = headers.findIndex(h => h.includes('description') || h.includes('desc') || h.includes('detail'));
+    const priceIndex = headers.findIndex(h => h.includes('price') || h.includes('cost') || h.includes('amount') || h.includes('valor'));
+
+    console.log('[MenuImport] Detected columns →', { nameIndex, categoryIndex, descriptionIndex, priceIndex, headers });
 
     // Parse data rows
     const items: ParsedMenuItem[] = [];
     for (let i = 1; i < data.length; i++) {
-      const row = data[i];
+      const row = data[i] as unknown[];
       if (!row || row.length === 0) continue; // Skip empty rows
       
-      const name = nameIndex >= 0 ? String(row[nameIndex] || '').trim() : '';
-      const category = categoryIndex >= 0 ? String(row[categoryIndex] || '').trim() : 'Uncategorized';
-      const description = descriptionIndex >= 0 ? String(row[descriptionIndex] || '').trim() : '';
-      const priceStr = priceIndex >= 0 ? String(row[priceIndex] || '').trim() : '';
-      const price = priceStr ? parseFloat(priceStr.replace(/[^0-9.]/g, '')) : undefined;
+      const name = nameIndex >= 0 ? String(row[nameIndex] ?? '').trim() : '';
+      const category = categoryIndex >= 0 ? String(row[categoryIndex] ?? '').trim() : 'Uncategorized';
+      const description = descriptionIndex >= 0 ? String(row[descriptionIndex] ?? '').trim() : '';
+      const rawPrice = priceIndex >= 0 ? row[priceIndex] : undefined;
+      const price = parseCurrencyPrice(rawPrice);
+
+      // Skip entirely blank rows
+      if (!name && !category && price === undefined) continue;
 
       const errors: string[] = [];
       if (!name) errors.push('Missing name');
@@ -99,13 +199,38 @@ const MenuImportModal: React.FC<MenuImportModalProps> = ({ isOpen, onClose, part
         name,
         category,
         description,
-        price: isNaN(price!) ? undefined : price,
+        price,
         isValid: errors.length === 0,
         errors
       });
     }
 
-    return items;
+    // Deduplicate: same name+category → keep the version with the most data (price wins)
+    const deduped = new Map<string, ParsedMenuItem>();
+    for (const item of items) {
+      const key = `${item.name.toLowerCase()}||${item.category.toLowerCase()}`;
+      const existing = deduped.get(key);
+
+      if (!existing) {
+        deduped.set(key, item);
+        continue;
+      }
+
+      // Prefer the version that has a price
+      const betterPrice = item.price !== undefined && existing.price === undefined;
+      // Prefer the version that has a description
+      const betterDesc = !!item.description && !existing.description;
+
+      if (betterPrice) {
+        deduped.set(key, { ...item, description: item.description || existing.description });
+      } else if (betterDesc) {
+        deduped.set(key, { ...existing, description: item.description });
+      }
+    }
+
+    const result = Array.from(deduped.values());
+    console.log('[MenuImport] Parsed', items.length, 'rows → deduplicated to', result.length, 'unique items');
+    return result;
   };
 
   const handleImport = async () => {
@@ -117,25 +242,71 @@ const MenuImportModal: React.FC<MenuImportModalProps> = ({ isOpen, onClose, part
     try {
       const validItems = parsedItems.filter(item => item.isValid);
       const totalItems = validItems.length;
+      let insertedCount = 0;
+      let updatedCount = 0;
+
+      const { data: existingItems, error: existingError } = await supabase
+        .from('menu_items')
+        .select('id, name, category, description, price, deleted_at')
+        .eq('partner_id', partnerId)
+        .is('deleted_at', null);
+
+      if (existingError) {
+        throw existingError;
+      }
+
+      const existingByKey = new Map<string, any>();
+      (existingItems || []).forEach(existing => {
+        existingByKey.set(normalizeMenuKey(existing.name || '', existing.category || ''), existing);
+      });
 
       for (let i = 0; i < validItems.length; i++) {
         const item = validItems[i];
+        const itemKey = normalizeMenuKey(item.name, item.category);
+        const existing = existingByKey.get(itemKey);
+
+        if (existing) {
+          const updateData: Record<string, any> = {};
+
+          if ((existing.price === null || existing.price === undefined) && item.price !== undefined) {
+            updateData.price = item.price;
+          }
+
+          if ((!existing.description || String(existing.description).trim() === '') && item.description) {
+            updateData.description = item.description;
+          }
+
+          if (Object.keys(updateData).length > 0) {
+            await updateMenuItem(existing.id, updateData);
+            updatedCount += 1;
+          }
+
+          setImportProgress(Math.round(((i + 1) / totalItems) * 100));
+          continue;
+        }
         
-        await supabase
-          .from('menu_items')
-          .insert({
-            partner_id: partnerId,
-            name: item.name,
-            category: item.category,
-            description: item.description || null,
-            price: item.price || null,
-            video_url: '',
-            photo_url: null,
-            is_active: true,
-            sort_order: i
-          });
+        const insertedItem = await insertMenuItem({
+          partner_id: partnerId,
+          name: item.name,
+          category: item.category,
+          description: item.description || null,
+          price: item.price ?? null,
+          video_url: '',
+          photo_url: null,
+          is_active: true,
+          sort_order: i,
+        });
+
+        insertedCount += 1;
+        if (insertedItem?.id) {
+          existingByKey.set(itemKey, insertedItem);
+        }
 
         setImportProgress(Math.round(((i + 1) / totalItems) * 100));
+      }
+
+      if (insertedCount === 0 && updatedCount === 0) {
+        throw new Error('All items from this file already exist in your menu. No duplicates were created.');
       }
 
       setImportComplete(true);
@@ -144,8 +315,8 @@ const MenuImportModal: React.FC<MenuImportModalProps> = ({ isOpen, onClose, part
         handleClose();
       }, 2000);
 
-    } catch (err) {
-      setError('Failed to import menu items. Please try again.');
+    } catch (err: any) {
+      setError(err?.message || 'Failed to import menu items. Please try again.');
       console.error('Import error:', err);
     } finally {
       setIsProcessing(false);

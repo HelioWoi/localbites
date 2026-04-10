@@ -191,6 +191,16 @@ const PartnerLandingPage: React.FC = () => {
                       alt="La Casa Beach Bar"
                       className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
                     />
+                    <img
+                      src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/MoolooBrew.png"
+                      alt="Mooloo Brew"
+                      className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
+                    />
+                    <img
+                      src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/craft.png"
+                      alt="Craft"
+                      className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
+                    />
 
                     <img
                       src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/bkstreet.png"
@@ -220,6 +230,16 @@ const PartnerLandingPage: React.FC = () => {
                     <img
                       src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/la%20casa.png"
                       alt="La Casa Beach Bar"
+                      className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
+                    />
+                    <img
+                      src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/MoolooBrew.png"
+                      alt="Mooloo Brew"
+                      className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
+                    />
+                    <img
+                      src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/craft.png"
+                      alt="Craft"
                       className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
                     />
                   </div>
@@ -806,6 +826,16 @@ const PartnerLandingPage: React.FC = () => {
                 alt="La Casa Beach Bar" 
                 className="h-16 w-auto grayscale hover:grayscale-0 transition-all duration-300 opacity-60 hover:opacity-100"
               />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/MoolooBrew.png" 
+                alt="Mooloo Brew" 
+                className="h-16 w-auto grayscale hover:grayscale-0 transition-all duration-300 opacity-60 hover:opacity-100"
+              />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/craft.png" 
+                alt="Craft" 
+                className="h-16 w-auto grayscale hover:grayscale-0 transition-all duration-300 opacity-60 hover:opacity-100"
+              />
             </div>
           </div>
 
@@ -842,6 +872,16 @@ const PartnerLandingPage: React.FC = () => {
                 alt="La Casa Beach Bar" 
                 className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
               />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/MoolooBrew.png" 
+                alt="Mooloo Brew" 
+                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
+              />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/craft.png" 
+                alt="Craft" 
+                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
+              />
               {/* Duplicate for infinite effect */}
               <img 
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/bkstreet.png" 
@@ -871,6 +911,16 @@ const PartnerLandingPage: React.FC = () => {
               <img 
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/la%20casa.png" 
                 alt="La Casa Beach Bar" 
+                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
+              />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/MoolooBrew.png" 
+                alt="Mooloo Brew" 
+                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
+              />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/craft.png" 
+                alt="Craft" 
                 className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
               />
               {/* Set 3 */}
@@ -904,6 +954,16 @@ const PartnerLandingPage: React.FC = () => {
                 alt="La Casa Beach Bar" 
                 className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
               />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/MoolooBrew.png" 
+                alt="Mooloo Brew" 
+                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
+              />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/craft.png" 
+                alt="Craft" 
+                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
+              />
               {/* Set 4 */}
               <img 
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/bkstreet.png" 
@@ -933,6 +993,16 @@ const PartnerLandingPage: React.FC = () => {
               <img 
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/la%20casa.png" 
                 alt="La Casa Beach Bar" 
+                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
+              />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/MoolooBrew.png" 
+                alt="Mooloo Brew" 
+                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
+              />
+              <img 
+                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/craft.png" 
+                alt="Craft" 
                 className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
               />
             </div>
