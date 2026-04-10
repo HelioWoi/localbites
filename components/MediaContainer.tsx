@@ -115,7 +115,7 @@ const MediaContainer: React.FC<MediaContainerProps> = ({
           className={`h-full w-full object-cover transition-opacity duration-500 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
           loop
           playsInline
-          preload="auto"
+          preload={isActive ? 'metadata' : 'none'}
           onCanPlay={() => setIsLoaded(true)}
           onLoadedData={() => setIsLoaded(true)}
           onError={(e) => {

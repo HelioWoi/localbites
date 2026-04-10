@@ -1144,8 +1144,7 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({
               muted
               loop
               playsInline
-              preload="metadata"
-              autoPlay
+              preload="none"
             />
             {/* Video badge */}
             <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-full z-10">

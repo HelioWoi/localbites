@@ -477,7 +477,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
                         className="w-full h-full object-cover bg-zinc-900"
                         playsInline
                         loop
-                        preload="auto"
+                        preload="metadata"
                         onLoadedData={(e) => {
                           e.currentTarget.currentTime = 0.1;
                         }}

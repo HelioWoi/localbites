@@ -336,6 +336,7 @@ const App: React.FC = () => {
   const [showFilterModal, setShowFilterModal] = useState<'cuisine' | 'price' | 'dietary' | 'ambiance' | 'amenities' | null>(null);
   const [showSaved, setShowSaved] = useState(false);
   const [showSavedFeed, setShowSavedFeed] = useState(false);
+  const [savedFeedActiveIndex, setSavedFeedActiveIndex] = useState(0);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [showHeartAnimation, setShowHeartAnimation] = useState<string | null>(null);
@@ -502,6 +503,20 @@ const App: React.FC = () => {
       setLoadingFeedReviews(false);
     }
   };
+
+  const handleSavedFeedScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const scrollTop = e.currentTarget.scrollTop;
+    const index = Math.round(scrollTop / window.innerHeight);
+    if (index !== savedFeedActiveIndex && index >= 0) {
+      setSavedFeedActiveIndex(index);
+    }
+  };
+
+  useEffect(() => {
+    if (showSavedFeed) {
+      setSavedFeedActiveIndex(0);
+    }
+  }, [showSavedFeed]);
 
   // Load user likes and saves from Supabase on mount
   useEffect(() => {
@@ -2160,7 +2175,7 @@ const App: React.FC = () => {
           </div>
 
           {/* Feed Container */}
-          <div className="h-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar">
+          <div className="h-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar" onScroll={handleSavedFeedScroll}>
             {Array.from(savedIds).length === 0 ? (
               <div className="h-full flex items-center justify-center p-8">
                 <div className="text-center">
@@ -2181,7 +2196,7 @@ const App: React.FC = () => {
                       <MediaContainer 
                         videoUrl={res!.dishes[0]?.videoUrl} 
                         photoUrl={res!.mainPhotoUrl}
-                        isActive={true}
+                        isActive={savedFeedActiveIndex === i}
                         isSubscribed={res!.isSubscribed}
                         restaurantId={res!.id}
                         itemId={res!.dishes[0]?.id}

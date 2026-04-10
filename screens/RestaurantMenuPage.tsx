@@ -627,7 +627,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                   muted
                   autoPlay
                   playsInline
-                  preload="auto"
+                  preload="metadata"
                   onPlaying={() => setVideoReady(prev => new Set(prev).add(index))}
                   onCanPlay={() => {
                     setVideoReady(prev => new Set(prev).add(index));

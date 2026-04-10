@@ -18,10 +18,28 @@ const BUNNY_CDN_URL = 'https://menulove.b-cdn.net';
  */
 export const getCDNUrl = (url: string | null | undefined): string => {
   if (!url) return '';
-  
-  // TEMPORARILY BYPASSED: Bunny CDN has cache-control: no-cache from Supabase origin,
-  // causing MISS on every request (slower than Supabase direct).
-  // TODO: Re-enable after configuring Bunny to override origin cache headers.
+
+  if (url.startsWith(BUNNY_CDN_URL)) {
+    return url;
+  }
+
+  const lower = url.toLowerCase();
+  const urlWithoutQuery = lower.split('?')[0].split('#')[0];
+  const isVideoAsset =
+    lower.includes('/menu-videos/') ||
+    urlWithoutQuery.endsWith('.mp4') ||
+    urlWithoutQuery.endsWith('.mov') ||
+    urlWithoutQuery.endsWith('.webm') ||
+    urlWithoutQuery.endsWith('.m3u8');
+
+  if (!isVideoAsset) {
+    return url;
+  }
+
+  if (url.startsWith(SUPABASE_STORAGE_URL)) {
+    return url.replace(SUPABASE_STORAGE_URL, BUNNY_CDN_URL);
+  }
+
   return url;
 };
 
