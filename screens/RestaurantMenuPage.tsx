@@ -39,6 +39,12 @@ interface RestaurantMenuPageProps {
 
 const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) => {
   const isQRRoute = window.location.pathname.startsWith('/r/');
+  const isIOSDevice = /iPad|iPhone|iPod/.test(window.navigator.userAgent) ||
+    (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
+  const isLikelyUnsupportedVideo = (videoUrl: string) => {
+    const cleanUrl = videoUrl.toLowerCase().split('?')[0].split('#')[0];
+    return isIOSDevice && cleanUrl.endsWith('.webm');
+  };
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(true); // Start muted, user clicks to unmute
@@ -275,6 +281,9 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     filteredItems = filteredItems.filter(item => savedItems.has(item.id));
   }
 
+  const isActiveVideoUnsupported = !!filteredItems[activeVideoIndex] &&
+    isLikelyUnsupportedVideo(filteredItems[activeVideoIndex].videoUrl);
+
   // Get next category helper
   const getNextCategory = (): string | null | false => {
     if (activeCategory === null) {
@@ -402,11 +411,18 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   // Timeout fallback: show retry UI after 4s if video doesn't load
   useEffect(() => {
     if (videoReady.has(activeVideoIndex)) return;
+    if (isActiveVideoUnsupported) return;
     const timeout = setTimeout(() => {
       setVideoTimedOut(prev => new Set(prev).add(activeVideoIndex));
     }, 4000);
     return () => clearTimeout(timeout);
-  }, [activeVideoIndex, videoReady]);
+  }, [activeVideoIndex, videoReady, isActiveVideoUnsupported]);
+
+  useEffect(() => {
+    if (!filteredItems[activeVideoIndex]) return;
+    if (!isLikelyUnsupportedVideo(filteredItems[activeVideoIndex].videoUrl)) return;
+    setVideoReady(prev => new Set(prev).add(activeVideoIndex));
+  }, [activeVideoIndex, filteredItems]);
 
   // Reset video index and state when category changes (skip initial mount to preserve URL dish params)
   useEffect(() => {
@@ -582,11 +598,15 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
       >
         {filteredItems.map((item, index) => (
           <div key={item.id} className="h-screen w-full snap-start relative">
+            {(() => {
+              const isUnsupportedVideo = isLikelyUnsupportedVideo(item.videoUrl);
+              return (
+                <>
             {/* Only render <video> for active video — multiple video elements kill mobile Safari */}
             {index === activeVideoIndex ? (
               <>
                 {/* Loading spinner */}
-                {!videoReady.has(index) && (
+                {!videoReady.has(index) && !isUnsupportedVideo && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-10">
                     {restaurant.coverPhotoUrl && (
                       <img src={restaurant.coverPhotoUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />
@@ -616,30 +636,42 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                     )}
                   </div>
                 )}
-                <video
-                  ref={el => {
-                    videoRefs.current[index] = el;
-                    if (el) el.muted = isMuted;
-                  }}
-                  src={getCDNUrl(item.videoUrl)}
-                  className="absolute inset-0 w-full h-full object-cover"
-                  loop
-                  muted
-                  autoPlay
-                  playsInline
-                  preload="metadata"
-                  onPlaying={() => setVideoReady(prev => new Set(prev).add(index))}
-                  onCanPlay={() => {
-                    setVideoReady(prev => new Set(prev).add(index));
-                    const video = videoRefs.current[index];
-                    if (video && isPlaying) video.play().catch(() => {});
-                  }}
-                  onLoadedData={() => setVideoReady(prev => new Set(prev).add(index))}
-                  onError={() => {
-                    console.error('Video failed to load:', item.videoUrl);
-                    setVideoErrors(prev => new Set(prev).add(index));
-                  }}
-                />
+                {isUnsupportedVideo ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black">
+                    {restaurant.coverPhotoUrl && (
+                      <img src={restaurant.coverPhotoUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40" />
+                    )}
+                    <div className="relative z-10 px-4 py-3 rounded-xl bg-black/50 border border-white/20 text-center">
+                      <p className="text-white text-sm font-semibold">Video unavailable on this device</p>
+                      <p className="text-white/70 text-xs mt-1">Swipe up to continue</p>
+                    </div>
+                  </div>
+                ) : (
+                  <video
+                    ref={el => {
+                      videoRefs.current[index] = el;
+                      if (el) el.muted = isMuted;
+                    }}
+                    src={getCDNUrl(item.videoUrl)}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    loop
+                    muted
+                    autoPlay
+                    playsInline
+                    preload="metadata"
+                    onPlaying={() => setVideoReady(prev => new Set(prev).add(index))}
+                    onCanPlay={() => {
+                      setVideoReady(prev => new Set(prev).add(index));
+                      const video = videoRefs.current[index];
+                      if (video && isPlaying) video.play().catch(() => {});
+                    }}
+                    onLoadedData={() => setVideoReady(prev => new Set(prev).add(index))}
+                    onError={() => {
+                      console.error('Video failed to load:', item.videoUrl);
+                      setVideoErrors(prev => new Set(prev).add(index));
+                    }}
+                  />
+                )}
               </>
             ) : (
               <div className="absolute inset-0 bg-black">
@@ -648,6 +680,9 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                 )}
               </div>
             )}
+                </>
+              );
+            })()}
 
             {/* Gradient overlay */}
             <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none" />

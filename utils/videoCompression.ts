@@ -80,14 +80,28 @@ export async function compressVideo(
           ...audioTracks
         ]);
         
-        // Use VP9 with Opus audio if available, fallback to VP8
-        let mimeType = 'video/webm;codecs=vp9,opus';
-        if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = 'video/webm;codecs=vp8,opus';
-          if (!MediaRecorder.isTypeSupported(mimeType)) {
-            mimeType = 'video/webm';
+        // Prefer MP4 for broad playback compatibility (especially iOS Safari)
+        const preferredMp4MimeTypes = [
+          'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+          'video/mp4;codecs=h264,aac',
+          'video/mp4'
+        ];
+        const supportedMp4Mime = preferredMp4MimeTypes.find((type) => MediaRecorder.isTypeSupported(type));
+
+        // If MP4 recording is not supported in this browser, skip compression to avoid producing WebM files
+        // that can cause playback issues on iOS devices.
+        if (!supportedMp4Mime) {
+          console.warn('[VideoCompression] MP4 MediaRecorder not supported, skipping compression to preserve iOS compatibility');
+          if (audioContext) {
+            audioContext.close();
           }
+          URL.revokeObjectURL(video.src);
+          onProgress(100);
+          resolve(file);
+          return;
         }
+
+        const mimeType = supportedMp4Mime;
 
         const recorder = new MediaRecorder(stream, {
           mimeType,
@@ -103,9 +117,10 @@ export async function compressVideo(
 
         recorder.onstop = () => {
           const blob = new Blob(chunks, { type: mimeType });
+          const originalExtension = file.name.split('.').pop() || 'mp4';
           const compressedFile = new File(
             [blob],
-            file.name.replace(/\.[^/.]+$/, '.webm'),
+            file.name.replace(/\.[^/.]+$/, `.${originalExtension}`),
             { type: mimeType }
           );
           
