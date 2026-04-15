@@ -1505,6 +1505,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     const file = e.target.files?.[0];
     if (!file || !partnerData) return;
 
+    const impersonatePartnerId = localStorage.getItem('admin_impersonate_partner_id');
+    const targetPartnerId = impersonatePartnerId || partnerData.id || user.id;
+
     // Validate file type
     if (!file.type.startsWith('image/')) {
       alert('Please select an image file');
@@ -1522,7 +1525,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     try {
       // Sanitizar nome do arquivo para garantir URLs seguras
       const sanitizedName = sanitizeFileName(file.name, 'restaurant-photo');
-      const fileName = `${user.id}/photos/${Date.now()}-${sanitizedName}`;
+      const fileName = `${targetPartnerId}/photos/${Date.now()}-${sanitizedName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('menu-videos')
@@ -1540,7 +1543,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       const { data: updatedPartner, error: updateError } = await supabase
         .from('partners')
         .update({ photo_url: publicUrl })
-        .eq('id', user.id)
+        .eq('id', targetPartnerId)
         .select('id')
         .maybeSingle();
 
