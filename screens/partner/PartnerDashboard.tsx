@@ -1522,11 +1522,13 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     try {
       // Sanitizar nome do arquivo para garantir URLs seguras
       const sanitizedName = sanitizeFileName(file.name, 'restaurant-photo');
-      const fileName = `${partnerData.id}/${sanitizedName}`;
+      const fileName = `${user.id}/photos/${Date.now()}-${sanitizedName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('menu-videos')
-        .upload(fileName, file);
+        .upload(fileName, file, {
+          upsert: true
+        });
 
       if (uploadError) throw uploadError;
 
@@ -1535,12 +1537,17 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         .getPublicUrl(fileName);
 
       // Update partner with photo URL
-      const { error: updateError } = await supabase
+      const { data: updatedPartner, error: updateError } = await supabase
         .from('partners')
         .update({ photo_url: publicUrl })
-        .eq('id', partnerData.id);
+        .eq('id', user.id)
+        .select('id')
+        .maybeSingle();
 
       if (updateError) throw updateError;
+      if (!updatedPartner) {
+        throw new Error('Could not update partner profile photo. Please sign out and sign in again.');
+      }
 
       setPartnerData({ ...partnerData, photo_url: publicUrl });
     } catch (error: any) {
