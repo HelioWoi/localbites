@@ -64,10 +64,10 @@ const RestaurantMenuLoader: React.FC<RestaurantMenuLoaderProps> = ({ slug }) => 
         // Include photo-only items as animated cards for all partners
         const enablePhotoCards = true;
 
-        // Filter items: always include video items; include photo-only items for pilot partners
+        // Filter items: always include video items; include photo-only items for all partners
         const feedItems = (menuItems || []).filter(item => {
           const hasVideo = item.video_url && item.video_url !== '';
-          const hasPhoto = item.photo_url && item.photo_url !== '';
+          const hasPhoto = (item.photo_url && item.photo_url !== '') || (item.thumbnail_url && item.thumbnail_url !== '');
           return hasVideo || (enablePhotoCards && hasPhoto);
         });
 
@@ -144,7 +144,7 @@ const RestaurantMenuLoader: React.FC<RestaurantMenuLoaderProps> = ({ slug }) => 
             description: item.description,
             category: item.category,
             videoUrl: item.video_url || '',
-            photoUrl: item.photo_url || '',
+            photoUrl: item.photo_url || item.thumbnail_url || '',
             price: item.price,
             dish_order_url: item.dish_order_url,
           })),

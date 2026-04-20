@@ -40,6 +40,7 @@ interface RestaurantMenuPageProps {
 
 const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) => {
   const isQRRoute = window.location.pathname.startsWith('/r/');
+  const isDemoRoute = window.location.pathname.startsWith('/demo/');
   const isBrazzosPilot = true; // Enhanced UI enabled for all partners
   const isIOSDevice = /iPad|iPhone|iPod/.test(window.navigator.userAgent) ||
     (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
@@ -47,12 +48,17 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     const cleanUrl = videoUrl.toLowerCase().split('?')[0].split('#')[0];
     return isIOSDevice && cleanUrl.endsWith('.webm');
   };
+
+  const handleDescriptionToggle = (itemId: string, hasDescription: boolean) => {
+    if (!isBrazzosPilot || !hasDescription) return;
+    setExpandedDescriptionItemId(prev => (prev === itemId ? null : itemId));
+  };
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(true); // Start muted, user clicks to unmute
   const [isPlaying, setIsPlaying] = useState(true);
   const [showSavedOnly, setShowSavedOnly] = useState(false); // Filter for saved videos
-  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+  const videoRefsById = useRef<Map<string, HTMLVideoElement>>(new Map());
   const scrollRef = useRef<HTMLDivElement>(null);
   const [videoReady, setVideoReady] = useState<Set<number>>(new Set());
   const isInitialMount = useRef(true); // Track which videos are ready to play
@@ -122,6 +128,24 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
             scrollRef.current.scrollTo({ 
               top: dishIndex * window.innerHeight, 
               behavior: 'smooth' 
+            });
+          }
+        }, 100);
+      }
+    } else if (isQRRoute || isDemoRoute) {
+      // QR/demo entry: if no explicit dish was requested, prefer opening on first video item
+      const itemsList = categoryParam
+        ? restaurant.menuItems.filter(item => item.category === categoryParam)
+        : restaurant.menuItems;
+
+      const firstVideoIndex = itemsList.findIndex(item => !!(item.videoUrl && item.videoUrl !== ''));
+      if (firstVideoIndex > 0) {
+        setActiveVideoIndex(firstVideoIndex);
+        setTimeout(() => {
+          if (scrollRef.current) {
+            scrollRef.current.scrollTo({
+              top: firstVideoIndex * window.innerHeight,
+              behavior: 'auto'
             });
           }
         }, 100);
@@ -370,7 +394,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
 
   // Play active video — only ONE <video> element exists at a time (rendered in JSX)
   useEffect(() => {
-    const activeVideo = videoRefs.current[activeVideoIndex];
+    if (!currentActiveItemId) return;
+    const activeVideo = videoRefsById.current.get(currentActiveItemId);
     if (!activeVideo) return;
     
     activeVideo.muted = isMuted;
@@ -383,7 +408,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     // Retry play every 500ms (mobile Safari sometimes needs multiple attempts)
     let retryCount = 0;
     const retryInterval = setInterval(() => {
-      const video = videoRefs.current[activeVideoIndex];
+      if (!currentActiveItemId) return;
+      const video = videoRefsById.current.get(currentActiveItemId);
       retryCount++;
       if (retryCount >= 10) { clearInterval(retryInterval); return; }
       if (video && isPlaying && video.paused) {
@@ -397,11 +423,12 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     }, 500);
 
     return () => clearInterval(retryInterval);
-  }, [activeVideoIndex, isMuted, isPlaying, filteredItems]);
+  }, [currentActiveItemId, isMuted, isPlaying]);
 
   // Auto-play next video when current ends
   useEffect(() => {
-    const currentVideo = videoRefs.current[activeVideoIndex];
+    if (!currentActiveItemId) return;
+    const currentVideo = videoRefsById.current.get(currentActiveItemId);
     if (!currentVideo) return;
     
     const handleVideoEnd = () => {
@@ -441,103 +468,61 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   // Cleanup: unload all videos when component unmounts to free memory
   useEffect(() => {
     return () => {
-      videoRefs.current.forEach((video) => {
-        if (video) {
-          video.pause();
-          video.removeAttribute('src');
-          video.load();
-        }
+      videoRefsById.current.forEach((video) => {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
       });
-      videoRefs.current = [];
+      videoRefsById.current.clear();
     };
   }, []);
 
   // Photo-only items: mark as ready immediately and auto-advance after 6 seconds
-  const activeIsPhotoOnly = activeItem && (!activeItem.videoUrl || activeItem.videoUrl === '') && activeItem.photoUrl && activeItem.photoUrl !== '';
+  const activeIsPhotoOnly = !!(activeItem && (!activeItem.videoUrl || activeItem.videoUrl === '') && activeItem.photoUrl && activeItem.photoUrl !== '');
+
+  // Progress bar: use native onTimeUpdate for videos (set in JSX), interval elapsed-time for photos.
+  const photoElapsedRef = useRef<number>(0);
+  const photoStartRef = useRef<number>(0);
 
   useEffect(() => {
-    if (!activeItem) {
-      setPlaybackProgress(0);
+    if (!activeIsPhotoOnly) {
+      photoElapsedRef.current = 0;
       return;
     }
 
-    if (activeIsPhotoOnly) {
-      if (!isPlaying) return;
-      const photoDurationMs = 6000;
-      const start = Date.now();
-      setPlaybackProgress(0);
+    const durationMs = 6000;
 
-      const interval = setInterval(() => {
-        const elapsed = Date.now() - start;
-        setPlaybackProgress(Math.min(elapsed / photoDurationMs, 1));
-      }, 80);
-
-      return () => clearInterval(interval);
-    }
-
-    if (!activeItem.videoUrl || isActiveVideoUnsupported) {
-      setPlaybackProgress(0);
+    if (!isPlaying) {
+      setPlaybackProgress(Math.min(photoElapsedRef.current / durationMs, 1));
       return;
     }
 
-    const activeVideo = videoRefs.current[activeVideoIndex];
-    if (!activeVideo) {
-      setPlaybackProgress(0);
-      return;
-    }
+    // New photo item starts from zero
+    photoElapsedRef.current = 0;
+    photoStartRef.current = performance.now();
+    setPlaybackProgress(0);
 
-    let rafId: number | null = null;
-
-    const updateProgress = () => {
-      if (!activeVideo.duration || !Number.isFinite(activeVideo.duration)) {
-        setPlaybackProgress(0);
-        return;
+    const interval = window.setInterval(() => {
+      const elapsed = performance.now() - photoStartRef.current;
+      photoElapsedRef.current = elapsed;
+      const progress = Math.min(elapsed / durationMs, 1);
+      setPlaybackProgress(progress);
+      if (progress >= 1) {
+        window.clearInterval(interval);
       }
-
-      setPlaybackProgress(Math.min(activeVideo.currentTime / activeVideo.duration, 1));
-    };
-
-    const tickProgress = () => {
-      updateProgress();
-      if (!activeVideo.paused && !activeVideo.ended) {
-        rafId = requestAnimationFrame(tickProgress);
-      }
-    };
-
-    const startSmoothProgress = () => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(tickProgress);
-    };
-
-    const stopSmoothProgress = () => {
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
-    };
-
-    const handleEnded = () => setPlaybackProgress(1);
-
-    updateProgress();
-    activeVideo.addEventListener('loadedmetadata', updateProgress);
-    activeVideo.addEventListener('seeking', updateProgress);
-    activeVideo.addEventListener('play', startSmoothProgress);
-    activeVideo.addEventListener('pause', stopSmoothProgress);
-    activeVideo.addEventListener('ended', handleEnded);
-
-    if (!activeVideo.paused && !activeVideo.ended) {
-      startSmoothProgress();
-    }
+    }, 50);
 
     return () => {
-      stopSmoothProgress();
-      activeVideo.removeEventListener('loadedmetadata', updateProgress);
-      activeVideo.removeEventListener('seeking', updateProgress);
-      activeVideo.removeEventListener('play', startSmoothProgress);
-      activeVideo.removeEventListener('pause', stopSmoothProgress);
-      activeVideo.removeEventListener('ended', handleEnded);
+      window.clearInterval(interval);
     };
-  }, [activeItem, activeIsPhotoOnly, activeVideoIndex, isActiveVideoUnsupported, isPlaying, videoReady]);
+  }, [activeItem?.id, activeIsPhotoOnly, isPlaying]);
+
+  // Video progress: reset when active item changes (actual updates come from onTimeUpdate in JSX)
+  useEffect(() => {
+    if (!activeIsPhotoOnly) {
+      setPlaybackProgress(0);
+    }
+  }, [currentActiveItemId]);
 
   useEffect(() => {
     if (!activeIsPhotoOnly) return;
@@ -597,7 +582,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     <div className="h-screen w-screen bg-black overflow-hidden">
       
       {/* Header - Restaurant Info */}
-      <div className={`fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-black/80 via-black/40 to-transparent ${isBrazzosPilot ? 'p-4 pt-10' : 'p-6 pt-12'}`}>
+      <div className={`fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-black/80 via-black/40 to-transparent ${isBrazzosPilot ? 'p-4 pt-12' : 'p-6 pt-12'}`}>
         <div className="flex items-center gap-4">
           {/* Back button */}
           {!isBrazzosPilot && (
@@ -681,7 +666,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
 
         {/* Category Pills */}
         {(restaurant.categories.length > 1 || isBrazzosPilot) && (
-          <div className={`flex items-center gap-2 ${isBrazzosPilot ? 'mt-0' : 'mt-4'} overflow-x-auto no-scrollbar pb-2`}>
+          <div className={`flex items-center gap-2 ${isBrazzosPilot ? 'mt-2' : 'mt-4'} overflow-x-auto no-scrollbar pb-2`}>
             {isBrazzosPilot && (
               <button
                 onClick={handleBackNavigation}
@@ -787,7 +772,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                     {videoTimedOut.has(index) || videoErrors.has(index) ? (
                       <button
                         onClick={() => {
-                          const video = videoRefs.current[index];
+                          const video = videoRefsById.current.get(item.id);
                           if (video) {
                             setVideoTimedOut(prev => { const n = new Set(prev); n.delete(index); return n; });
                             setVideoErrors(prev => { const n = new Set(prev); n.delete(index); return n; });
@@ -821,9 +806,14 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                   </div>
                 ) : (
                   <video
+                    key={item.id}
                     ref={el => {
-                      videoRefs.current[index] = el;
-                      if (el) el.muted = isMuted;
+                      if (el) {
+                        videoRefsById.current.set(item.id, el);
+                        el.muted = isMuted;
+                      } else {
+                        videoRefsById.current.delete(item.id);
+                      }
                     }}
                     src={getCDNUrl(item.videoUrl)}
                     className="absolute inset-0 w-full h-full object-cover"
@@ -835,8 +825,15 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                     onPlaying={() => setVideoReady(prev => new Set(prev).add(index))}
                     onCanPlay={() => {
                       setVideoReady(prev => new Set(prev).add(index));
-                      const video = videoRefs.current[index];
+                      const video = videoRefsById.current.get(item.id);
                       if (video && isPlaying) video.play().catch(() => {});
+                    }}
+                    onTimeUpdate={(e) => {
+                      if (item.id !== currentActiveItemId) return;
+                      const video = e.currentTarget;
+                      if (video.duration && Number.isFinite(video.duration)) {
+                        setPlaybackProgress(video.currentTime / video.duration);
+                      }
                     }}
                     onLoadedData={() => setVideoReady(prev => new Set(prev).add(index))}
                     onError={() => {
@@ -864,40 +861,28 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
             )}
 
             {/* Item Info */}
-            <div className={`absolute left-0 right-0 ${isBrazzosPilot ? 'bottom-28 p-5' : 'bottom-32 p-6'}`}>
+            <div className={`absolute left-0 right-0 ${isBrazzosPilot ? 'bottom-20 p-5' : 'bottom-32 p-6'}`}>
               <div
-                onClick={() => {
-                  if (!isBrazzosPilot || !item.description) return;
-                  setExpandedDescriptionItemId(prev => prev === item.id ? null : item.id);
-                }}
+                onClick={() => handleDescriptionToggle(item.id, !!item.description)}
                 className={isBrazzosPilot ? `max-w-[86%] rounded-2xl backdrop-blur-sm border border-white/10 transition-all ${isDescriptionExpanded ? 'bg-black/55 p-4' : 'bg-black/35 p-3'} ${item.description ? 'cursor-pointer' : ''}` : ''}
               >
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-orange-400 text-xs font-bold uppercase tracking-wider">{item.category}</span>
-                {isBrazzosPilot && isPhotoOnly && (
-                  <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-semibold uppercase tracking-wide">Photo Motion</span>
-                )}
-                {/* View counter - discrete but visible */}
-                {viewCounts.get(item.id) !== undefined && viewCounts.get(item.id)! > 0 && (
-                  <div className="flex items-center gap-1 bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded-full">
-                    <Eye size={10} className="text-white/70" />
-                    <span className="text-white/70 text-[10px] font-medium">{viewCounts.get(item.id)}</span>
-                  </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-white text-2xl font-black mt-1">{item.name}</h2>
+                {isBrazzosPilot && item.description && (
+                  <ChevronUp size={18} className={`text-white/50 mt-1 transition-transform duration-200 flex-shrink-0 ${isDescriptionExpanded ? 'rotate-0' : 'rotate-180'}`} />
                 )}
               </div>
-              <h2 className="text-white text-2xl font-black mt-1">{item.name}</h2>
-              {item.description && (
-                <>
-                  <p className={`text-white/70 text-sm mt-2 ${isBrazzosPilot && !isDescriptionExpanded ? 'line-clamp-2' : ''}`}>{item.description}</p>
-                  {isBrazzosPilot && (
-                    <p className="text-white/45 text-[11px] mt-1">
-                      {isDescriptionExpanded ? 'Tap to collapse' : 'Tap to expand'}
-                    </p>
-                  )}
-                </>
+              {isBrazzosPilot && item.description && isDescriptionExpanded && (
+                <p className="text-white/70 text-sm mt-2">{item.description}</p>
               )}
-              {item.price && (
-                <p className="text-white font-bold text-lg mt-2">${item.price.toFixed(2)}</p>
+              {!isBrazzosPilot && item.description && (
+                <p className="text-white/70 text-sm mt-2">{item.description}</p>
+              )}
+              {item.price && (!isBrazzosPilot || isDescriptionExpanded) && (
+                <p className="text-white font-bold text-lg mt-1">${item.price.toFixed(2)}</p>
               )}
               </div>
             </div>
@@ -983,7 +968,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                 onClick={() => {
                   setIsPlaying(prev => {
                     const next = !prev;
-                    const activeVideo = videoRefs.current[activeVideoIndex];
+                    const activeVideo = currentActiveItemId ? videoRefsById.current.get(currentActiveItemId) : null;
                     if (activeVideo && !activeIsPhotoOnly) {
                       if (next) {
                         activeVideo.play().catch(() => {});

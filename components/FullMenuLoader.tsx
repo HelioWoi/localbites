@@ -62,7 +62,7 @@ const FullMenuLoader: React.FC<FullMenuLoaderProps> = ({ slug }) => {
             category: item.category,
             price: item.price || 0,
             videoUrl: item.video_url,
-            photoUrl: item.photo_url || null,
+            photoUrl: item.photo_url || item.thumbnail_url || null,
             dish_order_url: item.dish_order_url,
           })),
         });

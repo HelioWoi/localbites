@@ -59,11 +59,53 @@ const DemoRestaurantLoader: React.FC<DemoRestaurantLoaderProps> = ({ slug }) => 
           console.error('Menu error:', menuError);
         }
 
-        // Filter items with video first
-        const itemsWithVideo = (menuItems || []).filter(item => item.video_url);
-        
-        // Get unique categories from items that have videos only
-        const categories = [...new Set(itemsWithVideo.map(item => item.category))].filter(Boolean);
+        // Include all items with video OR photo (photo-motion cards)
+        const feedItems = (menuItems || []).filter(item => {
+          const hasVideo = item.video_url && item.video_url !== '';
+          const hasPhoto = (item.photo_url && item.photo_url !== '') || (item.thumbnail_url && item.thumbnail_url !== '');
+          return hasVideo || hasPhoto;
+        });
+
+        // Normalize categories (unify singular/plural)
+        const cleanCategory = (value: string | null | undefined) => (value || '').trim();
+        const categoryLowers = new Set(
+          feedItems.map(item => cleanCategory(item.category).toLowerCase()).filter(Boolean)
+        );
+        const categoryLabelByLower = new Map<string, string>();
+        feedItems.forEach(item => {
+          const clean = cleanCategory(item.category);
+          const lower = clean.toLowerCase();
+          if (clean && !categoryLabelByLower.has(lower)) categoryLabelByLower.set(lower, clean);
+        });
+        const resolveCanonicalLower = (lower: string) => {
+          if (!lower) return lower;
+          if (lower.endsWith('s')) {
+            const singular = lower.slice(0, -1);
+            if (categoryLowers.has(singular)) return singular;
+            return lower;
+          }
+          const plural = `${lower}s`;
+          if (categoryLowers.has(plural)) return lower;
+          return lower;
+        };
+        feedItems.forEach(item => {
+          const clean = cleanCategory(item.category);
+          const lower = clean.toLowerCase();
+          const canonicalLower = resolveCanonicalLower(lower);
+          item.category = categoryLabelByLower.get(canonicalLower) || clean;
+        });
+
+        // Sort: videos first, then photo-only items within each category
+        feedItems.sort((a, b) => {
+          const aHasVideo = a.video_url && a.video_url !== '' ? 0 : 1;
+          const bHasVideo = b.video_url && b.video_url !== '' ? 0 : 1;
+          if (a.category !== b.category) return a.category.localeCompare(b.category);
+          if (aHasVideo !== bHasVideo) return aHasVideo - bHasVideo;
+          return (a.sort_order || 0) - (b.sort_order || 0);
+        });
+
+        // Get unique categories from all feed items
+        const categories = [...new Set(feedItems.map(item => item.category))].filter(Boolean);
 
         // Fetch real Google rating for partner restaurant
         let googleRating = partnerData.rating || 4.5;
@@ -104,25 +146,25 @@ const DemoRestaurantLoader: React.FC<DemoRestaurantLoaderProps> = ({ slug }) => 
           isOpen: true,
           isSubscribed: true,
           banner_images: partnerData.banner_images || [],
-          dishes: itemsWithVideo.map(item => ({
+          dishes: feedItems.map(item => ({
             id: item.id,
             name: item.name,
             description: item.description,
             category: item.category,
             videoUrl: item.video_url,
-            photoUrl: item.photo_url,
-            thumbnailUrl: item.video_url || item.photo_url,
+            photoUrl: item.photo_url || item.thumbnail_url,
+            thumbnailUrl: item.thumbnail_url || item.photo_url,
             price: item.price,
             isFeatured: item.is_featured || false,
             dish_order_url: item.dish_order_url,
           })),
-          menuItems: itemsWithVideo.map(item => ({
+          menuItems: feedItems.map(item => ({
             id: item.id,
             name: item.name,
             description: item.description,
             category: item.category,
-            videoUrl: item.video_url,
-            photoUrl: item.photo_url,
+            videoUrl: item.video_url || '',
+            photoUrl: item.photo_url || item.thumbnail_url || '',
             price: item.price,
             dish_order_url: item.dish_order_url,
           })),
