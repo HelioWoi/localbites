@@ -72,6 +72,8 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   // View counts state
   const [viewCounts, setViewCounts] = useState<Map<string, number>>(new Map());
   const [showOpeningHours, setShowOpeningHours] = useState(false);
+  const [gridMediaLoaded, setGridMediaLoaded] = useState<Set<string>>(new Set());
+  const isBrazzosPilot = true; // Enhanced UI enabled for all partners
   
   // Reload saved dishes when component mounts (e.g., returning from menu page)
   useEffect(() => {
@@ -114,14 +116,30 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   const [loadingReviews, setLoadingReviews] = useState(false);
 
   const dishesWithVideo = restaurant.dishes.filter(d => d.videoUrl);
+  const dishesWithPhotoOnly = isBrazzosPilot
+    ? restaurant.dishes.filter(d => !d.videoUrl && (d.photoUrl || d.thumbnailUrl))
+    : [];
+
+  const normalizeCategoryForBrazzos = (category?: string) => {
+    const clean = (category || '').trim();
+    if (!isBrazzosPilot || !clean) return clean;
+    const lower = clean.toLowerCase();
+    if (lower.endsWith('s')) return clean.slice(0, -1);
+    return clean;
+  };
+
+  const menuFeedItems = [...dishesWithVideo, ...dishesWithPhotoOnly].map((dish) => ({
+    ...dish,
+    category: normalizeCategoryForBrazzos(dish.category),
+  }));
   const savedDishes = restaurant.dishes.filter(d => savedDishIds.has(d.id));
   
   // Video menu categories
   const [selectedVideoCategory, setSelectedVideoCategory] = useState<string>('All');
-  const videoCategories = ['All', ...new Set(dishesWithVideo.map(d => d.category).filter(Boolean))];
-  const filteredVideos = selectedVideoCategory === 'All' 
-    ? dishesWithVideo 
-    : dishesWithVideo.filter(d => d.category === selectedVideoCategory);
+  const videoCategories = ['All', ...new Set(menuFeedItems.map(d => d.category).filter(Boolean))];
+  const filteredMenuItems = selectedVideoCategory === 'All' 
+    ? menuFeedItems 
+    : menuFeedItems.filter(d => d.category === selectedVideoCategory);
   
   // Load Google reviews for all restaurants
   useEffect(() => {
@@ -305,7 +323,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         video.currentTime = 0.1; // Show first frame
       }
     });
-  }, [filteredVideos]);
+  }, [filteredMenuItems]);
   
   // Sync saved dishes when changed in video feed
   useEffect(() => {
@@ -402,6 +420,24 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
     }
   };
 
+  const openDishFromGrid = (dish: Dish, fallbackIndex: number) => {
+    if (dish.videoUrl) {
+      const realIndex = dishesWithVideo.findIndex(d => d.id === dish.id);
+      openVideoReels(realIndex >= 0 ? realIndex : fallbackIndex);
+      return;
+    }
+
+    if (isBrazzosPilot) {
+      const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const params = new URLSearchParams();
+      params.set('dish', dish.id);
+      if (dish.category) params.set('category', normalizeCategoryForBrazzos(dish.category));
+      if (isStandalone) params.set('qr', '1');
+      const basePath = isStandalone ? `/r/${slug}/menu` : `/${slug}/menu`;
+      window.location.href = `${basePath}?${params.toString()}`;
+    }
+  };
+
   const openVideoReels = (startIndex: number) => {
     if (restaurant.isSubscribed) {
       const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -485,7 +521,9 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
             {dishesWithVideo.map((dish, idx) => (
               <div key={dish.id} className="h-screen w-full snap-start relative flex items-center justify-center">
                 <video
-                  ref={el => videoRefs.current[idx] = el}
+                  ref={el => {
+                    videoRefs.current[idx] = el;
+                  }}
                   src={getCDNUrl(dish.videoUrl)}
                   className="w-full h-full object-cover"
                   autoPlay={idx === activeVideoIndex}
@@ -703,7 +741,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
           )}
           {!isStandalone && (
             <div className="flex gap-3">
-              {restaurant.isSubscribed && (
+              {restaurant.isSubscribed && !isBrazzosPilot && (
                 <div className="w-11 h-11 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full flex items-center justify-center">
                   <Crown size={18} fill="currentColor" />
                 </div>
@@ -716,26 +754,37 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         </div>
         
         {/* Restaurant info overlay */}
-        <div className="absolute bottom-6 left-6 right-6">
-          <h1 className="text-3xl font-black text-white tracking-tight mb-1 drop-shadow-lg">{restaurant.name}</h1>
-          {!isStandalone && (
+        <div className={`absolute bottom-6 left-6 right-6 ${isBrazzosPilot ? 'text-center' : ''}`}>
+          {!isBrazzosPilot && (
+            <h1 className="text-3xl font-black text-white tracking-tight mb-1 drop-shadow-lg">{restaurant.name}</h1>
+          )}
+          {!isStandalone && !isBrazzosPilot && (
             <p className="text-white/70 text-sm font-medium">{restaurant.cuisine}</p>
           )}
         </div>
       </div>
 
-      <div className="p-6 space-y-3 flex-1 bg-white rounded-t-[32px] -mt-6 relative z-10">
+      <div className={`${isBrazzosPilot ? 'px-4 pt-2 pb-4' : 'p-6'} space-y-3 flex-1 bg-white ${isBrazzosPilot ? '' : 'rounded-t-[32px]'} -mt-6 relative z-10`}>
+        {isBrazzosPilot && (
+          <div className="px-1 pb-1">
+            <h1 className="text-base font-semibold text-zinc-900 truncate">{restaurant.name}</h1>
+          </div>
+        )}
         
         {/* MENU VIDEOS - Clean grid */}
         {restaurant.isSubscribed && (
           <section>
-            <div className="flex items-center gap-2 mb-1">
-              <Crown size={20} className="text-orange-500" />
-              <h2 className="text-lg font-bold text-zinc-900">Video Menus</h2>
-            </div>
-            <p className="text-xs text-zinc-500 mb-3">Tap any video to see the dish in detail.</p>
+            {!isBrazzosPilot && (
+              <>
+                <div className="flex items-center gap-2 mb-1">
+                  <Crown size={20} className="text-orange-500" />
+                  <h2 className="text-lg font-bold text-zinc-900">Video Menus</h2>
+                </div>
+                <p className="text-xs text-zinc-500 mb-3">Tap any video to see the dish in detail.</p>
+              </>
+            )}
             
-            {dishesWithVideo.length === 0 && (
+            {menuFeedItems.length === 0 && (
               <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-8 flex flex-col items-center text-center">
                 <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mb-4">
                   <PlayCircle size={32} className="text-zinc-400" />
@@ -746,8 +795,9 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
             )}
 
             {/* Category Pills - Desktop style for mobile */}
-            {dishesWithVideo.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto pb-3 -mx-6 px-6 scrollbar-hide mb-3">
+            {menuFeedItems.length > 0 && (
+              <div className={`${isBrazzosPilot ? 'sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-zinc-100 -mx-4 px-4 py-1 mb-2' : ''}`}>
+              <div className={`flex gap-2 overflow-x-auto ${isBrazzosPilot ? 'pb-1 -mx-4 px-4 mb-1' : 'pb-3 -mx-6 px-6 mb-3'} scrollbar-hide`}>
                 {videoCategories.map((category) => (
                   <button
                     key={category}
@@ -762,31 +812,36 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                   </button>
                 ))}
                 <a
-                  href={`${window.location.pathname.startsWith('/demo/') ? '/demo/' : isStandalone ? '/r/' : '/'}${restaurant.slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/full-menu`}
+                  href={`${window.location.pathname.startsWith('/demo/') ? '/demo/' : isStandalone ? '/r/' : '/'}${((restaurant as any).slug) || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/full-menu`}
                   className="px-5 py-2.5 rounded-full font-semibold text-sm whitespace-nowrap transition-all flex-shrink-0 bg-zinc-100 text-zinc-700 hover:bg-zinc-200 flex items-center gap-1.5"
                 >
                   Full Menu
                   <ChevronRight size={14} />
                 </a>
               </div>
+              </div>
             )}
 
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-3">
-              {filteredVideos.map((dish, index) => {
-                // Find the correct index in the unfiltered dishesWithVideo array
-                const realIndex = dishesWithVideo.findIndex(d => d.id === dish.id);
+              {filteredMenuItems.map((dish, index) => {
+                const isPhotoMotion = !dish.videoUrl;
                 return (
                 <button 
                   key={dish.id} 
-                  className="relative aspect-square rounded-xl overflow-hidden bg-zinc-100 group text-left"
-                  onClick={() => openVideoReels(realIndex >= 0 ? realIndex : index)}
+                  className={`relative ${isBrazzosPilot ? 'aspect-[3/4] rounded-2xl active:scale-[0.985]' : 'aspect-square rounded-xl'} overflow-hidden bg-zinc-100 group text-left transition-transform duration-200`}
+                  onClick={() => openDishFromGrid(dish, index)}
                 >
+                  {!gridMediaLoaded.has(dish.id) && (
+                    <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-zinc-200 via-zinc-100 to-zinc-200" />
+                  )}
                   {/* Video with 3-second auto-play cycles */}
                   {dish.videoUrl ? (
                     <video 
-                      ref={(el) => (gridVideoRefs.current[index] = el)}
+                      ref={(el) => {
+                        gridVideoRefs.current[index] = el;
+                      }}
                       src={getCDNUrl(dish.videoUrl)} 
-                      className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" 
+                      className={`w-full h-full object-cover group-active:scale-105 transition-all duration-300 ${gridMediaLoaded.has(dish.id) ? 'opacity-100' : 'opacity-0'}`}
                       muted 
                       playsInline
                       preload="metadata"
@@ -794,17 +849,20 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                       onLoadedData={(e) => {
                         // Show first frame
                         e.currentTarget.currentTime = 0.1;
+                        setGridMediaLoaded(prev => new Set(prev).add(dish.id));
                       }}
                     />
                   ) : (
                     <img 
-                      src={dish.thumbnailUrl || restaurant.mainPhotoUrl} 
-                      className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" 
+                      src={dish.photoUrl || dish.thumbnailUrl || restaurant.mainPhotoUrl} 
+                      className={`w-full h-full object-cover group-active:scale-105 transition-all duration-300 ${gridMediaLoaded.has(dish.id) ? 'opacity-100' : 'opacity-0'}`}
                       alt={dish.name}
+                      onLoad={() => setGridMediaLoaded(prev => new Set(prev).add(dish.id))}
                     />
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-2.5">
-                    <p className="text-white font-semibold text-xs">{dish.name}</p>
+                  <div className={`absolute inset-0 ${isBrazzosPilot ? 'bg-gradient-to-t from-black/85 via-black/15 to-transparent' : 'bg-gradient-to-t from-black/70 via-transparent to-transparent'} flex flex-col justify-end p-2.5`}>
+                    <p className="text-white font-semibold text-xs leading-tight">{dish.name}</p>
+                    {dish.price && <p className="text-white/90 text-[11px] mt-0.5 font-semibold">${Number(dish.price).toFixed(2)}</p>}
                   </div>
                   {/* View counter - top left */}
                   {viewCounts.get(dish.id) !== undefined && viewCounts.get(dish.id)! > 0 && (
@@ -814,8 +872,8 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                     </div>
                   )}
                   <div className="absolute top-2 right-2 flex gap-1">
-                    <div className="w-7 h-7 bg-black/30 backdrop-blur-sm rounded-full flex items-center justify-center">
-                      <PlayCircle size={14} className="text-white" fill="currentColor" />
+                    <div className={`${isBrazzosPilot ? 'px-2.5 w-auto rounded-full text-[9px] font-semibold uppercase tracking-wide' : 'w-7 h-7 rounded-full'} h-7 bg-black/40 backdrop-blur-sm flex items-center justify-center text-white`}>
+                      {isBrazzosPilot ? (isPhotoMotion ? 'Photo Motion' : 'Video') : <PlayCircle size={14} className="text-white" fill="currentColor" />}
                     </div>
                     {restaurant.enable_ordering_button && (dish.dish_order_url || restaurant.ordering_url) && (
                       <div
@@ -860,7 +918,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
 
         {/* FULL MENU Button */}
         <a
-          href={`${window.location.pathname.startsWith('/demo/') ? '/demo/' : isStandalone ? '/r/' : '/'}${restaurant.slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/full-menu`}
+          href={`${window.location.pathname.startsWith('/demo/') ? '/demo/' : isStandalone ? '/r/' : '/'}${((restaurant as any).slug) || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/full-menu`}
           className="w-full bg-orange-500 text-white rounded-2xl border border-orange-500 p-4 flex items-center justify-center gap-2 font-semibold text-base active:bg-orange-600 transition-colors"
         >
           <UtensilsCrossed size={20} />
@@ -868,7 +926,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         </a>
 
         {/* Phone - Card style */}
-        {restaurant.phone && (
+        {!isBrazzosPilot && restaurant.phone && (
           <a 
             href={`tel:${restaurant.phone}`}
             onClick={() => trackAnalyticsEvent({ eventType: 'phone_call', restaurantId: restaurant.id }).catch(() => {})}
@@ -910,6 +968,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         )}
 
         {/* Quick action buttons - Compact */}
+        {!isBrazzosPilot && (
         <div className="flex gap-2">
           <a 
             href={restaurant.googleMapsUrl} 
@@ -932,6 +991,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
             </a>
           )}
         </div>
+        )}
 
         {/* Share button */}
         <button
@@ -1005,10 +1065,10 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         )}
 
         {/* Disclaimer for app */}
-        <div className="py-4 px-2 space-y-3">
-          {isStandalone ? (
+        <div className="py-2 px-2 space-y-2">
+          {(isStandalone || isBrazzosPilot) ? (
             <>
-              <div className="flex flex-col items-center gap-1 pt-2">
+              <div className="flex flex-col items-center gap-0.5 pt-1">
                 <span className="text-[9px] text-zinc-400">Powered by</span>
                 <span className="text-sm font-bold text-zinc-700">MenuLove</span>
               </div>

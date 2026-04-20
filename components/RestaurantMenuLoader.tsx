@@ -61,11 +61,64 @@ const RestaurantMenuLoader: React.FC<RestaurantMenuLoaderProps> = ({ slug }) => 
           console.error('Menu error:', menuError);
         }
 
-        // Filter to only items with actual videos (exclude photo-only items)
-        const videoItems = (menuItems || []).filter(item => item.video_url && item.video_url !== '');
+        // Include photo-only items as animated cards for all partners
+        const enablePhotoCards = true;
 
-        // Get unique categories from video items only
-        const categories = [...new Set(videoItems.map(item => item.category))].filter(Boolean);
+        // Filter items: always include video items; include photo-only items for pilot partners
+        const feedItems = (menuItems || []).filter(item => {
+          const hasVideo = item.video_url && item.video_url !== '';
+          const hasPhoto = item.photo_url && item.photo_url !== '';
+          return hasVideo || (enablePhotoCards && hasPhoto);
+        });
+
+        if (enablePhotoCards) {
+          const cleanCategory = (value: string | null | undefined) => (value || '').trim();
+          const categoryLowers = new Set(
+            feedItems
+              .map(item => cleanCategory(item.category).toLowerCase())
+              .filter(Boolean)
+          );
+
+          const categoryLabelByLower = new Map<string, string>();
+          feedItems.forEach(item => {
+            const clean = cleanCategory(item.category);
+            const lower = clean.toLowerCase();
+            if (clean && !categoryLabelByLower.has(lower)) {
+              categoryLabelByLower.set(lower, clean);
+            }
+          });
+
+          const resolveCanonicalLower = (lower: string) => {
+            if (!lower) return lower;
+            if (lower.endsWith('s')) {
+              const singular = lower.slice(0, -1);
+              if (categoryLowers.has(singular)) return singular;
+              return lower;
+            }
+            const plural = `${lower}s`;
+            if (categoryLowers.has(plural)) return lower;
+            return lower;
+          };
+
+          feedItems.forEach(item => {
+            const clean = cleanCategory(item.category);
+            const lower = clean.toLowerCase();
+            const canonicalLower = resolveCanonicalLower(lower);
+            item.category = categoryLabelByLower.get(canonicalLower) || clean;
+          });
+        }
+
+        // Sort: videos first, then photo-only items (within existing category/sort_order)
+        feedItems.sort((a, b) => {
+          const aHasVideo = a.video_url && a.video_url !== '' ? 0 : 1;
+          const bHasVideo = b.video_url && b.video_url !== '' ? 0 : 1;
+          if (a.category !== b.category) return a.category.localeCompare(b.category);
+          if (aHasVideo !== bHasVideo) return aHasVideo - bHasVideo;
+          return (a.sort_order || 0) - (b.sort_order || 0);
+        });
+
+        // Get unique categories from feed items
+        const categories = [...new Set(feedItems.map(item => item.category))].filter(Boolean);
 
         const partnerRating = partnerData.rating || 4.5;
         const partnerTotalReviews = partnerData.total_reviews || 0;
@@ -85,12 +138,13 @@ const RestaurantMenuLoader: React.FC<RestaurantMenuLoaderProps> = ({ slug }) => 
           ordering_url: partnerData.ordering_url,
           enable_ordering_button: partnerData.enable_ordering_button,
           openingHours: partnerData.google_opening_hours || [],
-          menuItems: videoItems.map(item => ({
+          menuItems: feedItems.map(item => ({
             id: item.id,
             name: item.name,
             description: item.description,
             category: item.category,
-            videoUrl: item.video_url,
+            videoUrl: item.video_url || '',
+            photoUrl: item.photo_url || '',
             price: item.price,
             dish_order_url: item.dish_order_url,
           })),

@@ -78,6 +78,7 @@ interface FullMenuPageProps {
 }
 
 const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
+  const isBrazzosPilot = true; // Enhanced UI enabled for all partners
   // Analytics V2: Track QR scan on mount only if ?qr=1 param present (real QR code scan)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -164,6 +165,18 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
 
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
 
+  const navigateToMenuFeed = (item: MenuItem) => {
+    const pathname = window.location.pathname;
+    const isDemoRoute = pathname.startsWith('/demo/');
+    const isQRRoute = pathname.startsWith('/r/');
+    const prefix = isDemoRoute ? '/demo/' : isQRRoute ? '/r/' : '/';
+    const params = new URLSearchParams();
+    params.set('from', 'full-menu');
+    params.set('dish', item.id);
+    if (item.category) params.set('category', item.category);
+    window.location.href = `${prefix}${restaurant.slug}/menu?${params.toString()}`;
+  };
+
   const handleItemClick = (item: MenuItem) => {
     // Track item view
     trackEvent({
@@ -173,12 +186,8 @@ const FullMenuPage: React.FC<FullMenuPageProps> = ({ restaurant }) => {
       itemType: item.category,
     });
 
-    if (item.videoUrl) {
-      const pathname = window.location.pathname;
-      const isDemoRoute = pathname.startsWith('/demo/');
-      const isQRRoute = pathname.startsWith('/r/');
-      const prefix = isDemoRoute ? '/demo/' : isQRRoute ? '/r/' : '/';
-      window.location.href = `${prefix}${restaurant.slug}/menu?from=full-menu&dish=${item.id}`;
+    if (item.videoUrl || isBrazzosPilot) {
+      navigateToMenuFeed(item);
     } else {
       setSelectedItem(item);
     }

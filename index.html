@@ -126,6 +126,16 @@
             0% { transform: scale(1); }
             100% { transform: scale(1.08); }
         }
+        @keyframes ken-burns-feed {
+            0% { transform: scale(1) translateY(0); }
+            50% { transform: scale(1.03) translateY(-0.4%); }
+            100% { transform: scale(1.06) translateY(-0.8%); }
+        }
+        @keyframes ken-burns-feed-bg {
+            0% { transform: scale(1.04) translateY(0); }
+            50% { transform: scale(1.07) translateY(-0.5%); }
+            100% { transform: scale(1.1) translateY(-1%); }
+        }
         @keyframes shimmer {
             0% { background-position: -200% 0; }
             100% { background-position: 200% 0; }
@@ -147,6 +157,12 @@
         }
         .animate-ken-burns {
             animation: ken-burns 20s ease-out forwards;
+        }
+        .animate-ken-burns-feed {
+            animation: ken-burns-feed 6s ease-in-out forwards;
+        }
+        .animate-ken-burns-feed-bg {
+            animation: ken-burns-feed-bg 6s ease-in-out forwards;
         }
         .animate-shimmer {
             background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);

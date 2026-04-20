@@ -11,6 +11,7 @@ interface MenuItem {
   description?: string;
   category: string;
   videoUrl: string;
+  photoUrl?: string;
   price?: number;
   dish_order_url?: string;
 }
@@ -39,6 +40,7 @@ interface RestaurantMenuPageProps {
 
 const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) => {
   const isQRRoute = window.location.pathname.startsWith('/r/');
+  const isBrazzosPilot = true; // Enhanced UI enabled for all partners
   const isIOSDevice = /iPad|iPhone|iPod/.test(window.navigator.userAgent) ||
     (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
   const isLikelyUnsupportedVideo = (videoUrl: string) => {
@@ -62,6 +64,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   const [viewCounts, setViewCounts] = useState<Map<string, number>>(new Map());
   const [videoErrors, setVideoErrors] = useState<Set<number>>(new Set());
   const [videoTimedOut, setVideoTimedOut] = useState<Set<number>>(new Set());
+  const [playbackProgress, setPlaybackProgress] = useState(0);
+  const [expandedDescriptionItemId, setExpandedDescriptionItemId] = useState<string | null>(null);
   
   // Analytics V2: Track QR scan on mount only if ?qr=1 param present (real QR code scan)
   useEffect(() => {
@@ -90,15 +94,16 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     const dishId = urlParams.get('dish');
     let categoryParam = urlParams.get('category');
     
-    // If we have dishId but no category, find the dish's category automatically
-    if (dishId && !categoryParam) {
+    // When dish ID is present, always resolve category from loaded data
+    // (URL category may not match after Brazzos category unification)
+    if (dishId) {
       const dish = restaurant.menuItems.find(item => item.id === dishId);
       if (dish && dish.category) {
         categoryParam = dish.category;
-        setActiveCategory(categoryParam);
       }
-    } else if (categoryParam) {
-      // If category is provided in URL, use it
+    }
+
+    if (categoryParam) {
       setActiveCategory(categoryParam);
     }
     
@@ -281,8 +286,11 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     filteredItems = filteredItems.filter(item => savedItems.has(item.id));
   }
 
-  const isActiveVideoUnsupported = !!filteredItems[activeVideoIndex] &&
-    isLikelyUnsupportedVideo(filteredItems[activeVideoIndex].videoUrl);
+  const activeItem = filteredItems[activeVideoIndex];
+  const currentActiveItemId = activeItem?.id;
+  const activeItemHasVideo = activeItem && activeItem.videoUrl && activeItem.videoUrl !== '';
+  const isActiveVideoUnsupported = activeItemHasVideo &&
+    isLikelyUnsupportedVideo(activeItem.videoUrl);
 
   // Get next category helper
   const getNextCategory = (): string | null | false => {
@@ -296,6 +304,21 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     return false; // no more categories
   };
 
+  const shouldAutoAdvanceCategories = isQRRoute || isBrazzosPilot;
+
+  const goToNextCategoryStart = () => {
+    const next = getNextCategory();
+    if (next === false) return false;
+    setActiveCategory(next);
+    setActiveVideoIndex(0);
+    setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTo({ top: 0, behavior: 'auto' });
+      }
+    }, 0);
+    return true;
+  };
+
   // Handle scroll to update active video
   const handleScroll = () => {
     if (!scrollRef.current) return;
@@ -303,17 +326,45 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     const itemHeight = window.innerHeight;
     const newIndex = Math.round(scrollTop / itemHeight);
 
-    // On /r/ routes: auto-advance to next category when scrolling past last video
-    if (isQRRoute && newIndex >= filteredItems.length && filteredItems.length > 0) {
-      const next = getNextCategory();
-      if (next !== false) {
-        setActiveCategory(next);
-        return;
-      }
+    // Auto-advance to next category when scrolling past current category end
+    if (shouldAutoAdvanceCategories && newIndex >= filteredItems.length && filteredItems.length > 0) {
+      if (goToNextCategoryStart()) return;
     }
 
     if (newIndex !== activeVideoIndex && newIndex >= 0 && newIndex < filteredItems.length) {
       setActiveVideoIndex(newIndex);
+    }
+  };
+
+  const handleBackNavigation = () => {
+    const pathname = window.location.pathname;
+    const isDemoRoute = pathname.startsWith('/demo/');
+    const isQRRoute = pathname.startsWith('/r/');
+
+    if (isDemoRoute) {
+      const params = new URLSearchParams(window.location.search);
+      const from = params.get('from');
+
+      if (from === 'full-menu') {
+        window.location.href = `/demo/${restaurant.slug}/full-menu`;
+      } else if (from === 'saved') {
+        window.location.href = `/demo/${restaurant.slug}/saved`;
+      } else {
+        window.location.href = `/demo/${restaurant.slug}`;
+      }
+    } else if (isQRRoute) {
+      const params = new URLSearchParams(window.location.search);
+      const from = params.get('from');
+
+      if (from === 'full-menu') {
+        window.location.href = `/r/${restaurant.slug}/full-menu`;
+      } else if (from === 'saved') {
+        window.location.href = `/r/${restaurant.slug}/saved`;
+      } else {
+        window.location.href = `/r/${restaurant.slug}`;
+      }
+    } else {
+      window.location.href = `/${restaurant.slug}`;
     }
   };
 
@@ -325,6 +376,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     activeVideo.muted = isMuted;
     if (isPlaying) {
       activeVideo.play().catch(() => {});
+    } else {
+      activeVideo.pause();
     }
     
     // Retry play every 500ms (mobile Safari sometimes needs multiple attempts)
@@ -342,18 +395,9 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
         setVideoReady(prev => new Set(prev).add(activeVideoIndex));
       }
     }, 500);
-    
+
     return () => clearInterval(retryInterval);
   }, [activeVideoIndex, isMuted, isPlaying, filteredItems]);
-  
-  // Analytics V2: Track play and view when active video changes
-  const currentActiveItemId = filteredItems[activeVideoIndex]?.id;
-  useEffect(() => {
-    if (currentActiveItemId && restaurant.id) {
-      trackAnalyticsEvent({ eventType: 'play', restaurantId: restaurant.id, itemId: currentActiveItemId }).catch(() => {});
-      trackAnalyticsEvent({ eventType: 'view', restaurantId: restaurant.id, itemId: currentActiveItemId }).catch(() => {});
-    }
-  }, [currentActiveItemId, restaurant.id]);
 
   // Auto-play next video when current ends
   useEffect(() => {
@@ -408,18 +452,124 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     };
   }, []);
 
-  // Timeout fallback: show retry UI after 4s if video doesn't load
+  // Photo-only items: mark as ready immediately and auto-advance after 6 seconds
+  const activeIsPhotoOnly = activeItem && (!activeItem.videoUrl || activeItem.videoUrl === '') && activeItem.photoUrl && activeItem.photoUrl !== '';
+
   useEffect(() => {
+    if (!activeItem) {
+      setPlaybackProgress(0);
+      return;
+    }
+
+    if (activeIsPhotoOnly) {
+      if (!isPlaying) return;
+      const photoDurationMs = 6000;
+      const start = Date.now();
+      setPlaybackProgress(0);
+
+      const interval = setInterval(() => {
+        const elapsed = Date.now() - start;
+        setPlaybackProgress(Math.min(elapsed / photoDurationMs, 1));
+      }, 80);
+
+      return () => clearInterval(interval);
+    }
+
+    if (!activeItem.videoUrl || isActiveVideoUnsupported) {
+      setPlaybackProgress(0);
+      return;
+    }
+
+    const activeVideo = videoRefs.current[activeVideoIndex];
+    if (!activeVideo) {
+      setPlaybackProgress(0);
+      return;
+    }
+
+    let rafId: number | null = null;
+
+    const updateProgress = () => {
+      if (!activeVideo.duration || !Number.isFinite(activeVideo.duration)) {
+        setPlaybackProgress(0);
+        return;
+      }
+
+      setPlaybackProgress(Math.min(activeVideo.currentTime / activeVideo.duration, 1));
+    };
+
+    const tickProgress = () => {
+      updateProgress();
+      if (!activeVideo.paused && !activeVideo.ended) {
+        rafId = requestAnimationFrame(tickProgress);
+      }
+    };
+
+    const startSmoothProgress = () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(tickProgress);
+    };
+
+    const stopSmoothProgress = () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    };
+
+    const handleEnded = () => setPlaybackProgress(1);
+
+    updateProgress();
+    activeVideo.addEventListener('loadedmetadata', updateProgress);
+    activeVideo.addEventListener('seeking', updateProgress);
+    activeVideo.addEventListener('play', startSmoothProgress);
+    activeVideo.addEventListener('pause', stopSmoothProgress);
+    activeVideo.addEventListener('ended', handleEnded);
+
+    if (!activeVideo.paused && !activeVideo.ended) {
+      startSmoothProgress();
+    }
+
+    return () => {
+      stopSmoothProgress();
+      activeVideo.removeEventListener('loadedmetadata', updateProgress);
+      activeVideo.removeEventListener('seeking', updateProgress);
+      activeVideo.removeEventListener('play', startSmoothProgress);
+      activeVideo.removeEventListener('pause', stopSmoothProgress);
+      activeVideo.removeEventListener('ended', handleEnded);
+    };
+  }, [activeItem, activeIsPhotoOnly, activeVideoIndex, isActiveVideoUnsupported, isPlaying, videoReady]);
+
+  useEffect(() => {
+    if (!activeIsPhotoOnly) return;
+    if (!isPlaying) return;
+    setVideoReady(prev => new Set(prev).add(activeVideoIndex));
+    const timer = setTimeout(() => {
+      if (activeVideoIndex < filteredItems.length - 1) {
+        setActiveVideoIndex(activeVideoIndex + 1);
+        if (scrollRef.current) {
+          scrollRef.current.scrollTo({ top: (activeVideoIndex + 1) * window.innerHeight, behavior: 'smooth' });
+        }
+      } else if (shouldAutoAdvanceCategories) {
+        goToNextCategoryStart();
+      }
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [activeVideoIndex, activeIsPhotoOnly, filteredItems.length, shouldAutoAdvanceCategories, isPlaying]);
+
+  // Timeout fallback: show retry UI after 4s if video doesn't load (skip photo-only)
+  useEffect(() => {
+    if (activeIsPhotoOnly) return;
     if (videoReady.has(activeVideoIndex)) return;
     if (isActiveVideoUnsupported) return;
     const timeout = setTimeout(() => {
       setVideoTimedOut(prev => new Set(prev).add(activeVideoIndex));
     }, 4000);
     return () => clearTimeout(timeout);
-  }, [activeVideoIndex, videoReady, isActiveVideoUnsupported]);
+  }, [activeVideoIndex, videoReady, isActiveVideoUnsupported, activeIsPhotoOnly]);
 
   useEffect(() => {
     if (!filteredItems[activeVideoIndex]) return;
+    if (!filteredItems[activeVideoIndex].videoUrl) return;
     if (!isLikelyUnsupportedVideo(filteredItems[activeVideoIndex].videoUrl)) return;
     setVideoReady(prev => new Set(prev).add(activeVideoIndex));
   }, [activeVideoIndex, filteredItems]);
@@ -439,122 +589,108 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     }
   }, [activeCategory]);
 
+  useEffect(() => {
+    setExpandedDescriptionItemId(null);
+  }, [activeVideoIndex, activeCategory]);
+
   return (
     <div className="h-screen w-screen bg-black overflow-hidden">
       
       {/* Header - Restaurant Info */}
-      <div className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-black/80 via-black/40 to-transparent p-6 pt-12">
+      <div className={`fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-black/80 via-black/40 to-transparent ${isBrazzosPilot ? 'p-4 pt-10' : 'p-6 pt-12'}`}>
         <div className="flex items-center gap-4">
           {/* Back button */}
-          <button 
-            onClick={() => {
-              const pathname = window.location.pathname;
-              const isDemoRoute = pathname.startsWith('/demo/');
-              const isQRRoute = pathname.startsWith('/r/');
-              
-              if (isDemoRoute) {
-                // Demo route (/demo/:slug/menu) - check for special routes
-                const params = new URLSearchParams(window.location.search);
-                const from = params.get('from');
+          {!isBrazzosPilot && (
+            <button 
+              onClick={handleBackNavigation}
+              className="p-2 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all flex-shrink-0"
+            >
+              <ChevronLeft size={20} />
+            </button>
+          )}
+          {!isBrazzosPilot && (
+            <>
+              {/* Logo - clickable to go back */}
+              <button onClick={() => {
+                const pathname = window.location.pathname;
+                const isDemoRoute = pathname.startsWith('/demo/');
+                const isQRRoute = pathname.startsWith('/r/');
                 
-                if (from === 'full-menu') {
-                  window.location.href = `/demo/${restaurant.slug}/full-menu`;
-                } else if (from === 'saved') {
-                  window.location.href = `/demo/${restaurant.slug}/saved`;
+                if (isDemoRoute) {
+                  // Demo route (/demo/:slug/menu) - check for special routes
+                  const params = new URLSearchParams(window.location.search);
+                  const from = params.get('from');
+                  
+                  if (from === 'full-menu') {
+                    window.location.href = `/demo/${restaurant.slug}/full-menu`;
+                  } else if (from === 'saved') {
+                    window.location.href = `/demo/${restaurant.slug}/saved`;
+                  } else {
+                    window.location.href = `/demo/${restaurant.slug}`;
+                  }
+                } else if (isQRRoute) {
+                  // QR code route (/r/:slug/menu) - check for special routes
+                  const params = new URLSearchParams(window.location.search);
+                  const from = params.get('from');
+                  
+                  if (from === 'full-menu') {
+                    window.location.href = `/r/${restaurant.slug}/full-menu`;
+                  } else if (from === 'saved') {
+                    window.location.href = `/r/${restaurant.slug}/saved`;
+                  } else {
+                    window.location.href = `/r/${restaurant.slug}`;
+                  }
                 } else {
-                  window.location.href = `/demo/${restaurant.slug}`;
+                  // App feed route (/:slug/menu) - go back to /:slug
+                  window.location.href = `/${restaurant.slug}`;
                 }
-              } else if (isQRRoute) {
-                // QR code route (/r/:slug/menu) - check for special routes
-                const params = new URLSearchParams(window.location.search);
-                const from = params.get('from');
-                
-                if (from === 'full-menu') {
-                  window.location.href = `/r/${restaurant.slug}/full-menu`;
-                } else if (from === 'saved') {
-                  window.location.href = `/r/${restaurant.slug}/saved`;
-                } else {
-                  window.location.href = `/r/${restaurant.slug}`;
-                }
-              } else {
-                // App feed route (/:slug/menu) - go back to /:slug
-                window.location.href = `/${restaurant.slug}`;
-              }
-            }}
-            className="p-2 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all flex-shrink-0"
-          >
-            <ChevronLeft size={20} />
-          </button>
-          {/* Logo - clickable to go back */}
-          <button onClick={() => {
-            const pathname = window.location.pathname;
-            const isDemoRoute = pathname.startsWith('/demo/');
-            const isQRRoute = pathname.startsWith('/r/');
-            
-            if (isDemoRoute) {
-              // Demo route (/demo/:slug/menu) - check for special routes
-              const params = new URLSearchParams(window.location.search);
-              const from = params.get('from');
-              
-              if (from === 'full-menu') {
-                window.location.href = `/demo/${restaurant.slug}/full-menu`;
-              } else if (from === 'saved') {
-                window.location.href = `/demo/${restaurant.slug}/saved`;
-              } else {
-                window.location.href = `/demo/${restaurant.slug}`;
-              }
-            } else if (isQRRoute) {
-              // QR code route (/r/:slug/menu) - check for special routes
-              const params = new URLSearchParams(window.location.search);
-              const from = params.get('from');
-              
-              if (from === 'full-menu') {
-                window.location.href = `/r/${restaurant.slug}/full-menu`;
-              } else if (from === 'saved') {
-                window.location.href = `/r/${restaurant.slug}/saved`;
-              } else {
-                window.location.href = `/r/${restaurant.slug}`;
-              }
-            } else {
-              // App feed route (/:slug/menu) - go back to /:slug
-              window.location.href = `/${restaurant.slug}`;
-            }
-          }} className="flex-shrink-0">
-            {restaurant.logoUrl ? (
-              <img src={restaurant.logoUrl} alt={restaurant.name} className="w-12 h-12 rounded-full object-cover border-2 border-white/20" />
-            ) : (
-              <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center">
-                <span className="text-white font-bold text-lg">{restaurant.name.charAt(0)}</span>
+              }} className="flex-shrink-0">
+                {restaurant.logoUrl ? (
+                  <img src={restaurant.logoUrl} alt={restaurant.name} className="w-12 h-12 rounded-full object-cover border-2 border-white/20" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center">
+                    <span className="text-white font-bold text-lg">{restaurant.name.charAt(0)}</span>
+                  </div>
+                )}
+              </button>
+              <div className="flex-1">
+                <h1 className="text-white font-bold text-base leading-tight">{restaurant.name}</h1>
+                <div className="flex items-center gap-2 text-white/60 text-xs">
+                  <span>{restaurant.cuisine}</span>
+                  <span>•</span>
+                  <div className="flex items-center gap-1">
+                    <Star size={10} className="text-amber-400" fill="currentColor" />
+                    <span>{restaurant.rating}</span>
+                  </div>
+                </div>
               </div>
-            )}
-          </button>
-          <div className="flex-1">
-            <h1 className="text-white font-bold text-base leading-tight">{restaurant.name}</h1>
-            <div className="flex items-center gap-2 text-white/60 text-xs">
-              <span>{restaurant.cuisine}</span>
-              <span>•</span>
-              <div className="flex items-center gap-1">
-                <Star size={10} className="text-amber-400" fill="currentColor" />
-                <span>{restaurant.rating}</span>
-              </div>
-            </div>
-          </div>
-          {/* Review button - top right */}
-          <a
-            href={restaurant.googleMapsUrl ? `${restaurant.googleMapsUrl}#reviews` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurant.name + ' ' + restaurant.address)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full hover:bg-white/30 transition-all"
-          >
-            <Star size={14} className="text-amber-400" fill="currentColor" />
-            <span className="text-white font-bold text-sm">{restaurant.rating?.toFixed(1)}</span>
-            <span className="text-white/70 text-xs">({restaurant.totalReviews})</span>
-          </a>
+              {/* Review button - top right */}
+              <a
+                href={restaurant.googleMapsUrl ? `${restaurant.googleMapsUrl}#reviews` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurant.name + ' ' + restaurant.address)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full hover:bg-white/30 transition-all"
+              >
+                <Star size={14} className="text-amber-400" fill="currentColor" />
+                <span className="text-white font-bold text-sm">{restaurant.rating?.toFixed(1)}</span>
+                <span className="text-white/70 text-xs">({restaurant.totalReviews})</span>
+              </a>
+            </>
+          )}
         </div>
 
         {/* Category Pills */}
-        {restaurant.categories.length > 1 && (
-          <div className="flex gap-2 mt-4 overflow-x-auto no-scrollbar pb-2">
+        {(restaurant.categories.length > 1 || isBrazzosPilot) && (
+          <div className={`flex items-center gap-2 ${isBrazzosPilot ? 'mt-0' : 'mt-4'} overflow-x-auto no-scrollbar pb-2`}>
+            {isBrazzosPilot && (
+              <button
+                onClick={handleBackNavigation}
+                className="p-2 bg-white/14 backdrop-blur-md rounded-full text-white hover:bg-white/24 transition-all flex-shrink-0"
+                aria-label="Back"
+              >
+                <ChevronLeft size={18} />
+              </button>
+            )}
             <button
               onClick={() => setActiveCategory(null)}
               className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
@@ -596,10 +732,47 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
         className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar"
         onScroll={handleScroll}
       >
-        {filteredItems.map((item, index) => (
+        {filteredItems.map((item, index) => {
+          const itemHasVideo = item.videoUrl && item.videoUrl !== '';
+          const itemHasPhoto = item.photoUrl && item.photoUrl !== '';
+          const isPhotoOnly = !itemHasVideo && itemHasPhoto;
+          const isDescriptionExpanded = expandedDescriptionItemId === item.id;
+          return (
           <div key={item.id} className="h-screen w-full snap-start relative">
             {(() => {
-              const isUnsupportedVideo = isLikelyUnsupportedVideo(item.videoUrl);
+              const isUnsupportedVideo = itemHasVideo && isLikelyUnsupportedVideo(item.videoUrl);
+
+              // Photo-only item: render animated Ken Burns photo
+              if (isPhotoOnly) {
+                return (
+                  <div className="absolute inset-0 bg-black overflow-hidden">
+                    <img
+                      src={item.photoUrl}
+                      alt=""
+                      aria-hidden="true"
+                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
+                        index === activeVideoIndex ? 'opacity-100 animate-ken-burns-feed-bg' : 'opacity-0'
+                      }`}
+                      style={{
+                        filter: 'blur(52px) brightness(0.6)',
+                        animationPlayState: index === activeVideoIndex && !isPlaying ? 'paused' : 'running'
+                      }}
+                    />
+                    <img
+                      src={item.photoUrl}
+                      alt={item.name}
+                      className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-700 ${
+                        index === activeVideoIndex ? 'opacity-100 animate-ken-burns-feed' : 'opacity-0'
+                      }`}
+                      style={{
+                        animationPlayState: index === activeVideoIndex && !isPlaying ? 'paused' : 'running'
+                      }}
+                      onLoad={() => setVideoReady(prev => new Set(prev).add(index))}
+                    />
+                  </div>
+                );
+              }
+
               return (
                 <>
             {/* Only render <video> for active video — multiple video elements kill mobile Safari */}
@@ -686,11 +859,24 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
 
             {/* Gradient overlay */}
             <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none" />
+            {isBrazzosPilot && (
+              <div className="absolute inset-x-0 bottom-0 h-80 bg-gradient-to-t from-black/95 via-black/60 to-transparent pointer-events-none" />
+            )}
 
             {/* Item Info */}
-            <div className="absolute bottom-32 left-0 right-0 p-6">
+            <div className={`absolute left-0 right-0 ${isBrazzosPilot ? 'bottom-28 p-5' : 'bottom-32 p-6'}`}>
+              <div
+                onClick={() => {
+                  if (!isBrazzosPilot || !item.description) return;
+                  setExpandedDescriptionItemId(prev => prev === item.id ? null : item.id);
+                }}
+                className={isBrazzosPilot ? `max-w-[86%] rounded-2xl backdrop-blur-sm border border-white/10 transition-all ${isDescriptionExpanded ? 'bg-black/55 p-4' : 'bg-black/35 p-3'} ${item.description ? 'cursor-pointer' : ''}` : ''}
+              >
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-orange-400 text-xs font-bold uppercase tracking-wider">{item.category}</span>
+                {isBrazzosPilot && isPhotoOnly && (
+                  <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-semibold uppercase tracking-wide">Photo Motion</span>
+                )}
                 {/* View counter - discrete but visible */}
                 {viewCounts.get(item.id) !== undefined && viewCounts.get(item.id)! > 0 && (
                   <div className="flex items-center gap-1 bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded-full">
@@ -701,21 +887,29 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
               </div>
               <h2 className="text-white text-2xl font-black mt-1">{item.name}</h2>
               {item.description && (
-                <p className="text-white/70 text-sm mt-2 line-clamp-2">{item.description}</p>
+                <>
+                  <p className={`text-white/70 text-sm mt-2 ${isBrazzosPilot && !isDescriptionExpanded ? 'line-clamp-2' : ''}`}>{item.description}</p>
+                  {isBrazzosPilot && (
+                    <p className="text-white/45 text-[11px] mt-1">
+                      {isDescriptionExpanded ? 'Tap to collapse' : 'Tap to expand'}
+                    </p>
+                  )}
+                </>
               )}
               {item.price && (
                 <p className="text-white font-bold text-lg mt-2">${item.price.toFixed(2)}</p>
               )}
+              </div>
             </div>
 
             {/* Right side controls */}
-            <div className="absolute right-4 bottom-40 flex flex-col items-center gap-4">
+            <div className={`absolute ${isBrazzosPilot ? 'right-3 bottom-36 gap-5' : 'right-4 bottom-40 gap-4'} flex flex-col items-center`}>
               {/* Like button */}
               <button 
                 onClick={() => toggleLike(item.id)}
                 className="flex flex-col items-center gap-1"
               >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                <div className={`${isBrazzosPilot ? 'w-14 h-14' : 'w-12 h-12'} rounded-full flex items-center justify-center transition-all ${
                   likedItems.has(item.id) 
                     ? 'bg-red-500' 
                     : 'bg-white/20 backdrop-blur-md'
@@ -735,7 +929,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                 onClick={() => toggleSave(item.id)}
                 className="flex flex-col items-center gap-1"
               >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                <div className={`${isBrazzosPilot ? 'w-14 h-14' : 'w-12 h-12'} rounded-full flex items-center justify-center transition-all ${
                   savedItems.has(item.id) 
                     ? 'bg-orange-500' 
                     : 'bg-white/20 backdrop-blur-md'
@@ -755,7 +949,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                 onClick={() => shareDish(item)}
                 className="flex flex-col items-center gap-1"
               >
-                <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-md">
+                <div className={`${isBrazzosPilot ? 'w-14 h-14' : 'w-12 h-12'} rounded-full flex items-center justify-center bg-white/20 backdrop-blur-md`}>
                   <Send size={24} className="text-white" />
                 </div>
                 <span className="text-white text-[10px] font-medium">Share</span>
@@ -767,41 +961,57 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                   onClick={() => handleOrderNow(item)}
                   className="flex flex-col items-center gap-1"
                 >
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center bg-orange-500">
+                  <div className={`${isBrazzosPilot ? 'w-14 h-14' : 'w-12 h-12'} rounded-full flex items-center justify-center bg-orange-500`}>
                     <ShoppingBag size={24} className="text-white" />
                   </div>
                   <span className="text-white text-[10px] font-medium">Order</span>
                 </button>
               )}
               
-              {/* Mute button */}
-              <button 
-                onClick={() => setIsMuted(!isMuted)}
-                className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white mt-2"
-              >
-                {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-              </button>
+              {/* Mute button - hide for photo-only items */}
+              {!isPhotoOnly && (
+                <button 
+                  onClick={() => setIsMuted(!isMuted)}
+                  className={`${isBrazzosPilot ? 'w-12 h-12' : 'w-10 h-10'} bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white mt-2`}
+                >
+                  {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                </button>
+              )}
               
-              {/* Play/Pause button */}
+              {/* Play/Pause button - available for both video and photo-motion */}
               <button 
-                onClick={() => setIsPlaying(!isPlaying)}
-                className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white"
+                onClick={() => {
+                  setIsPlaying(prev => {
+                    const next = !prev;
+                    const activeVideo = videoRefs.current[activeVideoIndex];
+                    if (activeVideo && !activeIsPhotoOnly) {
+                      if (next) {
+                        activeVideo.play().catch(() => {});
+                      } else {
+                        activeVideo.pause();
+                      }
+                    }
+                    return next;
+                  });
+                }}
+                className={`${isBrazzosPilot ? 'w-12 h-12' : 'w-10 h-10'} bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white`}
               >
                 {isPlaying ? <Pause size={20} /> : <Play size={20} />}
               </button>
             </div>
 
-            {/* Swipe indicator - on /r/ routes, also show on last video if there's a next category */}
-            {index === activeVideoIndex && (index < filteredItems.length - 1 || (isQRRoute && getNextCategory() !== false)) && (
+            {/* Swipe indicator - also show on last item if there's a next category */}
+            {index === activeVideoIndex && (index < filteredItems.length - 1 || (shouldAutoAdvanceCategories && getNextCategory() !== false)) && (
               <div className="absolute bottom-24 left-1/2 -translate-x-1/2">
                 <ChevronUp className="w-6 h-6 text-white/50 animate-bounce" />
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
 
-        {/* End card - on /r/ routes, only show when no more categories to advance to */}
-        {filteredItems.length > 0 && !(isQRRoute && getNextCategory() !== false) && (
+        {/* End card - only show when there is no next category to auto-advance */}
+        {filteredItems.length > 0 && !(shouldAutoAdvanceCategories && getNextCategory() !== false) && (
           <div className="h-screen w-full snap-start flex flex-col items-center justify-center p-8 bg-gradient-to-b from-black to-zinc-900">
             <div className="text-center">
               {restaurant.logoUrl ? (
@@ -865,6 +1075,17 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
       </div>
 
       {/* Video counter */}
+      {filteredItems.length > 0 && (
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-40 w-[min(88vw,420px)] px-4">
+          <div className="h-1 w-full rounded-full bg-white/25 overflow-hidden backdrop-blur-sm">
+            <div
+              className="h-full bg-orange-500 transition-[width] duration-100 ease-linear"
+              style={{ width: `${Math.max(0, Math.min(playbackProgress, 1)) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
         <div className="bg-white/20 backdrop-blur-md rounded-full px-4 py-2">
           <span className="text-white text-xs font-bold">
