@@ -5,6 +5,7 @@ import RestaurantProfile from '../screens/RestaurantProfile';
 import RestaurantMenuPage from '../screens/RestaurantMenuPage';
 import DesktopRestaurantProfile from './DesktopRestaurantProfile';
 import { Loader2 } from 'lucide-react';
+import { orderCategoriesAlcoholLast } from '../utils/categoryOrder';
 
 interface DemoRestaurantLoaderProps {
   slug: string;
@@ -105,7 +106,9 @@ const DemoRestaurantLoader: React.FC<DemoRestaurantLoaderProps> = ({ slug }) => 
         });
 
         // Get unique categories from all feed items
-        const categories = [...new Set(feedItems.map(item => item.category))].filter(Boolean);
+        const categories = orderCategoriesAlcoholLast(
+          [...new Set(feedItems.map(item => item.category))].filter(Boolean) as string[]
+        );
 
         // Fetch real Google rating for partner restaurant
         let googleRating = partnerData.rating || 4.5;

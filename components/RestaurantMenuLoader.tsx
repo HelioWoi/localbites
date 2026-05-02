@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import RestaurantMenuPage from '../screens/RestaurantMenuPage';
 import { Loader2 } from 'lucide-react';
+import { orderCategoriesAlcoholLast } from '../utils/categoryOrder';
 
 interface RestaurantMenuLoaderProps {
   slug: string;
@@ -118,7 +119,9 @@ const RestaurantMenuLoader: React.FC<RestaurantMenuLoaderProps> = ({ slug }) => 
         });
 
         // Get unique categories from feed items
-        const categories = [...new Set(feedItems.map(item => item.category))].filter(Boolean);
+        const categories = orderCategoriesAlcoholLast(
+          [...new Set(feedItems.map(item => item.category))].filter(Boolean) as string[]
+        );
 
         const partnerRating = partnerData.rating || 4.5;
         const partnerTotalReviews = partnerData.total_reviews || 0;

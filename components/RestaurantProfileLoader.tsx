@@ -4,6 +4,7 @@ import { textSearchRestaurants } from '../services/googlePlacesProxy';
 import RestaurantProfile from '../screens/RestaurantProfile';
 import DesktopRestaurantProfile from './DesktopRestaurantProfile';
 import { Loader2 } from 'lucide-react';
+import { orderCategoriesAlcoholLast } from '../utils/categoryOrder';
 
 interface RestaurantProfileLoaderProps {
   slug: string;
@@ -61,7 +62,9 @@ const RestaurantProfileLoader: React.FC<RestaurantProfileLoaderProps> = ({ slug,
         }
 
         // Get unique categories
-        const categories = [...new Set((menuItems || []).map(item => item.category))].filter(Boolean);
+        const categories = orderCategoriesAlcoholLast(
+          [...new Set((menuItems || []).map(item => item.category))].filter(Boolean) as string[]
+        );
 
         // Fetch real Google rating for partner restaurant
         let googleRating = partnerData.rating || 4.5;

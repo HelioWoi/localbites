@@ -7,6 +7,7 @@ import { trackEvent } from '../services/eventsService';
 import { trackAnalyticsEvent } from '../services/analyticsV2Service';
 import { getMenuItemViewCounts } from '../services/partnerAnalyticsService';
 import { getCDNUrl } from '../utils/cdnHelper';
+import { orderCategoriesAlcoholLast } from '../utils/categoryOrder';
 
 interface RestaurantProfileProps {
   restaurant: Restaurant;
@@ -71,9 +72,11 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   
   // View counts state
   const [viewCounts, setViewCounts] = useState<Map<string, number>>(new Map());
+  const [weeklyViewCounts, setWeeklyViewCounts] = useState<Map<string, number>>(new Map());
   const [showOpeningHours, setShowOpeningHours] = useState(false);
   const [gridMediaLoaded, setGridMediaLoaded] = useState<Set<string>>(new Set());
-  const isBrazzosPilot = true; // Enhanced UI enabled for all partners
+  const [mediaView, setMediaView] = useState<'video' | 'photo'>('video');
+  const isPartnerExperience = restaurant.isSubscribed;
   
   // Reload saved dishes when component mounts (e.g., returning from menu page)
   useEffect(() => {
@@ -86,7 +89,10 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
     const loadViewCounts = async () => {
       try {
         const itemIds = restaurant.dishes.map(dish => dish.id);
-        const counts = await getMenuItemViewCounts(itemIds);
+        const [counts, weeklyCounts] = await Promise.all([
+          getMenuItemViewCounts(itemIds),
+          getMenuItemViewCounts(itemIds, 7),
+        ]);
         
         // If no real data, add mock data for visual testing
         if (counts.size === 0) {
@@ -95,8 +101,10 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
             mockCounts.set(dish.id, Math.floor(Math.random() * 450) + 50);
           });
           setViewCounts(mockCounts);
+          setWeeklyViewCounts(mockCounts);
         } else {
           setViewCounts(counts);
+          setWeeklyViewCounts(weeklyCounts.size > 0 ? weeklyCounts : counts);
         }
       } catch (error) {
         console.error('Failed to load view counts:', error);
@@ -106,6 +114,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
           mockCounts.set(dish.id, Math.floor(Math.random() * 450) + 50);
         });
         setViewCounts(mockCounts);
+        setWeeklyViewCounts(mockCounts);
       }
     };
     loadViewCounts();
@@ -116,30 +125,65 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   const [loadingReviews, setLoadingReviews] = useState(false);
 
   const dishesWithVideo = restaurant.dishes.filter(d => d.videoUrl);
-  const dishesWithPhotoOnly = isBrazzosPilot
+  const dishesWithPhotoOnly = isPartnerExperience
     ? restaurant.dishes.filter(d => !d.videoUrl && (d.photoUrl || d.thumbnailUrl))
     : [];
 
-  const normalizeCategoryForBrazzos = (category?: string) => {
+  const normalizeCategoryForPartner = (category?: string) => {
     const clean = (category || '').trim();
-    if (!isBrazzosPilot || !clean) return clean;
+    if (!isPartnerExperience || !clean) return clean;
     const lower = clean.toLowerCase();
     if (lower.endsWith('s')) return clean.slice(0, -1);
     return clean;
   };
 
-  const menuFeedItems = [...dishesWithVideo, ...dishesWithPhotoOnly].map((dish) => ({
+  const normalizedMenuItems = [...dishesWithVideo, ...dishesWithPhotoOnly].map((dish) => ({
     ...dish,
-    category: normalizeCategoryForBrazzos(dish.category),
+    category: normalizeCategoryForPartner(dish.category),
   }));
+  const videoMenuItems = normalizedMenuItems.filter(d => d.videoUrl);
+  const photoMenuItems = normalizedMenuItems.filter(d => !d.videoUrl && (d.photoUrl || d.thumbnailUrl));
+  const menuFeedItems = mediaView === 'video' ? videoMenuItems : photoMenuItems;
+
+  const menuCategoryOrder = new Map(
+    orderCategoriesAlcoholLast([...new Set(menuFeedItems.map(d => d.category).filter(Boolean))] as string[])
+      .map((category, index) => [category, index])
+  );
+
+  const orderedMenuFeedItems = [...menuFeedItems].sort((a, b) => {
+    const aOrder = menuCategoryOrder.get(a.category || '') ?? Number.MAX_SAFE_INTEGER;
+    const bOrder = menuCategoryOrder.get(b.category || '') ?? Number.MAX_SAFE_INTEGER;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return (weeklyViewCounts.get(b.id) || 0) - (weeklyViewCounts.get(a.id) || 0);
+  });
+
+  const hasVideoItems = videoMenuItems.length > 0;
+  const hasPhotoItems = photoMenuItems.length > 0;
+
+  const heroDish = orderedMenuFeedItems[0] || normalizedMenuItems[0] || null;
   const savedDishes = restaurant.dishes.filter(d => savedDishIds.has(d.id));
   
   // Video menu categories
   const [selectedVideoCategory, setSelectedVideoCategory] = useState<string>('All');
-  const videoCategories = ['All', ...new Set(menuFeedItems.map(d => d.category).filter(Boolean))];
+  const videoCategories = ['All', ...orderCategoriesAlcoholLast([...new Set(menuFeedItems.map(d => d.category).filter(Boolean))] as string[])];
   const filteredMenuItems = selectedVideoCategory === 'All' 
-    ? menuFeedItems 
-    : menuFeedItems.filter(d => d.category === selectedVideoCategory);
+    ? orderedMenuFeedItems 
+    : orderedMenuFeedItems.filter(d => d.category === selectedVideoCategory);
+
+  useEffect(() => {
+    if (mediaView === 'video' && !hasVideoItems && hasPhotoItems) {
+      setMediaView('photo');
+      setSelectedVideoCategory('All');
+    }
+    if (mediaView === 'photo' && !hasPhotoItems && hasVideoItems) {
+      setMediaView('video');
+      setSelectedVideoCategory('All');
+    }
+  }, [mediaView, hasVideoItems, hasPhotoItems]);
+
+  useEffect(() => {
+    setSelectedVideoCategory('All');
+  }, [mediaView, restaurant.id]);
   
   // Load Google reviews for all restaurants
   useEffect(() => {
@@ -167,7 +211,6 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         // For partner restaurants, resolve Google Place ID if not already stored
         if (!placeId && restaurant.name) {
           console.log('[RestaurantProfile] No stored place_id - running resolver');
-          console.log('[RestaurantProfile] Partner location:', restaurant.latitude, restaurant.longitude);
           
           // Build search variations with smart name handling
           const baseName = restaurant.name.replace(/\s*-\s*Sunshine Coast$/i, '').trim();
@@ -187,8 +230,8 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
           for (const query of searchVariations) {
             console.log('[RestaurantProfile] Trying search:', query);
             const results = await textSearchRestaurants(
-              restaurant.latitude || 0, 
-              restaurant.longitude || 0, 
+              0,
+              0,
               50000, // 50km radius
               query!
             );
@@ -206,38 +249,22 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
           console.log('[RestaurantProfile] Total unique candidates:', uniqueCandidates.length);
           
           if (uniqueCandidates.length > 0) {
-            // Select best candidate by distance to partner location
-            const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
-              const R = 6371; // Earth radius in km
-              const dLat = (lat2 - lat1) * Math.PI / 180;
-              const dLng = (lng2 - lng1) * Math.PI / 180;
-              const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLng / 2) * Math.sin(dLng / 2);
-              const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-              return R * c;
-            };
-            
-            const candidatesWithDistance = uniqueCandidates.map(c => ({
-              ...c,
-              distanceKm: calculateDistance(
-                restaurant.latitude || 0,
-                restaurant.longitude || 0,
-                c.latitude || 0,
-                c.longitude || 0
-              )
-            }));
-            
-            // Sort by distance (closest first)
-            candidatesWithDistance.sort((a, b) => a.distanceKm - b.distanceKm);
-            
-            const bestCandidate = candidatesWithDistance[0];
+            // GPS-free selection: prioritize more reviewed and better rated candidates
+            const rankedCandidates = [...uniqueCandidates].sort((a, b) => {
+              const reviewsA = Number(a.totalReviews || 0);
+              const reviewsB = Number(b.totalReviews || 0);
+              if (reviewsB !== reviewsA) return reviewsB - reviewsA;
+              const ratingA = Number(a.rating || 0);
+              const ratingB = Number(b.rating || 0);
+              return ratingB - ratingA;
+            });
+
+            const bestCandidate = rankedCandidates[0];
             placeId = bestCandidate.id;
             
             console.log('[RestaurantProfile] Best candidate selected:');
             console.log('  - Place ID:', placeId);
             console.log('  - Name:', bestCandidate.name);
-            console.log('  - Distance:', bestCandidate.distanceKm.toFixed(2), 'km');
             console.log('  - Rating:', bestCandidate.rating);
             console.log('  - Total reviews:', bestCandidate.totalReviews);
             
@@ -420,6 +447,12 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
     }
   };
 
+  const handleSeeMoreFromHero = () => {
+    if (!heroDish) return;
+    const heroIndex = menuFeedItems.findIndex(d => d.id === heroDish.id);
+    openDishFromGrid(heroDish, heroIndex >= 0 ? heroIndex : 0);
+  };
+
   const openDishFromGrid = (dish: Dish, fallbackIndex: number) => {
     if (dish.videoUrl) {
       const realIndex = dishesWithVideo.findIndex(d => d.id === dish.id);
@@ -427,11 +460,11 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
       return;
     }
 
-    if (isBrazzosPilot) {
+    if (isPartnerExperience) {
       const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const params = new URLSearchParams();
       params.set('dish', dish.id);
-      if (dish.category) params.set('category', normalizeCategoryForBrazzos(dish.category));
+      if (dish.category) params.set('category', normalizeCategoryForPartner(dish.category));
       if (isStandalone) params.set('qr', '1');
       const basePath = isStandalone ? `/r/${slug}/menu` : `/${slug}/menu`;
       window.location.href = `${basePath}?${params.toString()}`;
@@ -492,6 +525,26 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
 
   // Google Reviews URL
   const googleReviewsUrl = `${restaurant.googleMapsUrl}&review=true`;
+
+  const handleShareRestaurant = async () => {
+    trackAnalyticsEvent({ eventType: 'share', restaurantId: restaurant.id }).catch(() => {});
+
+    const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const shareUrl = restaurant.isSubscribed
+      ? `${window.location.origin}/${slug}`
+      : `${window.location.origin}${window.location.pathname}?restaurant=${encodeURIComponent(restaurant.id)}`;
+    const shareData = {
+      title: restaurant.name,
+      text: `Check out ${restaurant.name} on MenuLove!`,
+      url: shareUrl,
+    };
+    if (navigator.share) {
+      try { await navigator.share(shareData); } catch (e) { }
+    } else {
+      await navigator.clipboard.writeText(shareUrl);
+      alert('Link copied to clipboard!');
+    }
+  };
 
   return (
     <div className="h-screen w-full bg-white flex flex-col profile-scroll">
@@ -717,64 +770,121 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         </div>
       )}
 
-      <div className="relative h-[45vh] shrink-0">
-        {/* QR Code route with banner images: show slider */}
-        {isStandalone && (restaurant as any).banner_images && (restaurant as any).banner_images.length > 0 ? (
-          <BannerSlider images={(restaurant as any).banner_images} />
-        ) : restaurant.mainPhotoUrl ? (
-          <img src={restaurant.mainPhotoUrl} className="w-full h-full object-cover" alt={restaurant.name} />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-900 flex flex-col items-center justify-center">
-            <Camera size={48} className="text-zinc-600 mb-3" />
-            <p className="text-zinc-500 text-sm font-medium">Cover photo coming soon</p>
+      {isPartnerExperience ? (
+        <>
+          <div className="h-14 px-4 border-b border-orange-100 bg-white flex items-center justify-between shrink-0">
+            {!window.location.pathname.startsWith('/r/') && onBack ? (
+              <button onClick={onBack} className="text-zinc-700 font-semibold text-sm">Back</button>
+            ) : <div className="w-10" />}
+            <h1 className="text-2xl font-black truncate max-w-[60vw] bg-gradient-to-r from-zinc-900 to-zinc-600 bg-clip-text text-transparent">{restaurant.name}</h1>
+            <button onClick={handleShareRestaurant} className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-400 text-white font-semibold text-sm shadow-sm shadow-orange-200/70">Share</button>
           </div>
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
-        
-        {/* Header buttons */}
-        <div className="absolute top-14 left-6 right-6 flex justify-between">
-          {/* Back button - Hidden on /r/ routes, shown on /demo/ routes, hidden when onBack is undefined (external link) */}
-          {!window.location.pathname.startsWith('/r/') && onBack && (
-            <button onClick={onBack} className="p-3 bg-black/20 backdrop-blur-md rounded-full text-white active:scale-90 transition-transform">
-              <ChevronLeft size={24}/>
-            </button>
-          )}
-          {!isStandalone && (
-            <div className="flex gap-3">
-              {restaurant.isSubscribed && !isBrazzosPilot && (
-                <div className="w-11 h-11 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full flex items-center justify-center">
-                  <Crown size={18} fill="currentColor" />
+
+          <div className="relative h-[34vh] shrink-0 bg-zinc-100">
+            {mediaView === 'video' && heroDish?.videoUrl ? (
+              <video
+                src={getCDNUrl(heroDish.videoUrl)}
+                className="w-full h-full object-cover"
+                muted
+                playsInline
+                loop
+                preload="metadata"
+                poster={heroDish.thumbnailUrl || heroDish.photoUrl || restaurant.mainPhotoUrl}
+                onLoadedData={(e) => {
+                  e.currentTarget.currentTime = 0.1;
+                }}
+              />
+            ) : (heroDish?.photoUrl || heroDish?.thumbnailUrl || restaurant.mainPhotoUrl) ? (
+              <img
+                src={heroDish?.photoUrl || heroDish?.thumbnailUrl || restaurant.mainPhotoUrl}
+                className="w-full h-full object-cover"
+                alt={heroDish?.name || restaurant.name}
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-900 flex flex-col items-center justify-center">
+                <Camera size={48} className="text-zinc-600 mb-3" />
+                <p className="text-zinc-500 text-sm font-medium">Cover photo coming soon</p>
+              </div>
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
+            <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-black/70 text-white text-xs font-bold">Bestseller da semana</div>
+            {mediaView === 'video' && heroDish?.videoUrl && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-14 h-14 rounded-full bg-white/90 text-zinc-900 flex items-center justify-center">
+                  <Play size={24} className="fill-zinc-900 ml-0.5" />
                 </div>
-              )}
-              <button onClick={onToggleSave} className={`p-3 backdrop-blur-md rounded-full transition-all active:scale-90 ${isSaved ? 'bg-orange-500 text-white' : 'bg-black/20 text-white'}`}>
-                <Bookmark size={20} fill={isSaved ? "currentColor" : "none"} />
-              </button>
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="relative h-[45vh] shrink-0">
+          {isStandalone && (restaurant as any).banner_images && (restaurant as any).banner_images.length > 0 ? (
+            <BannerSlider images={(restaurant as any).banner_images} />
+          ) : restaurant.mainPhotoUrl ? (
+            <img src={restaurant.mainPhotoUrl} className="w-full h-full object-cover" alt={restaurant.name} />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-900 flex flex-col items-center justify-center">
+              <Camera size={48} className="text-zinc-600 mb-3" />
+              <p className="text-zinc-500 text-sm font-medium">Cover photo coming soon</p>
             </div>
           )}
-        </div>
-        
-        {/* Restaurant info overlay */}
-        <div className={`absolute bottom-6 left-6 right-6 ${isBrazzosPilot ? 'text-center' : ''}`}>
-          {!isBrazzosPilot && (
-            <h1 className="text-3xl font-black text-white tracking-tight mb-1 drop-shadow-lg">{restaurant.name}</h1>
-          )}
-          {!isStandalone && !isBrazzosPilot && (
-            <p className="text-white/70 text-sm font-medium">{restaurant.cuisine}</p>
-          )}
-        </div>
-      </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
 
-      <div className={`${isBrazzosPilot ? 'px-4 pt-2 pb-4' : 'p-6'} space-y-3 flex-1 bg-white ${isBrazzosPilot ? '' : 'rounded-t-[32px]'} -mt-6 relative z-10`}>
-        {isBrazzosPilot && (
-          <div className="px-1 pb-1">
-            <h1 className="text-base font-semibold text-zinc-900 truncate">{restaurant.name}</h1>
+          <div className="absolute top-14 left-6 right-6 flex justify-between">
+            {!window.location.pathname.startsWith('/r/') && onBack && (
+              <button onClick={onBack} className="p-3 bg-black/20 backdrop-blur-md rounded-full text-white active:scale-90 transition-transform">
+                <ChevronLeft size={24}/>
+              </button>
+            )}
+            {!isStandalone && (
+              <div className="flex gap-3">
+                {restaurant.isSubscribed && !isPartnerExperience && (
+                  <div className="w-11 h-11 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full flex items-center justify-center">
+                    <Crown size={18} fill="currentColor" />
+                  </div>
+                )}
+                <button onClick={onToggleSave} className={`p-3 backdrop-blur-md rounded-full transition-all active:scale-90 ${isSaved ? 'bg-orange-500 text-white' : 'bg-black/20 text-white'}`}>
+                  <Bookmark size={20} fill={isSaved ? "currentColor" : "none"} />
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className={`absolute bottom-6 left-6 right-6 ${isPartnerExperience ? 'text-center' : ''}`}>
+            {!isPartnerExperience && (
+              <h1 className="text-3xl font-black text-white tracking-tight mb-1 drop-shadow-lg">{restaurant.name}</h1>
+            )}
+            {!isStandalone && !isPartnerExperience && (
+              <p className="text-white/70 text-sm font-medium">{restaurant.cuisine}</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className={`${isPartnerExperience ? 'px-4 pt-2 pb-4' : 'p-6'} space-y-3 flex-1 bg-white ${isPartnerExperience ? '' : 'rounded-t-[32px]'} ${isPartnerExperience ? '-mt-8' : '-mt-6'} relative z-10`}>
+        {isPartnerExperience && (
+          <div className="bg-gradient-to-br from-white via-white to-orange-50/30 rounded-2xl border border-orange-100 shadow-[0_10px_24px_rgba(251,146,60,0.08)] p-4">
+            <div className="flex items-start justify-between gap-2">
+              <h2 className="text-3xl font-black leading-tight bg-gradient-to-br from-zinc-900 to-zinc-600 bg-clip-text text-transparent">{heroDish?.name || restaurant.name}</h2>
+              {heroDish?.price && <p className="text-3xl font-black text-orange-500 shrink-0">${heroDish.price}</p>}
+            </div>
+            {heroDish?.description && (
+              <p className="text-zinc-600 mt-3 text-lg leading-relaxed line-clamp-3">{heroDish.description}</p>
+            )}
+            <button
+              onClick={handleSeeMoreFromHero}
+              className="mt-4 h-10 w-full rounded-xl bg-gradient-to-r from-orange-500 via-orange-500 to-amber-400 text-white font-bold shadow-lg shadow-orange-200/60"
+            >
+              See more
+            </button>
           </div>
         )}
         
         {/* MENU VIDEOS - Clean grid */}
         {restaurant.isSubscribed && (
           <section>
-            {!isBrazzosPilot && (
+            {!isPartnerExperience && (
               <>
                 <div className="flex items-center gap-2 mb-1">
                   <Crown size={20} className="text-orange-500" />
@@ -794,17 +904,39 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
               </div>
             )}
 
-            {/* Category Pills - Desktop style for mobile */}
+            {isPartnerExperience && (
+              <div className="flex items-center justify-center gap-3 mb-3 pt-1">
+                <span className="text-sm font-semibold text-zinc-500">View by</span>
+                <div className="inline-flex bg-white rounded-full p-1 border border-orange-100 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9)]">
+                  <button
+                    onClick={() => setMediaView('video')}
+                    disabled={!hasVideoItems}
+                    className={`px-5 py-2 rounded-full text-base font-bold transition-all ${mediaView === 'video' ? 'bg-gradient-to-r from-orange-500 to-amber-400 text-white shadow-sm shadow-orange-200/70' : 'text-zinc-700'} ${!hasVideoItems ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  >
+                    Video
+                  </button>
+                  <button
+                    onClick={() => setMediaView('photo')}
+                    disabled={!hasPhotoItems}
+                    className={`px-5 py-2 rounded-full text-base font-bold transition-all ${mediaView === 'photo' ? 'bg-gradient-to-r from-orange-500 to-amber-400 text-white shadow-sm shadow-orange-200/70' : 'text-zinc-700'} ${!hasPhotoItems ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  >
+                    Photo
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Category Pills - text only */}
             {menuFeedItems.length > 0 && (
-              <div className={`${isBrazzosPilot ? 'sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-zinc-100 -mx-4 px-4 py-1 mb-2' : ''}`}>
-              <div className={`flex gap-2 overflow-x-auto ${isBrazzosPilot ? 'pb-1 -mx-4 px-4 mb-1' : 'pb-3 -mx-6 px-6 mb-3'} scrollbar-hide`}>
+              <div className={`${isPartnerExperience ? 'sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-orange-100 -mx-4 px-4 py-1 mb-2 relative overflow-hidden' : ''}`}>
+              <div className={`flex gap-2 overflow-x-auto ${isPartnerExperience ? 'pb-1 -mx-4 px-4 mb-1' : 'pb-3 -mx-6 px-6 mb-3'} scrollbar-hide`}>
                 {videoCategories.map((category) => (
                   <button
                     key={category}
                     onClick={() => setSelectedVideoCategory(category)}
                     className={`px-5 py-2.5 rounded-full font-semibold text-sm whitespace-nowrap transition-all flex-shrink-0 ${
                       selectedVideoCategory === category
-                        ? 'bg-orange-500 text-white shadow-md'
+                        ? 'bg-gradient-to-r from-orange-500 to-amber-400 text-white shadow-sm shadow-orange-200/70'
                         : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
                     }`}
                   >
@@ -813,22 +945,21 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                 ))}
                 <a
                   href={`${window.location.pathname.startsWith('/demo/') ? '/demo/' : isStandalone ? '/r/' : '/'}${((restaurant as any).slug) || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/full-menu`}
-                  className="px-5 py-2.5 rounded-full font-semibold text-sm whitespace-nowrap transition-all flex-shrink-0 bg-zinc-100 text-zinc-700 hover:bg-zinc-200 flex items-center gap-1.5"
+                  className="px-5 py-2.5 rounded-full font-semibold text-sm whitespace-nowrap transition-all flex-shrink-0 bg-gradient-to-r from-orange-500 to-amber-400 text-white shadow-sm shadow-orange-200/70"
                 >
                   Full Menu
-                  <ChevronRight size={14} />
                 </a>
               </div>
+              {isPartnerExperience && <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-white/95 to-transparent pointer-events-none z-10" />}
               </div>
             )}
 
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-3">
+            <div className={isPartnerExperience ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-3'}>
               {filteredMenuItems.map((dish, index) => {
-                const isPhotoMotion = !dish.videoUrl;
                 return (
                 <button 
                   key={dish.id} 
-                  className={`relative ${isBrazzosPilot ? 'aspect-[3/4] rounded-2xl active:scale-[0.985]' : 'aspect-square rounded-xl'} overflow-hidden bg-zinc-100 group text-left transition-transform duration-200`}
+                  className={`relative ${isPartnerExperience ? 'aspect-[3/4] rounded-2xl active:scale-[0.985]' : 'aspect-square rounded-xl'} overflow-hidden bg-zinc-100 group text-left transition-transform duration-200`}
                   onClick={() => openDishFromGrid(dish, index)}
                 >
                   {!gridMediaLoaded.has(dish.id) && (
@@ -860,34 +991,36 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                       onLoad={() => setGridMediaLoaded(prev => new Set(prev).add(dish.id))}
                     />
                   )}
-                  <div className={`absolute inset-0 ${isBrazzosPilot ? 'bg-gradient-to-t from-black/85 via-black/15 to-transparent' : 'bg-gradient-to-t from-black/70 via-transparent to-transparent'} flex flex-col justify-end p-2.5`}>
+                  <div className={`absolute inset-0 ${isPartnerExperience ? 'bg-gradient-to-t from-black/85 via-black/15 to-transparent' : 'bg-gradient-to-t from-black/70 via-transparent to-transparent'} flex flex-col justify-end p-2.5`}>
                     <p className="text-white font-semibold text-xs leading-tight">{dish.name}</p>
                     {dish.price && <p className="text-white/90 text-[11px] mt-0.5 font-semibold">${Number(dish.price).toFixed(2)}</p>}
                   </div>
                   {/* View counter - top left */}
                   {viewCounts.get(dish.id) !== undefined && viewCounts.get(dish.id)! > 0 && (
                     <div className="absolute top-2 left-2 flex items-center gap-1 bg-black/40 backdrop-blur-sm px-1.5 py-0.5 rounded-full">
-                      <Eye size={10} className="text-white/80" />
+                      {!isPartnerExperience && <Eye size={10} className="text-white/80" />}
                       <span className="text-white/80 text-[9px] font-medium">{viewCounts.get(dish.id)}</span>
                     </div>
                   )}
-                  <div className="absolute top-2 right-2 flex gap-1">
-                    <div className={`${isBrazzosPilot ? 'px-2.5 w-auto rounded-full text-[9px] font-semibold uppercase tracking-wide' : 'w-7 h-7 rounded-full'} h-7 bg-black/40 backdrop-blur-sm flex items-center justify-center text-white`}>
-                      {isBrazzosPilot ? (isPhotoMotion ? 'Photo Motion' : 'Video') : <PlayCircle size={14} className="text-white" fill="currentColor" />}
-                    </div>
-                    {restaurant.enable_ordering_button && (dish.dish_order_url || restaurant.ordering_url) && (
-                      <div
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleOrderNow(dish);
-                        }}
-                        className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center cursor-pointer hover:bg-orange-600 transition-colors"
-                      >
-                        <ShoppingBag size={14} className="text-white" />
+                  {!isPartnerExperience && (
+                    <div className="absolute top-2 right-2 flex gap-1">
+                      <div className="w-7 h-7 rounded-full h-7 bg-black/40 backdrop-blur-sm flex items-center justify-center text-white">
+                        <PlayCircle size={14} className="text-white" fill="currentColor" />
                       </div>
-                    )}
-                  </div>
+                      {restaurant.enable_ordering_button && (dish.dish_order_url || restaurant.ordering_url) && (
+                        <div
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleOrderNow(dish);
+                          }}
+                          className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center cursor-pointer hover:bg-orange-600 transition-colors"
+                        >
+                          <ShoppingBag size={14} className="text-white" />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </button>
                 );
               })}
@@ -902,10 +1035,12 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
               ? `/demo/${(restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/saved`
               : `/${(restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/saved`
             }
-            className="w-full bg-white rounded-2xl border border-zinc-200 p-4 flex items-center justify-between active:bg-zinc-50 transition-colors"
+            className="w-full bg-gradient-to-br from-white via-white to-orange-50/25 rounded-2xl border border-orange-100 p-4 flex items-center justify-between shadow-[0_8px_20px_rgba(251,146,60,0.06)] active:brightness-[0.99] transition-all"
           >
             <div className="flex items-center gap-3">
-              <Bookmark size={20} className="text-orange-500" fill="currentColor" />
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-orange-500 to-amber-400 flex items-center justify-center shadow-sm shadow-orange-200/70">
+                <Bookmark size={16} className="text-white" fill="currentColor" />
+              </div>
               <span className="text-base font-bold text-zinc-900">Your Picks</span>
               <span className="text-sm text-orange-500 font-medium">({savedDishIds.size})</span>
             </div>
@@ -919,14 +1054,14 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         {/* FULL MENU Button */}
         <a
           href={`${window.location.pathname.startsWith('/demo/') ? '/demo/' : isStandalone ? '/r/' : '/'}${((restaurant as any).slug) || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/full-menu`}
-          className="w-full bg-orange-500 text-white rounded-2xl border border-orange-500 p-4 flex items-center justify-center gap-2 font-semibold text-base active:bg-orange-600 transition-colors"
+          className="w-full bg-gradient-to-r from-orange-500 to-amber-400 text-white rounded-2xl border border-orange-400/50 p-4 flex items-center justify-center gap-2 font-semibold text-base shadow-md shadow-orange-200/70 active:brightness-95 transition-all"
         >
           <UtensilsCrossed size={20} />
           <span>Full Menu</span>
         </a>
 
         {/* Phone - Card style */}
-        {!isBrazzosPilot && restaurant.phone && (
+        {!isPartnerExperience && restaurant.phone && (
           <a 
             href={`tel:${restaurant.phone}`}
             onClick={() => trackAnalyticsEvent({ eventType: 'phone_call', restaurantId: restaurant.id }).catch(() => {})}
@@ -940,7 +1075,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
 
         {/* Opening Hours - Collapsible Card */}
         {restaurant.openingHours && restaurant.openingHours.length > 0 && (
-          <div className="w-full bg-white rounded-2xl border border-zinc-200 p-4">
+          <div className="w-full bg-gradient-to-br from-white via-white to-orange-50/20 rounded-2xl border border-orange-100 p-4 shadow-[0_8px_20px_rgba(251,146,60,0.06)]">
             <button
               onClick={() => setShowOpeningHours(!showOpeningHours)}
               className="w-full flex items-center justify-between"
@@ -968,7 +1103,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
         )}
 
         {/* Quick action buttons - Compact */}
-        {!isBrazzosPilot && (
+        {!isPartnerExperience && (
         <div className="flex gap-2">
           <a 
             href={restaurant.googleMapsUrl} 
@@ -995,28 +1130,8 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
 
         {/* Share button */}
         <button
-          onClick={async () => {
-            // Analytics V2: Track share
-            trackAnalyticsEvent({ eventType: 'share', restaurantId: restaurant.id }).catch(() => {});
-            
-            const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-            // Public share link uses /restaurant-name (not /r/ - that's QR code only)
-            const shareUrl = restaurant.isSubscribed 
-              ? `${window.location.origin}/${slug}`
-              : `${window.location.origin}${window.location.pathname}?restaurant=${encodeURIComponent(restaurant.id)}`;
-            const shareData = {
-              title: restaurant.name,
-              text: `Check out ${restaurant.name} on MenuLove!`,
-              url: shareUrl,
-            };
-            if (navigator.share) {
-              try { await navigator.share(shareData); } catch (e) { /* user cancelled */ }
-            } else {
-              await navigator.clipboard.writeText(shareUrl);
-              alert('Link copied to clipboard!');
-            }
-          }}
-          className="w-full flex items-center justify-center gap-2 bg-zinc-100 text-zinc-700 font-semibold py-3 rounded-xl text-sm active:scale-95 transition-all"
+          onClick={handleShareRestaurant}
+          className="w-full flex items-center justify-center gap-2 bg-zinc-100 border border-zinc-200 text-zinc-700 font-semibold py-3 rounded-xl text-sm active:scale-95 transition-all"
         >
           <Share2 size={14} /> Share
         </button>
@@ -1066,7 +1181,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
 
         {/* Disclaimer for app */}
         <div className="py-2 px-2 space-y-2">
-          {(isStandalone || isBrazzosPilot) ? (
+          {(isStandalone || isPartnerExperience) ? (
             <>
               <div className="flex flex-col items-center gap-0.5 pt-1">
                 <span className="text-[9px] text-zinc-400">Powered by</span>

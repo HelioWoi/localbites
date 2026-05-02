@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import FullMenuPage from '../screens/FullMenuPage';
 import { Loader2 } from 'lucide-react';
+import { orderCategoriesAlcoholLast } from '../utils/categoryOrder';
 
 interface FullMenuLoaderProps {
   slug: string;
@@ -44,7 +45,9 @@ const FullMenuLoader: React.FC<FullMenuLoaderProps> = ({ slug }) => {
         }
 
         // Get unique categories
-        const categories = [...new Set((menuItems || []).map(item => item.category))].filter(Boolean);
+        const categories = orderCategoriesAlcoholLast(
+          [...new Set((menuItems || []).map(item => item.category))].filter(Boolean) as string[]
+        );
 
         setRestaurant({
           id: partnerData.id,

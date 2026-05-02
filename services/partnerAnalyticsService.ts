@@ -161,16 +161,28 @@ export const getPartnerInsights = async (
 
 // Get view counts for menu items (for public display)
 export const getMenuItemViewCounts = async (
-  itemIds: string[]
+  itemIds: string[],
+  daysBack?: number
 ): Promise<Map<string, number>> => {
   try {
     if (itemIds.length === 0) return new Map();
 
-    const { data, error } = await supabase
+    const fromDateIso =
+      typeof daysBack === 'number' && daysBack > 0
+        ? new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString()
+        : null;
+
+    let query = supabase
       .from('events')
       .select('item_id')
       .in('item_id', itemIds)
       .in('event_type', ['item_view', 'video_play']);
+
+    if (fromDateIso) {
+      query = query.gte('created_at', fromDateIso);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 
