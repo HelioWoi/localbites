@@ -787,7 +787,17 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
           </div>
 
           <div className="relative h-[34vh] shrink-0 bg-zinc-100">
-            {(heroDish?.photoUrl || heroDish?.thumbnailUrl) ? (
+            {mediaView === 'video' && heroDish?.videoUrl ? (
+              <video
+                src={getCDNUrl(heroDish.videoUrl)}
+                className="w-full h-full object-cover"
+                autoPlay
+                loop
+                muted
+                playsInline
+                preload="metadata"
+              />
+            ) : (heroDish?.photoUrl || heroDish?.thumbnailUrl) ? (
               <img
                 src={heroDish?.photoUrl || heroDish?.thumbnailUrl}
                 className="w-full h-full object-cover"
@@ -801,13 +811,6 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
             <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-black/70 text-white text-xs font-bold">Weekly Bestseller</div>
-            {mediaView === 'video' && heroDish?.videoUrl && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-14 h-14 rounded-full bg-white/90 text-zinc-900 flex items-center justify-center">
-                  <Play size={24} className="fill-zinc-900 ml-0.5" />
-                </div>
-              </div>
-            )}
           </div>
         </>
       ) : (
