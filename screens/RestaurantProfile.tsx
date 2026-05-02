@@ -454,6 +454,20 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   };
 
   const openDishFromGrid = (dish: Dish, fallbackIndex: number) => {
+    if (isPartnerExperience && mediaView === 'photo') {
+      const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const isDemoMode = window.location.pathname.startsWith('/demo/');
+
+      if (isDemoMode) {
+        window.location.href = `/demo/${slug}/full-menu`;
+      } else if (isStandalone) {
+        window.location.href = `/r/${slug}/full-menu`;
+      } else {
+        window.location.href = `/${slug}/full-menu`;
+      }
+      return;
+    }
+
     if (dish.videoUrl) {
       const realIndex = dishesWithVideo.findIndex(d => d.id === dish.id);
       openVideoReels(realIndex >= 0 ? realIndex : fallbackIndex);
