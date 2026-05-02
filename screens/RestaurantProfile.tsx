@@ -772,7 +772,13 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
 
       {isPartnerExperience ? (
         <>
-          <div className="h-14 px-4 border-b border-orange-100 bg-white flex items-center justify-between shrink-0">
+          <div
+            className="px-4 border-b border-orange-100 bg-white flex items-center justify-between shrink-0"
+            style={{
+              paddingTop: 'max(env(safe-area-inset-top), 8px)',
+              minHeight: 'calc(56px + env(safe-area-inset-top))',
+            }}
+          >
             {!window.location.pathname.startsWith('/r/') && onBack ? (
               <button onClick={onBack} className="text-zinc-700 font-semibold text-sm">Back</button>
             ) : <div className="w-10" />}
@@ -781,20 +787,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
           </div>
 
           <div className="relative h-[34vh] shrink-0 bg-zinc-100">
-            {mediaView === 'video' && heroDish?.videoUrl ? (
-              <video
-                src={getCDNUrl(heroDish.videoUrl)}
-                className="w-full h-full object-cover"
-                muted
-                playsInline
-                loop
-                preload="metadata"
-                poster={heroDish.thumbnailUrl || heroDish.photoUrl || restaurant.mainPhotoUrl}
-                onLoadedData={(e) => {
-                  e.currentTarget.currentTime = 0.1;
-                }}
-              />
-            ) : (heroDish?.photoUrl || heroDish?.thumbnailUrl || restaurant.mainPhotoUrl) ? (
+            {(heroDish?.photoUrl || heroDish?.thumbnailUrl || restaurant.mainPhotoUrl) ? (
               <img
                 src={heroDish?.photoUrl || heroDish?.thumbnailUrl || restaurant.mainPhotoUrl}
                 className="w-full h-full object-cover"
@@ -807,7 +800,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
               </div>
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
-            <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-black/70 text-white text-xs font-bold">Bestseller da semana</div>
+            <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-black/70 text-white text-xs font-bold">Weekly Bestseller</div>
             {mediaView === 'video' && heroDish?.videoUrl && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-14 h-14 rounded-full bg-white/90 text-zinc-900 flex items-center justify-center">

@@ -102,9 +102,9 @@ const PartnerLandingPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-white overflow-x-hidden lg:overflow-x-visible">
+    <div className="min-h-screen bg-white overflow-x-hidden lg:overflow-x-visible bg-[radial-gradient(60%_40%_at_90%_0%,rgba(251,146,60,0.10),transparent_60%),radial-gradient(45%_35%_at_10%_60%,rgba(255,186,120,0.08),transparent_65%)]">
       {/* Primary Hero Section */}
-      <section className="bg-gradient-to-r from-slate-50 via-zinc-50 to-white border-b border-zinc-100">
+      <section className="bg-white border-b border-orange-100/70">
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 sm:pt-12 pb-16 sm:pb-20">
           <div className="flex items-center justify-between gap-3 mb-10 sm:mb-12">
             <a
@@ -119,7 +119,7 @@ const PartnerLandingPage: React.FC = () => {
             </a>
             <a
               href="/partner"
-              className="shrink-0 whitespace-nowrap text-zinc-800 text-sm font-semibold hover:text-orange-600 transition-colors"
+              className="shrink-0 whitespace-nowrap px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-400 text-white text-sm font-semibold shadow-sm shadow-orange-200/60 hover:brightness-105 transition-all"
             >
               Partner Access
             </a>
@@ -139,14 +139,14 @@ const PartnerLandingPage: React.FC = () => {
               <div className="flex flex-col sm:flex-row gap-4 mb-4 w-full sm:w-auto">
                 <button
                   onClick={scrollToForm}
-                  className="group w-full sm:w-auto px-7 py-4 bg-orange-500 text-white font-black text-base sm:text-lg rounded-2xl hover:bg-orange-600 transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                  className="group w-full sm:w-auto px-7 py-4 bg-gradient-to-r from-orange-500 to-amber-400 text-white font-black text-base sm:text-lg rounded-2xl hover:brightness-105 transition-all duration-300 shadow-md shadow-orange-200/70 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2"
                 >
                   Create My Video Menu
                   <ArrowRight className="group-hover:translate-x-1 transition-transform" size={22} />
                 </button>
                 <a
                   href="/live-examples"
-                  className="w-full sm:w-auto inline-flex items-center justify-center px-7 py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-base sm:text-lg rounded-2xl hover:from-orange-600 hover:to-amber-600 transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5 text-center"
+                  className="w-full sm:w-auto inline-flex items-center justify-center px-7 py-4 bg-gradient-to-r from-orange-500 to-amber-400 text-white font-bold text-base sm:text-lg rounded-2xl hover:brightness-105 transition-all duration-300 shadow-md shadow-orange-200/70 hover:shadow-lg hover:-translate-y-0.5 text-center"
                 >
                   See a live example
                 </a>
@@ -196,11 +196,6 @@ const PartnerLandingPage: React.FC = () => {
                       alt="Mooloo Brew"
                       className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
                     />
-                    <img
-                      src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/craft.png"
-                      alt="Craft"
-                      className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
-                    />
 
                     <img
                       src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/bkstreet.png"
@@ -237,18 +232,13 @@ const PartnerLandingPage: React.FC = () => {
                       alt="Mooloo Brew"
                       className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
                     />
-                    <img
-                      src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/craft.png"
-                      alt="Craft"
-                      className="h-7 sm:h-8 w-auto grayscale opacity-70 flex-shrink-0"
-                    />
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="flex justify-center lg:justify-end">
-              <div className="relative rounded-3xl overflow-hidden w-full max-w-[500px] bg-white">
+              <div className="relative rounded-3xl overflow-hidden w-full max-w-[500px] shadow-[0_20px_50px_rgba(251,146,60,0.14)]">
                 <video
                   autoPlay
                   loop
@@ -266,7 +256,7 @@ const PartnerLandingPage: React.FC = () => {
 
       {/* Stats Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10 mb-16 relative z-10">
-        <div className="bg-white rounded-3xl p-8 grid grid-cols-2 lg:grid-cols-4 gap-8 border border-zinc-200">
+        <div className="bg-gradient-to-br from-white via-white to-orange-50/30 rounded-3xl p-8 grid grid-cols-2 lg:grid-cols-4 gap-8 border border-orange-100 shadow-[0_12px_35px_rgba(251,146,60,0.08)]">
           {stats.map((stat, index) => (
             <div key={index} className="text-center">
               <div className="text-4xl sm:text-5xl font-black text-orange-600 mb-2">
@@ -281,7 +271,7 @@ const PartnerLandingPage: React.FC = () => {
       </div>
 
       {/* How It Works Section */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-gradient-to-br from-white to-orange-50/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl sm:text-5xl font-black text-zinc-900 mb-4">
@@ -294,7 +284,7 @@ const PartnerLandingPage: React.FC = () => {
 
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Demo Video Side */}
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+            <div className="relative rounded-3xl overflow-hidden border border-orange-100 shadow-[0_20px_50px_rgba(251,146,60,0.14)]">
               <video
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/video%20backstreet%20cafe.mp4"
                 className="w-full h-[500px] object-cover"
@@ -309,7 +299,7 @@ const PartnerLandingPage: React.FC = () => {
             {/* Steps Side */}
             <div className="space-y-8">
               <div className="flex gap-6">
-                <div className="flex-shrink-0 w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center text-white font-black text-xl">
+                <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-400 rounded-full flex items-center justify-center text-white font-black text-xl shadow-sm shadow-orange-200/70">
                   1
                 </div>
                 <div>
@@ -323,7 +313,7 @@ const PartnerLandingPage: React.FC = () => {
               </div>
 
               <div className="flex gap-6">
-                <div className="flex-shrink-0 w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center text-white font-black text-xl">
+                <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-400 rounded-full flex items-center justify-center text-white font-black text-xl shadow-sm shadow-orange-200/70">
                   2
                 </div>
                 <div>
@@ -337,7 +327,7 @@ const PartnerLandingPage: React.FC = () => {
               </div>
 
               <div className="flex gap-6">
-                <div className="flex-shrink-0 w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center text-white font-black text-xl">
+                <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-400 rounded-full flex items-center justify-center text-white font-black text-xl shadow-sm shadow-orange-200/70">
                   3
                 </div>
                 <div>
@@ -353,7 +343,7 @@ const PartnerLandingPage: React.FC = () => {
               <div className="pt-6 flex justify-center lg:justify-start">
                 <button
                   onClick={scrollToForm}
-                  className="inline-flex items-center gap-2 px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold text-lg rounded-xl transition-all transform hover:scale-105 shadow-lg"
+                  className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-orange-500 to-amber-400 text-white font-bold text-lg rounded-xl transition-all hover:brightness-105 transform hover:scale-105 shadow-lg shadow-orange-200/70"
                 >
                   Create My Video Menu
                   <ArrowRight size={20} />
@@ -365,7 +355,7 @@ const PartnerLandingPage: React.FC = () => {
       </section>
 
       {/* Restaurant Showcase Section */}
-      <section className="py-20 bg-gradient-to-br from-zinc-50 to-white">
+      <section className="py-20 bg-gradient-to-br from-white to-orange-50/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
@@ -377,26 +367,26 @@ const PartnerLandingPage: React.FC = () => {
               </p>
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                  <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-400 rounded-full flex items-center justify-center shadow-sm shadow-orange-200/70">
                     <CheckCircle2 className="text-white" size={20} />
                   </div>
                   <span className="text-lg font-semibold text-zinc-900">No setup fees or hidden costs</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                  <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-400 rounded-full flex items-center justify-center shadow-sm shadow-orange-200/70">
                     <CheckCircle2 className="text-white" size={20} />
                   </div>
                   <span className="text-lg font-semibold text-zinc-900">14-day free trial included</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                  <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-400 rounded-full flex items-center justify-center shadow-sm shadow-orange-200/70">
                     <CheckCircle2 className="text-white" size={20} />
                   </div>
                   <span className="text-lg font-semibold text-zinc-900">Cancel anytime, no questions asked</span>
                 </div>
               </div>
             </div>
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+            <div className="relative rounded-3xl overflow-hidden border border-orange-100 shadow-[0_20px_50px_rgba(251,146,60,0.14)]">
               <img
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/img_coffeeshop.jpg"
                 alt="Restaurant using MenuLove"
@@ -408,7 +398,7 @@ const PartnerLandingPage: React.FC = () => {
       </section>
 
       {/* Signup Form Section */}
-      <div id="signup-form" className="bg-white py-16">
+      <div id="signup-form" className="bg-gradient-to-br from-white to-orange-50/20 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-start">
             {/* Left: Benefits */}
@@ -457,7 +447,7 @@ const PartnerLandingPage: React.FC = () => {
             </div>
 
             {/* Right: Signup Form */}
-            <div className="bg-white rounded-3xl shadow-2xl p-8 border border-zinc-100">
+            <div className="bg-gradient-to-br from-white via-white to-orange-50/25 rounded-3xl shadow-[0_16px_40px_rgba(251,146,60,0.10)] p-8 border border-orange-100">
               {!formSubmitted ? (
                 <>
                   <div className="text-center mb-6">
@@ -484,7 +474,7 @@ const PartnerLandingPage: React.FC = () => {
                     type="text"
                     name="restaurantName"
                     placeholder="Your restaurant name"
-                    className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition-all"
+                    className="w-full px-4 py-3 rounded-xl border border-orange-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition-all bg-white"
                     required
                   />
                 </div>
@@ -494,7 +484,7 @@ const PartnerLandingPage: React.FC = () => {
                     type="email"
                     name="email"
                     placeholder="you@restaurant.com"
-                    className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition-all"
+                    className="w-full px-4 py-3 rounded-xl border border-orange-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition-all bg-white"
                     required
                   />
                 </div>
@@ -504,13 +494,13 @@ const PartnerLandingPage: React.FC = () => {
                     type="text"
                     name="address"
                     placeholder="Your address"
-                    className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition-all"
+                    className="w-full px-4 py-3 rounded-xl border border-orange-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition-all bg-white"
                     required
                   />
                 </div>
                 <button
                   type="submit"
-                  className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-black text-lg rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-400 text-white font-black text-lg rounded-xl hover:brightness-105 transition-all transform hover:scale-[1.01] shadow-lg shadow-orange-200/70 flex items-center justify-center gap-2"
                 >
                   Create My Video Menu
                   <ArrowRight size={20} />
@@ -559,7 +549,7 @@ const PartnerLandingPage: React.FC = () => {
             return (
               <div 
                 key={index}
-                className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-1 border border-zinc-100"
+                className="bg-gradient-to-br from-white via-white to-orange-50/20 rounded-2xl p-8 shadow-[0_10px_24px_rgba(251,146,60,0.08)] hover:shadow-[0_16px_34px_rgba(251,146,60,0.14)] transition-all transform hover:-translate-y-1 border border-orange-100"
               >
                 <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center mb-5">
                   <Icon className="text-white" size={28} />
@@ -577,7 +567,7 @@ const PartnerLandingPage: React.FC = () => {
       </div>
 
       {/* Client Menus Showcase */}
-      <div className="bg-white py-20">
+      <div className="bg-gradient-to-br from-white to-orange-50/15 py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl sm:text-5xl font-black text-zinc-900 mb-4">
@@ -589,7 +579,7 @@ const PartnerLandingPage: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-7 lg:gap-10">
-            <div className="bg-white rounded-3xl overflow-hidden">
+            <div className="rounded-3xl overflow-hidden shadow-[0_10px_24px_rgba(251,146,60,0.08)]">
               <video autoPlay loop muted playsInline className="w-full h-auto">
                 <source src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/decision.mp4" type="video/mp4" />
               </video>
@@ -599,7 +589,7 @@ const PartnerLandingPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-3xl overflow-hidden">
+            <div className="rounded-3xl overflow-hidden shadow-[0_10px_24px_rgba(251,146,60,0.08)]">
               <video autoPlay loop muted playsInline className="w-full h-auto">
                 <source src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/flume.mp4" type="video/mp4" />
               </video>
@@ -609,7 +599,7 @@ const PartnerLandingPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-3xl overflow-hidden">
+            <div className="rounded-3xl overflow-hidden shadow-[0_10px_24px_rgba(251,146,60,0.08)]">
               <video autoPlay loop muted playsInline className="w-full h-auto">
                 <source src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/la%20casa.mp4" type="video/mp4" />
               </video>
@@ -623,7 +613,7 @@ const PartnerLandingPage: React.FC = () => {
           <div className="flex justify-center mt-10">
             <a
               href="/live-examples"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-lg rounded-2xl hover:from-orange-600 hover:to-amber-600 transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-orange-500 to-amber-400 text-white font-bold text-lg rounded-2xl hover:brightness-105 transition-all duration-300 shadow-md shadow-orange-200/70 hover:shadow-lg hover:-translate-y-0.5"
             >
               See a live example
               <ArrowRight size={18} />
@@ -633,7 +623,7 @@ const PartnerLandingPage: React.FC = () => {
       </div>
 
       {/* Food Truck Section */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-gradient-to-br from-white to-orange-50/15">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl sm:text-5xl font-black text-zinc-900 mb-4">
@@ -645,28 +635,28 @@ const PartnerLandingPage: React.FC = () => {
           </div>
 
           <div className="grid lg:grid-cols-2 gap-8 mb-12">
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+            <div className="relative rounded-3xl overflow-hidden border border-orange-100 shadow-[0_16px_35px_rgba(251,146,60,0.12)]">
               <img
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/foodd%20truck.jpg"
                 alt="Food truck at outdoor event"
                 className="w-full h-[400px] object-cover"
               />
             </div>
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+            <div className="relative rounded-3xl overflow-hidden border border-orange-100 shadow-[0_16px_35px_rgba(251,146,60,0.12)]">
               <img
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/food%20truck%204.jpg"
                 alt="Food market vendor"
                 className="w-full h-[400px] object-cover"
               />
             </div>
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+            <div className="relative rounded-3xl overflow-hidden border border-orange-100 shadow-[0_16px_35px_rgba(251,146,60,0.12)]">
               <img
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/qr-code%20market.png"
                 alt="QR code at market stall"
                 className="w-full h-[400px] object-cover"
               />
             </div>
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+            <div className="relative rounded-3xl overflow-hidden border border-orange-100 shadow-[0_16px_35px_rgba(251,146,60,0.12)]">
               <img
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/foodd%20truck%202.B.jpg"
                 alt="Food truck festival"
@@ -677,7 +667,7 @@ const PartnerLandingPage: React.FC = () => {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="text-center">
-              <div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-400 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm shadow-orange-200/70">
                 <QrCode className="text-white" size={32} />
               </div>
               <h3 className="text-xl font-black text-zinc-900 mb-2">Display Your QR Code</h3>
@@ -686,7 +676,7 @@ const PartnerLandingPage: React.FC = () => {
               </p>
             </div>
             <div className="text-center">
-              <div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-400 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm shadow-orange-200/70">
                 <Video className="text-white" size={32} />
               </div>
               <h3 className="text-xl font-black text-zinc-900 mb-2">Show Your Best Dishes</h3>
@@ -695,7 +685,7 @@ const PartnerLandingPage: React.FC = () => {
               </p>
             </div>
             <div className="text-center">
-              <div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-400 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm shadow-orange-200/70">
                 <MapPin className="text-white" size={32} />
               </div>
               <h3 className="text-xl font-black text-zinc-900 mb-2">Update Your Location</h3>
@@ -717,7 +707,7 @@ const PartnerLandingPage: React.FC = () => {
       </section>
 
       {/* Dashboard Screenshots Section */}
-      <section className="py-20 bg-gradient-to-br from-zinc-50 to-white">
+      <section className="py-20 bg-gradient-to-br from-white to-orange-50/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl sm:text-5xl font-black text-zinc-900 mb-4">
@@ -729,14 +719,14 @@ const PartnerLandingPage: React.FC = () => {
           </div>
 
           <div className="grid lg:grid-cols-2 gap-8">
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-zinc-200">
+            <div className="relative rounded-2xl overflow-hidden shadow-[0_16px_35px_rgba(251,146,60,0.12)] border border-orange-100 bg-white">
               <img
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/dashboard%201%20(1).png"
                 alt="MenuLove Dashboard Analytics"
                 className="w-full h-auto"
               />
             </div>
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-zinc-200">
+            <div className="relative rounded-2xl overflow-hidden shadow-[0_16px_35px_rgba(251,146,60,0.12)] border border-orange-100 bg-white">
               <img
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/dashboard%202%20(1).png"
                 alt="MenuLove Menu Management"
@@ -748,32 +738,32 @@ const PartnerLandingPage: React.FC = () => {
       </section>
 
       {/* CTA Section */}
-      <div className="relative bg-gradient-to-br from-orange-500 to-amber-500 py-20 overflow-hidden">
+      <div className="relative bg-gradient-to-br from-white to-orange-50/25 py-20 overflow-hidden border-y border-orange-100">
         <div 
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: 'url(https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/img_Why.jpg)' }}
         />
-        <div className="absolute inset-0 bg-black/50" />
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center p-12 sm:p-16">
-          <Sparkles className="mx-auto mb-4 text-yellow-300" size={40} />
-          <h2 className="text-3xl sm:text-4xl font-black text-white mb-6 leading-tight">
+        <div className="absolute inset-0 bg-white/88" />
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center p-12 sm:p-16 rounded-3xl border border-orange-100 backdrop-blur-md shadow-[0_18px_40px_rgba(251,146,60,0.10)]">
+          <Sparkles className="mx-auto mb-4 text-orange-500" size={40} />
+          <h2 className="text-3xl sm:text-4xl font-black text-zinc-900 mb-6 leading-tight">
             Ready to Grow Your Restaurant?
           </h2>
-          <p className="text-lg text-white/90 mb-10 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-lg text-zinc-600 mb-10 max-w-2xl mx-auto leading-relaxed">
             Be among the first restaurants in Australia to revolutionize how customers experience your menu through engaging video content, QR codes, and your own shareable link.
           </p>
           <button
             onClick={scrollToForm}
-            className="inline-flex items-center gap-2 px-10 py-5 bg-white text-orange-600 font-black text-xl rounded-2xl hover:bg-yellow-300 hover:text-orange-700 transition-all transform hover:scale-105 shadow-2xl mb-4"
+            className="inline-flex items-center gap-2 px-10 py-5 bg-gradient-to-r from-orange-500 to-amber-400 text-white font-black text-xl rounded-2xl hover:brightness-105 transition-all transform hover:scale-105 shadow-lg shadow-orange-200/70 mb-4"
           >
             Create My Video Menu
             <ArrowRight size={24} />
           </button>
-          <p className="text-white/80 text-sm mb-3">
+          <p className="text-zinc-500 text-sm mb-3">
             14 day trial. No credit card required. No commission fees.
           </p>
-          <p className="mt-6 text-white/80">
-            Questions? Email us at <a href="mailto:contact@menulove.com.au" className="underline font-bold hover:text-yellow-300 transition-colors">contact@menulove.com.au</a>
+          <p className="mt-6 text-zinc-600">
+            Questions? Email us at <a href="mailto:contact@menulove.com.au" className="underline font-bold text-orange-600 hover:text-orange-700 transition-colors">contact@menulove.com.au</a>
           </p>
         </div>
       </div>
@@ -831,11 +821,6 @@ const PartnerLandingPage: React.FC = () => {
                 alt="Mooloo Brew" 
                 className="h-16 w-auto grayscale hover:grayscale-0 transition-all duration-300 opacity-60 hover:opacity-100"
               />
-              <img 
-                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/craft.png" 
-                alt="Craft" 
-                className="h-16 w-auto grayscale hover:grayscale-0 transition-all duration-300 opacity-60 hover:opacity-100"
-              />
             </div>
           </div>
 
@@ -877,11 +862,6 @@ const PartnerLandingPage: React.FC = () => {
                 alt="Mooloo Brew" 
                 className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
               />
-              <img 
-                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/craft.png" 
-                alt="Craft" 
-                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
-              />
               {/* Duplicate for infinite effect */}
               <img 
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/bkstreet.png" 
@@ -916,11 +896,6 @@ const PartnerLandingPage: React.FC = () => {
               <img 
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/MoolooBrew.png" 
                 alt="Mooloo Brew" 
-                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
-              />
-              <img 
-                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/craft.png" 
-                alt="Craft" 
                 className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
               />
               {/* Set 3 */}
@@ -959,11 +934,6 @@ const PartnerLandingPage: React.FC = () => {
                 alt="Mooloo Brew" 
                 className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
               />
-              <img 
-                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/craft.png" 
-                alt="Craft" 
-                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
-              />
               {/* Set 4 */}
               <img 
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/bkstreet.png" 
@@ -998,11 +968,6 @@ const PartnerLandingPage: React.FC = () => {
               <img 
                 src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/MoolooBrew.png" 
                 alt="Mooloo Brew" 
-                className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
-              />
-              <img 
-                src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/craft.png" 
-                alt="Craft" 
                 className="h-12 w-auto grayscale opacity-60 flex-shrink-0"
               />
             </div>
