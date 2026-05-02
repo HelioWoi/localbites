@@ -787,9 +787,9 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
           </div>
 
           <div className="relative h-[34vh] shrink-0 bg-zinc-100">
-            {(heroDish?.photoUrl || heroDish?.thumbnailUrl || restaurant.mainPhotoUrl) ? (
+            {(heroDish?.photoUrl || heroDish?.thumbnailUrl) ? (
               <img
-                src={heroDish?.photoUrl || heroDish?.thumbnailUrl || restaurant.mainPhotoUrl}
+                src={heroDish?.photoUrl || heroDish?.thumbnailUrl}
                 className="w-full h-full object-cover"
                 alt={heroDish?.name || restaurant.name}
               />
