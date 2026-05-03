@@ -34,7 +34,6 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
   isQRRoute = false,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [mediaView, setMediaView] = useState<'video' | 'photo'>('video');
   const [showFullMenu, setShowFullMenu] = useState(false);
 
   // Analytics V2: Track profile view on mount
@@ -122,12 +121,12 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
   const hasVideos = (restaurant.dishes?.filter(d => d.videoUrl && d.videoUrl.length > 0) || []).length > 0;
   const hasPhotos = (restaurant.dishes?.filter(d => (d.photoUrl && d.photoUrl.length > 0) || (d.thumbnailUrl && d.thumbnailUrl.length > 0)) || []).length > 0;
 
-  // Media datasets
-  const videoDishes = restaurant.dishes?.filter(d => d.videoUrl && d.videoUrl.length > 0) || [];
-  const photoDishes = restaurant.dishes?.filter(d => (d.photoUrl && d.photoUrl.length > 0) || (d.thumbnailUrl && d.thumbnailUrl.length > 0)) || [];
-  const mediaDishes = mediaView === 'video' ? videoDishes : photoDishes;
+  // Unified media dataset (video + photo items together)
+  const mediaDishes = restaurant.dishes?.filter(
+    d => (d.videoUrl && d.videoUrl.length > 0) || (d.photoUrl && d.photoUrl.length > 0) || (d.thumbnailUrl && d.thumbnailUrl.length > 0)
+  ) || [];
 
-  // Get unique categories from currently selected media type
+  // Get unique categories from unified media feed
   const mediaCategories = ['All', ...orderCategoriesAlcoholLast([...new Set(mediaDishes.map(d => d.category).filter(Boolean))] as string[])];
 
   const mediaCategoryOrder = new Map(
@@ -155,10 +154,10 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
   const featuredDishes = [...featuredSource, ...nonFeaturedSource].slice(0, 3);
   const heroDish = featuredDishes[0] || filteredDishes[0] || mediaDishes[0] || null;
   const restaurantLogoUrl = (restaurant as any).logoUrl as string | undefined;
-  const allowDishNavigation = mediaView !== 'video';
+  const allowDishNavigation = true;
 
   const handleDishCardClick = (dish: any) => {
-    if (mediaView === 'photo') {
+    if (!dish.videoUrl) {
       setSelectedDishId(dish.id);
       setShowFullMenu(true);
       trackAnalyticsEvent({ eventType: 'view', restaurantId: restaurant.id, itemId: dish.id }).catch(() => {});
@@ -190,22 +189,10 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
     setSelectedDishId(dish.id);
     setShowFullMenu(true);
     trackAnalyticsEvent({ eventType: 'view', restaurantId: restaurant.id, itemId: dish.id }).catch(() => {});
-    if (mediaView === 'video' && dish.videoUrl) {
+    if (dish.videoUrl) {
       trackAnalyticsEvent({ eventType: 'play', restaurantId: restaurant.id, itemId: dish.id }).catch(() => {});
     }
   };
-
-  useEffect(() => {
-    // Keep the selected mode valid when a restaurant only has one media type
-    if (mediaView === 'video' && !hasVideos && hasPhotos) {
-      setMediaView('photo');
-      setSelectedCategory('All');
-    }
-    if (mediaView === 'photo' && !hasPhotos && hasVideos) {
-      setMediaView('video');
-      setSelectedCategory('All');
-    }
-  }, [mediaView, hasVideos, hasPhotos]);
 
   // Get saved videos count
   const savedCount = savedVideos.size;
@@ -265,7 +252,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
                 onClick={allowDishNavigation ? () => handleDishCardClick(heroDish) : undefined}
                 className={`relative rounded-2xl overflow-hidden bg-zinc-100 aspect-square group border border-white/60 shadow-lg ${allowDishNavigation ? 'cursor-pointer' : 'cursor-default'}`}
               >
-                {mediaView === 'video' && heroDish.videoUrl ? (
+                {heroDish.videoUrl ? (
                   <video
                     src={getCDNUrl(heroDish.videoUrl)}
                     className="w-full h-full object-cover bg-zinc-900"
@@ -297,7 +284,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
 
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
                 <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/55 text-white text-xs font-bold">Bestseller</div>
-                {mediaView === 'video' && heroDish.videoUrl && (
+                {heroDish.videoUrl && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
                       <Play size={24} className="text-zinc-900 fill-zinc-900 ml-0.5" />
@@ -328,52 +315,15 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
         {(hasVideos || hasPhotos) && (
           <div className="mx-6 mb-6 rounded-2xl border border-orange-100 bg-gradient-to-br from-white via-white to-orange-50/25 px-5 py-5 shadow-[0_10px_30px_rgba(251,146,60,0.08)]">
             <div className="flex items-center gap-2 mb-4">
-              {mediaView === 'video' ? (
-                <Video size={18} className="text-orange-500" />
-              ) : (
-                <ImageIcon size={18} className="text-orange-500" />
-              )}
-              <h3 className="text-lg font-bold text-zinc-900">{mediaView === 'video' ? 'Video Menus' : 'Photo Menus'}</h3>
-            </div>
-
-            {/* View by toggle */}
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-sm font-semibold text-zinc-500">View by</span>
-              <div className="inline-flex bg-white rounded-xl p-1 border border-orange-100 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9)]">
-                <button
-                  onClick={() => {
-                    setMediaView('video');
-                    setSelectedCategory('All');
-                  }}
-                  disabled={!hasVideos}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-                    mediaView === 'video' ? 'bg-gradient-to-r from-orange-500 to-amber-400 text-white shadow-sm shadow-orange-200/70' : 'text-zinc-600 hover:bg-zinc-200'
-                  } ${!hasVideos ? 'opacity-40 cursor-not-allowed' : ''}`}
-                >
-                  Video
-                </button>
-                <button
-                  onClick={() => {
-                    setMediaView('photo');
-                    setSelectedCategory('All');
-                  }}
-                  disabled={!hasPhotos}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-                    mediaView === 'photo' ? 'bg-gradient-to-r from-orange-500 to-amber-400 text-white shadow-sm shadow-orange-200/70' : 'text-zinc-600 hover:bg-zinc-200'
-                  } ${!hasPhotos ? 'opacity-40 cursor-not-allowed' : ''}`}
-                >
-                  Photo
-                </button>
-              </div>
+              <Video size={18} className="text-orange-500" />
+              <h3 className="text-lg font-bold text-zinc-900">Menu</h3>
             </div>
 
             {/* Featured top 3 */}
             {featuredDishes.length > 0 && (
               <div className="grid grid-cols-3 gap-3 mb-5">
                 {featuredDishes.map((dish) => {
-                  const mediaSrc = mediaView === 'video'
-                    ? (dish.videoUrl ? getCDNUrl(dish.videoUrl) : undefined)
-                    : (dish.photoUrl || dish.thumbnailUrl);
+                  const mediaSrc = dish.photoUrl || dish.thumbnailUrl;
 
                   return (
                     <div
@@ -381,7 +331,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
                       onClick={allowDishNavigation ? () => handleDishCardClick(dish) : undefined}
                       className={`relative aspect-[16/10] rounded-2xl overflow-hidden group ${allowDishNavigation ? 'cursor-pointer' : 'cursor-default'}`}
                     >
-                      {mediaView === 'video' && dish.videoUrl ? (
+                      {dish.videoUrl ? (
                         <video
                           src={getCDNUrl(dish.videoUrl)}
                           className="w-full h-full object-cover bg-zinc-900"
@@ -480,7 +430,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
                     onClick={allowDishNavigation ? () => handleDishCardClick(dish) : undefined}
                     className={`w-full h-full ${allowDishNavigation ? 'cursor-pointer' : 'cursor-default'}`}
                   >
-                    {mediaView === 'video' && dish.videoUrl ? (
+                    {dish.videoUrl ? (
                       <video
                         src={getCDNUrl(dish.videoUrl)}
                         className="w-full h-full object-cover bg-zinc-900"
@@ -507,7 +457,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
                       />
                     ) : (
                       <div className="w-full h-full bg-zinc-200 flex items-center justify-center">
-                        {mediaView === 'video' ? <Video size={24} className="text-zinc-400" /> : <ImageIcon size={24} className="text-zinc-400" />}
+                        <ImageIcon size={24} className="text-zinc-400" />
                       </div>
                     )}
                   </div>

@@ -3,7 +3,7 @@ import {
   LogOut, Plus, Play, Trash2, Eye, Heart, MapPin,
   Loader2, X, Upload, Check, Settings, BarChart3,
   Video, Crown, AlertCircle, ChevronRight, Calendar,
-  TrendingUp, Clock, Edit2, Save, QrCode, Copy, ExternalLink, Menu, Camera, Image, Star, CreditCard, Search, CheckCircle, ChevronDown
+  TrendingUp, Clock, Edit2, Save, QrCode, Copy, ExternalLink, Menu, Camera, Image, Star, CreditCard, Search, CheckCircle, ChevronDown, Sparkles
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { PartnerUser } from './PartnerPortal';
@@ -50,6 +50,8 @@ interface MenuItem {
   is_active: boolean;
   is_featured?: boolean;
   dish_order_url?: string;
+  partner_id?: string;
+  deleted_at?: string | null;
 }
 
 interface PartnerData {
@@ -67,6 +69,10 @@ interface PartnerData {
   tiktok_url?: string;
   ordering_url?: string;
   enable_ordering_button?: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
+  banner_images?: string[] | null;
+  opening_hours?: Record<string, unknown> | null;
 }
 
 interface Restaurant {
@@ -139,8 +145,19 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   // Photo upload for menu items
   const [menuPhotoFile, setMenuPhotoFile] = useState<File | null>(null);
   const [menuPhotoPreview, setMenuPhotoPreview] = useState<string | null>(null);
+  const [hasNewMenuPhotoSelection, setHasNewMenuPhotoSelection] = useState(false);
   const menuPhotoInputRef = useRef<HTMLInputElement>(null);
+  const menuCameraInputRef = useRef<HTMLInputElement>(null);
   const [mediaType, setMediaType] = useState<'video' | 'photo'>('video');
+
+  // AI Enhancement state
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [enhanceElapsed, setEnhanceElapsed] = useState(0);
+  const enhanceTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [enhancedPreview, setEnhancedPreview] = useState<string | null>(null);
+  const [enhanceOriginalPreview, setEnhanceOriginalPreview] = useState<string | null>(null);
+  const [showEnhanceModal, setShowEnhanceModal] = useState(false);
+  const [acceptedPhotoUrl, setAcceptedPhotoUrl] = useState<string | null>(null);
 
   // Settings state
   const [editingRestaurant, setEditingRestaurant] = useState(false);
@@ -1117,8 +1134,25 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       let photoUrl = editingMenuItem.photo_url;
       let videoUrl = editingMenuItem.video_url;
 
+      // If an already-uploaded enhanced photo URL was accepted, use it directly
+      if (acceptedPhotoUrl) {
+        photoUrl = acceptedPhotoUrl;
+        // Only clear videoUrl if item was already photo-only (no video)
+        if (!editingMenuItem.video_url) {
+          videoUrl = '';
+        }
+        setAcceptedPhotoUrl(null);
+      }
+
       // Handle photo upload if new photo selected
-      if (mediaType === 'photo' && menuPhotoFile) {
+      if (
+        mediaType === 'photo' &&
+        hasNewMenuPhotoSelection &&
+        menuPhotoFile &&
+        !acceptedPhotoUrl &&
+        !!menuPhotoPreview &&
+        menuPhotoPreview.startsWith('blob:')
+      ) {
         setUploadProgress(20);
         const timestamp = Date.now();
         const sanitizedName = sanitizeFileName(menuPhotoFile.name, menuItemName.trim());
@@ -1374,6 +1408,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     setUploadPreview(null);
     setMenuPhotoFile(null);
     setMenuPhotoPreview(null);
+    setHasNewMenuPhotoSelection(false);
     setMediaType('video');
     setMenuItemName('');
     setMenuItemCategory('');
@@ -1383,6 +1418,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     setNewCategory('');
     setUploadProgress(0);
     setEditingMenuItem(null);
+    setAcceptedPhotoUrl(null);
   };
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1395,7 +1431,85 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       }
       setMenuPhotoFile(file);
       setMenuPhotoPreview(URL.createObjectURL(file));
+      setHasNewMenuPhotoSelection(true);
+      setEnhancedPreview(null);
     }
+  };
+
+  const handleEnhancePhoto = async () => {
+    const sourcePhoto = menuPhotoPreview || editingMenuItem?.photo_url;
+    if (!sourcePhoto) return;
+
+    setIsEnhancing(true);
+    setEnhanceElapsed(0);
+    enhanceTimerRef.current = setInterval(() => setEnhanceElapsed(s => s + 1), 1000);
+
+    try {
+      let base64Data = sourcePhoto;
+      if (!sourcePhoto.startsWith('data:')) {
+        const res = await fetch(sourcePhoto);
+        const blob = await res.blob();
+        base64Data = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      }
+
+      const jobId = crypto.randomUUID();
+
+      await fetch('/.netlify/functions/enhance-photo-background', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64Data, jobId }),
+      });
+
+      const enhancedImage = await new Promise<string>((resolve, reject) => {
+        let attempts = 0;
+        const maxAttempts = 80;
+        const interval = setInterval(async () => {
+          attempts++;
+          if (attempts > maxAttempts) {
+            clearInterval(interval);
+            reject(new Error('Enhancement timed out. Please try again.'));
+            return;
+          }
+          try {
+            const res = await fetch(`/.netlify/functions/enhance-photo-status?jobId=${jobId}`);
+            const data = await res.json();
+            if (data.status === 'done') {
+              clearInterval(interval);
+              resolve(data.enhancedImage);
+            } else if (data.status === 'error') {
+              clearInterval(interval);
+              reject(new Error(data.error || 'Enhancement failed'));
+            }
+          } catch {
+            // silently retry
+          }
+        }, 3000);
+      });
+
+      setEnhanceOriginalPreview(sourcePhoto);
+      setEnhancedPreview(enhancedImage);
+      setShowEnhanceModal(true);
+    } catch (error: any) {
+      alert('Enhancement failed: ' + error.message);
+    } finally {
+      setIsEnhancing(false);
+      if (enhanceTimerRef.current) clearInterval(enhanceTimerRef.current);
+    }
+  };
+
+  const acceptEnhancedPhoto = () => {
+    if (!enhancedPreview) return;
+    setAcceptedPhotoUrl(enhancedPreview);
+    setMenuPhotoPreview(enhancedPreview);
+    setMenuPhotoFile(null);
+    setHasNewMenuPhotoSelection(false);
+    setEnhanceOriginalPreview(null);
+    setEnhancedPreview(null);
+    setShowEnhanceModal(false);
   };
 
   const handleDeleteMenuItem = async (itemId: string) => {
@@ -2014,69 +2128,71 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               </div>
             </div>
 
-            {/* Promo Banner Images (QR Code Only) */}
+            {/* AI Photo Upgrade Showcase */}
             <div className="bg-white rounded-xl border border-zinc-200 p-5">
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Image size={24} className="text-white" />
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Sparkles size={24} className="text-white" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-base font-bold text-zinc-900 mb-1">
-                    Promo Banners <span className="text-orange-500 text-sm font-normal">(QR Code Only)</span>
+                    AI Photo Upgrade Showcase
                   </h3>
-                  <p className="text-sm text-zinc-600 mb-4">Upload up to 3 promotional images. These will appear as a slider on your QR code link only.</p>
-                  
-                  <div className="grid grid-cols-3 gap-3">
-                    {[0, 1, 2].map((index) => (
-                      <div key={index} className="relative">
-                        <input
-                          ref={(el) => (bannerInputRefs.current[index] = el)}
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleBannerUpload(index, e)}
-                          className="hidden"
-                        />
-                        <button
-                          onClick={() => bannerInputRefs.current[index]?.click()}
-                          disabled={isUploadingBanner}
-                          className="relative aspect-square bg-zinc-100 rounded-lg overflow-hidden w-full hover:bg-zinc-200 transition-colors disabled:cursor-not-allowed"
-                        >
-                          {bannerImages[index] ? (
-                            <>
-                              <img src={bannerImages[index]} alt={`Banner ${index + 1}`} className="w-full h-full object-cover" />
-                              <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center">
-                                <div className="opacity-0 hover:opacity-100 transition-opacity bg-white/90 rounded-full p-2">
-                                  <Camera size={16} className="text-zinc-700" />
-                                </div>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center gap-1">
-                              <Image size={20} className="text-zinc-300" />
-                              <span className="text-xs text-zinc-400">Banner {index + 1}</span>
-                            </div>
-                          )}
-                          {uploadingBannerIndex === index && (
-                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                              <Loader2 size={20} className="text-white animate-spin" />
-                            </div>
-                          )}
-                        </button>
-                        {bannerImages[index] && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveBanner(index);
-                            }}
-                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg z-10"
-                          >
-                            <X size={14} />
-                          </button>
-                        )}
+                  <p className="text-sm text-zinc-600 mb-4">
+                    Show guests the value of AI-enhanced food photos with a clear before-and-after example.
+                  </p>
+
+                  <div className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 via-white to-amber-50 p-4 md:p-5">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                      <div>
+                        <p className="text-zinc-900 text-lg font-bold leading-tight">Simple Photo. Professional Result.</p>
+                        <p className="text-zinc-600 text-xs md:text-sm">With one click, turn phone photos into premium menu visuals.</p>
                       </div>
-                    ))}
+                      <div className="flex items-center gap-2 text-orange-600 text-xs font-semibold uppercase tracking-wide">
+                        <Sparkles size={14} />
+                        AI Upgrade
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-[11px] text-zinc-500 mb-1.5 font-medium">Before (Phone Shot)</p>
+                        <div className="relative aspect-square rounded-xl overflow-hidden border border-zinc-200 bg-white">
+                          <img
+                            src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/before.jpg"
+                            alt="Before AI enhancement"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-zinc-500 mb-1.5 font-medium">After (AI Enhanced)</p>
+                        <div className="relative aspect-square rounded-xl overflow-hidden border border-orange-200 bg-white shadow-[0_0_0_1px_rgba(251,146,60,0.15)]">
+                          <img
+                            src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/after.jpg"
+                            alt="After AI enhancement"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <div className="flex items-center gap-2 text-zinc-700 text-xs">
+                        <Camera size={14} className="text-orange-500" />
+                        Capture directly from your phone camera
+                      </div>
+                      <div className="flex items-center gap-2 text-zinc-700 text-xs">
+                        <Upload size={14} className="text-orange-500" />
+                        Or upload an existing photo
+                      </div>
+                      <div className="flex items-center gap-2 text-zinc-700 text-xs md:col-span-2">
+                        <Sparkles size={14} className="text-orange-500" />
+                        Improve framing, lighting, and texture while keeping the dish realistic
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs text-zinc-400 mt-3">Click on any slot to upload. Max 2MB per image. Recommended: 1080x1080px</p>
+                  <p className="text-xs text-zinc-500 mt-3">This section demonstrates what your guests will see after AI enhancement.</p>
                 </div>
               </div>
             </div>
@@ -2229,12 +2345,22 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                               .eq('id', item.id)
                               .single();
                             const itemToEdit = freshItem || item;
+                            setUploadFile(null);
+                            setUploadPreview(null);
+                            setMenuPhotoFile(null);
+                            setMenuPhotoPreview(null);
+                            setHasNewMenuPhotoSelection(false);
+                            setAcceptedPhotoUrl(null);
+                            setEnhancedPreview(null);
+                            setEnhanceOriginalPreview(null);
+                            setShowEnhanceModal(false);
                             setEditingMenuItem(itemToEdit);
                             setMenuItemName(itemToEdit.name);
                             setMenuItemCategory(itemToEdit.category);
                             setMenuItemDescription(itemToEdit.description || '');
                             setMenuItemPrice(itemToEdit.price?.toString() || '');
                             setMenuItemOrderingUrl(itemToEdit.dish_order_url || '');
+                            setMediaType(itemToEdit.video_url ? 'video' : itemToEdit.photo_url ? 'photo' : 'video');
                             setShowMenuUploadModal(true);
                           }}
                           className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center shadow-md hover:bg-orange-600 transition-colors"
@@ -2363,12 +2489,22 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                                     .eq('id', item.id)
                                     .single();
                                   const itemToEdit = freshItem || item;
+                                  setUploadFile(null);
+                                  setUploadPreview(null);
+                                  setMenuPhotoFile(null);
+                                  setMenuPhotoPreview(null);
+                                  setHasNewMenuPhotoSelection(false);
+                                  setAcceptedPhotoUrl(null);
+                                  setEnhancedPreview(null);
+                                  setEnhanceOriginalPreview(null);
+                                  setShowEnhanceModal(false);
                                   setEditingMenuItem(itemToEdit);
                                   setMenuItemName(itemToEdit.name);
                                   setMenuItemCategory(itemToEdit.category);
                                   setMenuItemDescription(itemToEdit.description || '');
                                   setMenuItemPrice(itemToEdit.price?.toString() || '');
                                   setMenuItemOrderingUrl(itemToEdit.dish_order_url || '');
+                                  setMediaType(itemToEdit.video_url ? 'video' : itemToEdit.photo_url ? 'photo' : 'video');
                                   setShowMenuUploadModal(true);
                                 }}
                                 className="p-2 bg-orange-500/90 backdrop-blur-sm rounded-full text-white hover:bg-orange-600 transition-colors shadow-lg"
@@ -2651,7 +2787,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                           />
                         ) : (
                           <p className="text-sm text-zinc-900">
-                            {partnerData?.opening_hours?.[day] || '-'}
+                            {(partnerData?.opening_hours?.[day] as string) || '-'}
                           </p>
                         )}
                       </div>
@@ -2864,7 +3000,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               {/* Media Type Toggle */}
               <div className="flex bg-zinc-100 rounded-xl p-1">
                 <button
-                  onClick={() => { setMediaType('video'); setMenuPhotoFile(null); setMenuPhotoPreview(null); }}
+                  onClick={() => { setMediaType('video'); setMenuPhotoFile(null); setMenuPhotoPreview(null); setHasNewMenuPhotoSelection(false); }}
                   className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all ${
                     mediaType === 'video' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'
                   }`}
@@ -2950,7 +3086,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                     <div className="relative w-64 aspect-square bg-zinc-100 rounded-xl overflow-hidden mx-auto">
                       <img src={menuPhotoPreview} className="w-full h-full object-cover" alt="Preview" />
                       <button
-                        onClick={() => { setMenuPhotoFile(null); setMenuPhotoPreview(null); }}
+                        onClick={() => { setMenuPhotoFile(null); setMenuPhotoPreview(null); setHasNewMenuPhotoSelection(false); }}
                         className="absolute top-2 right-2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70"
                       >
                         <X size={16} />
@@ -2984,14 +3120,24 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                       <p className="text-xs text-center text-zinc-500">Current photo • Click icons to change or remove</p>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => menuPhotoInputRef.current?.click()}
-                      className="w-full aspect-square max-h-64 bg-zinc-100 border-2 border-dashed border-zinc-200 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-orange-300 transition-colors"
-                    >
-                      <Image size={32} className="text-zinc-400" />
-                      <p className="text-sm font-medium text-zinc-600">Click to select photo</p>
-                      <p className="text-xs text-zinc-400">JPG, PNG • Max 2MB</p>
-                    </button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => menuPhotoInputRef.current?.click()}
+                        className="w-full aspect-square max-h-48 bg-zinc-100 border-2 border-dashed border-zinc-200 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-orange-300 transition-colors"
+                      >
+                        <Image size={28} className="text-zinc-400" />
+                        <p className="text-sm font-medium text-zinc-600">Upload Photo</p>
+                        <p className="text-xs text-zinc-400">JPG, PNG • Max 2MB</p>
+                      </button>
+                      <button
+                        onClick={() => menuCameraInputRef.current?.click()}
+                        className="w-full aspect-square max-h-48 bg-zinc-100 border-2 border-dashed border-zinc-200 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-orange-300 transition-colors"
+                      >
+                        <Camera size={28} className="text-zinc-400" />
+                        <p className="text-sm font-medium text-zinc-600">Take Photo</p>
+                        <p className="text-xs text-zinc-400">Open camera</p>
+                      </button>
+                    </div>
                   )}
                   <input
                     ref={menuPhotoInputRef}
@@ -3000,6 +3146,36 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                     onChange={handlePhotoSelect}
                     className="hidden"
                   />
+                  <input
+                    ref={menuCameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handlePhotoSelect}
+                    className="hidden"
+                  />
+                  {(menuPhotoPreview || editingMenuItem?.photo_url) && (
+                    <button
+                      onClick={handleEnhancePhoto}
+                      disabled={isEnhancing}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isEnhancing ? (
+                        <>
+                          <Loader2 size={15} className="animate-spin" />
+                          Enhancing with AI... ({enhanceElapsed}s)
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={15} />
+                          <span>Enhance with AI</span>
+                          <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-white/20 rounded-md border border-white/30">
+                            Beta
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </>
               )}
               <p className="text-xs text-zinc-400 text-center">
@@ -3278,6 +3454,74 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             alt="Menu item"
             onClick={(e) => e.stopPropagation()}
           />
+        </div>
+      )}
+
+      {/* AI Enhancement Before/After Modal */}
+      {showEnhanceModal && enhancedPreview && enhanceOriginalPreview && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-4 border-b border-zinc-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles size={18} className="text-purple-500" />
+                <h2 className="text-base font-bold text-zinc-900">AI Enhancement Preview</h2>
+              </div>
+              <button
+                onClick={() => {
+                  setShowEnhanceModal(false);
+                  setEnhancedPreview(null);
+                  setEnhanceOriginalPreview(null);
+                }}
+                className="p-2 text-zinc-400 hover:text-zinc-600 rounded-lg"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-4">
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                  <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2 text-center">Before</p>
+                  <div className="aspect-[9/16] bg-zinc-100 rounded-xl overflow-hidden">
+                    <img src={enhanceOriginalPreview} className="w-full h-full object-cover" alt="Original" />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-purple-500 uppercase tracking-wider mb-2 text-center">After ✨</p>
+                  <div className="aspect-[9/16] bg-zinc-100 rounded-xl overflow-hidden">
+                    <img src={enhancedPreview} className="w-full h-full object-cover" alt="Enhanced" />
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-zinc-400 text-center mb-4">
+                Enhancement is one-time. You can still upload a new photo at any time.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowEnhanceModal(false);
+                    setEnhancedPreview(null);
+                    setEnhanceOriginalPreview(null);
+                  }}
+                  className="flex-1 py-3 border border-zinc-200 text-zinc-700 font-semibold rounded-xl hover:bg-zinc-50 transition-colors text-sm"
+                >
+                  Keep Original
+                </button>
+                <button
+                  onClick={acceptEnhancedPhoto}
+                  className="flex-1 py-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold rounded-xl hover:opacity-90 transition-opacity text-sm flex items-center justify-center gap-2"
+                >
+                  <Sparkles size={15} />
+                  Use Enhanced
+                </button>
+              </div>
+              <div className="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+                <AlertCircle size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                <p className="text-[11px] leading-relaxed text-amber-800">
+                  AI may occasionally produce unexpected results. If anything looks incorrect, please keep the original and send feedback so we can improve.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

@@ -143,13 +143,20 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   }));
   const videoMenuItems = normalizedMenuItems.filter(d => d.videoUrl);
   const photoMenuItems = normalizedMenuItems.filter(d => !d.videoUrl && (d.photoUrl || d.thumbnailUrl));
-  const menuFeedItems = mediaView === 'video' ? videoMenuItems : photoMenuItems;
+  // For subscribed (partner experience) restaurants, include photo-only items in the main feed
+  const menuFeedItems = mediaView === 'video'
+    ? (isPartnerExperience ? normalizedMenuItems : videoMenuItems)
+    : photoMenuItems;
   const restaurantSlug = ((restaurant as any).slug) || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   const fullMenuPath = `${window.location.pathname.startsWith('/demo/') ? '/demo/' : isStandalone ? '/r/' : '/'}${restaurantSlug}/full-menu`;
 
+  const menuCategories = [...new Set(menuFeedItems.map(d => d.category).filter(Boolean))] as string[];
+  const orderedMenuCategories = isPartnerExperience
+    ? [...menuCategories].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+    : orderCategoriesAlcoholLast(menuCategories);
+
   const menuCategoryOrder = new Map(
-    orderCategoriesAlcoholLast([...new Set(menuFeedItems.map(d => d.category).filter(Boolean))] as string[])
-      .map((category, index) => [category, index])
+    orderedMenuCategories.map((category, index) => [category, index])
   );
 
   const photoCategoryOrder = new Map(
@@ -179,7 +186,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   
   // Video menu categories
   const [selectedVideoCategory, setSelectedVideoCategory] = useState<string>('All');
-  const videoCategories = ['All', ...orderCategoriesAlcoholLast([...new Set(menuFeedItems.map(d => d.category).filter(Boolean))] as string[])];
+  const videoCategories = ['All', ...orderedMenuCategories];
   const filteredMenuItems = selectedVideoCategory === 'All' 
     ? orderedMenuFeedItems 
     : orderedMenuFeedItems.filter(d => d.category === selectedVideoCategory);
@@ -193,7 +200,8 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
           items: selectedCategoryPhotoItems.filter((dish) => dish.category === category),
         }))
     : [{ category: selectedVideoCategory, items: selectedCategoryPhotoItems }];
-  const shouldShowPhotoContinuation = isPartnerExperience && mediaView === 'video' && selectedCategoryPhotoItems.length > 0;
+  // Photos are now included in the main feed for partner experience — continuation section not needed
+  const shouldShowPhotoContinuation = false;
 
   useEffect(() => {
     if (mediaView === 'video' && !hasVideoItems && hasPhotoItems) {
@@ -931,8 +939,8 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
 
             {isPartnerExperience && (
               <div className="mb-3 pt-1">
-                <h2 className="text-xl font-black text-zinc-900">Tap & Watch the Menu</h2>
-                <p className="text-xs text-zinc-500">Scroll videos, then explore more dishes below.</p>
+                <h2 className="text-xl font-black text-zinc-900">Tap & Explore the Menu</h2>
+                <p className="text-xs text-zinc-500">Browse dishes and tap to see more details.</p>
               </div>
             )}
             
@@ -976,9 +984,19 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
 
             <div className={isPartnerExperience ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-3'}>
               {filteredMenuItems.map((dish, index) => {
+                const prevDish = index > 0 ? filteredMenuItems[index - 1] : null;
+                const showCategoryHeader = selectedVideoCategory === 'All' && dish.category !== prevDish?.category;
+                const categoryItemCount = filteredMenuItems.filter((item) => item.category === dish.category).length;
                 return (
+                <React.Fragment key={dish.id}>
+                  {showCategoryHeader && (
+                    <div className="col-span-2 rounded-3xl border border-orange-100 bg-gradient-to-br from-white via-white to-orange-50/25 px-4 py-3">
+                      <h4 className="text-2xl font-black leading-tight text-zinc-900">{dish.category}</h4>
+                      <p className="text-sm text-zinc-500">{categoryItemCount} items</p>
+                    </div>
+                  )}
                 <button 
-                  key={dish.id} 
+                  key={`btn-${dish.id}`} 
                   className={`relative ${isPartnerExperience ? 'aspect-[3/4] rounded-2xl active:scale-[0.985]' : 'aspect-square rounded-xl'} overflow-hidden bg-zinc-100 group text-left transition-transform duration-200`}
                   onClick={() => openDishFromGrid(dish, index)}
                 >
@@ -1042,6 +1060,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                     </div>
                   )}
                 </button>
+                </React.Fragment>
                 );
               })}
             </div>
