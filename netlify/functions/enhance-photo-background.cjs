@@ -134,12 +134,14 @@ exports.handler = async (event) => {
   try {
     if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
 
+    let usedModel = 'gpt-image-2';
     let b64Image = null;
     try {
       b64Image = await callOpenAI('gpt-image-2', '1024x1536', 'medium');
     } catch (err) {
       if (err.isAccessError) {
         console.log('[enhance-photo-background] gpt-image-2 access denied, falling back to gpt-image-1');
+        usedModel = 'gpt-image-1';
         b64Image = await callOpenAI('gpt-image-1', '1024x1536', 'low');
       } else {
         throw err;
@@ -172,7 +174,7 @@ exports.handler = async (event) => {
     });
     const { data: { publicUrl } } = supabase.storage.from('menu-videos').getPublicUrl(outputPath);
 
-    await saveJob({ status: 'done', enhancedImage: publicUrl, discardedReplacement });
+    await saveJob({ status: 'done', enhancedImage: publicUrl, discardedReplacement, modelUsed: usedModel });
 
   } catch (error) {
     console.error('[enhance-photo-background] error:', error);

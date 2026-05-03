@@ -1,0 +1,37 @@
+'use strict';
+
+const { createClient } = require('@supabase/supabase-js');
+
+exports.handler = async (event) => {
+  const headers = { 'Content-Type': 'application/json' };
+  const jobId = event.queryStringParameters?.jobId;
+
+  if (!jobId) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'jobId is required' }) };
+  }
+
+  try {
+    const supabase = createClient(
+      process.env.VITE_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_KEY
+    );
+
+    const { data, error } = await supabase.storage
+      .from('menu-videos')
+      .download(`ai-jobs/${jobId}.json`);
+
+    if (error || !data) {
+      return { statusCode: 200, headers, body: JSON.stringify({ status: 'pending' }) };
+    }
+
+    const text = await data.text();
+    return { statusCode: 200, headers, body: text };
+  } catch (error) {
+    console.error('[enhance-photo-status] error:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ status: 'error', error: error.message }),
+    };
+  }
+};

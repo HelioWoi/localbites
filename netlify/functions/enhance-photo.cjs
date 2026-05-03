@@ -71,34 +71,53 @@ exports.handler = async (event) => {
     const imageBuffer = Buffer.from(base64Data, 'base64');
     const blob = new Blob([imageBuffer], { type: mimeType });
 
-    const formData = new FormData();
-    formData.append('image', blob, 'photo.jpg');
-    formData.append('prompt', MASTER_PROMPT);
-    formData.append('model', 'gpt-image-1');
-    formData.append('n', '1');
-    formData.append('size', '1024x1536');
-    formData.append('quality', 'low');
+    const callOpenAI = async (model, quality) => {
+      const formData = new FormData();
+      formData.append('image', blob, 'photo.jpg');
+      formData.append('prompt', MASTER_PROMPT);
+      formData.append('model', model);
+      formData.append('n', '1');
+      formData.append('size', '1024x1536');
+      formData.append('quality', quality);
 
-    const controller = new AbortController();
-    const timeoutMs = 28000;
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      const controller = new AbortController();
+      const timeoutMs = 28000;
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    const response = await fetch('https://api.openai.com/v1/images/edits', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: formData,
-      signal: controller.signal,
-    });
+      const response = await fetch('https://api.openai.com/v1/images/edits', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}` },
+        body: formData,
+        signal: controller.signal,
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || `OpenAI error ${response.status}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const msg = errorData.error?.message || `OpenAI error ${response.status}`;
+        const isAccessError = msg.toLowerCase().includes('verified') || msg.toLowerCase().includes('permission') || response.status === 403;
+        throw Object.assign(new Error(msg), { isAccessError });
+      }
+
+      const data = await response.json();
+      return data.data?.[0]?.b64_json || null;
+    };
+
+    let usedModel = 'gpt-image-2';
+    let b64Image = null;
+
+    try {
+      b64Image = await callOpenAI('gpt-image-2', 'medium');
+    } catch (err) {
+      if (err.isAccessError) {
+        console.log('[enhance-photo] gpt-image-2 access denied, falling back to gpt-image-1');
+        usedModel = 'gpt-image-1';
+        b64Image = await callOpenAI('gpt-image-1', 'low');
+      } else {
+        throw err;
+      }
     }
-
-    const data = await response.json();
-    const b64Image = data.data?.[0]?.b64_json;
 
     if (!b64Image) {
       throw new Error('No image returned from OpenAI');
@@ -107,7 +126,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ enhancedImage: `data:image/png;base64,${b64Image}` }),
+      body: JSON.stringify({ enhancedImage: `data:image/png;base64,${b64Image}`, modelUsed: usedModel }),
     };
   } catch (error) {
     console.error('[enhance-photo] error:', error);
