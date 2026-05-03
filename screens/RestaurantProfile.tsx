@@ -144,11 +144,25 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   const videoMenuItems = normalizedMenuItems.filter(d => d.videoUrl);
   const photoMenuItems = normalizedMenuItems.filter(d => !d.videoUrl && (d.photoUrl || d.thumbnailUrl));
   const menuFeedItems = mediaView === 'video' ? videoMenuItems : photoMenuItems;
+  const restaurantSlug = ((restaurant as any).slug) || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const fullMenuPath = `${window.location.pathname.startsWith('/demo/') ? '/demo/' : isStandalone ? '/r/' : '/'}${restaurantSlug}/full-menu`;
 
   const menuCategoryOrder = new Map(
     orderCategoriesAlcoholLast([...new Set(menuFeedItems.map(d => d.category).filter(Boolean))] as string[])
       .map((category, index) => [category, index])
   );
+
+  const photoCategoryOrder = new Map(
+    orderCategoriesAlcoholLast([...new Set(photoMenuItems.map(d => d.category).filter(Boolean))] as string[])
+      .map((category, index) => [category, index])
+  );
+
+  const orderedPhotoMenuItems = [...photoMenuItems].sort((a, b) => {
+    const aOrder = photoCategoryOrder.get(a.category || '') ?? Number.MAX_SAFE_INTEGER;
+    const bOrder = photoCategoryOrder.get(b.category || '') ?? Number.MAX_SAFE_INTEGER;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return (weeklyViewCounts.get(b.id) || 0) - (weeklyViewCounts.get(a.id) || 0);
+  });
 
   const orderedMenuFeedItems = [...menuFeedItems].sort((a, b) => {
     const aOrder = menuCategoryOrder.get(a.category || '') ?? Number.MAX_SAFE_INTEGER;
@@ -169,6 +183,17 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
   const filteredMenuItems = selectedVideoCategory === 'All' 
     ? orderedMenuFeedItems 
     : orderedMenuFeedItems.filter(d => d.category === selectedVideoCategory);
+  const selectedCategoryPhotoItems = selectedVideoCategory === 'All'
+    ? orderedPhotoMenuItems
+    : orderedPhotoMenuItems.filter(d => d.category === selectedVideoCategory);
+  const photoContinuationGroups = selectedVideoCategory === 'All'
+    ? orderCategoriesAlcoholLast([...new Set(selectedCategoryPhotoItems.map(d => d.category).filter(Boolean))] as string[])
+        .map((category) => ({
+          category,
+          items: selectedCategoryPhotoItems.filter((dish) => dish.category === category),
+        }))
+    : [{ category: selectedVideoCategory, items: selectedCategoryPhotoItems }];
+  const shouldShowPhotoContinuation = isPartnerExperience && mediaView === 'video' && selectedCategoryPhotoItems.length > 0;
 
   useEffect(() => {
     if (mediaView === 'video' && !hasVideoItems && hasPhotoItems) {
@@ -903,6 +928,13 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                 <p className="text-xs text-zinc-500 mb-3">Tap any video to see the dish in detail.</p>
               </>
             )}
+
+            {isPartnerExperience && (
+              <div className="mb-3 pt-1">
+                <h2 className="text-xl font-black text-zinc-900">Tap & Watch the Menu</h2>
+                <p className="text-xs text-zinc-500">Scroll videos, then explore more dishes below.</p>
+              </div>
+            )}
             
             {menuFeedItems.length === 0 && (
               <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-8 flex flex-col items-center text-center">
@@ -911,28 +943,6 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                 </div>
                 <p className="text-zinc-500 font-medium">Menu videos coming soon!</p>
                 <p className="text-zinc-400 text-xs mt-1">This restaurant is setting up their video menu.</p>
-              </div>
-            )}
-
-            {isPartnerExperience && (
-              <div className="flex items-center justify-center gap-3 mb-3 pt-1">
-                <span className="text-sm font-semibold text-zinc-500">View by</span>
-                <div className="inline-flex bg-white rounded-full p-1 border border-orange-100 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9)]">
-                  <button
-                    onClick={() => setMediaView('video')}
-                    disabled={!hasVideoItems}
-                    className={`px-5 py-2 rounded-full text-base font-bold transition-all ${mediaView === 'video' ? 'bg-gradient-to-r from-orange-500 to-amber-400 text-white shadow-sm shadow-orange-200/70' : 'text-zinc-700'} ${!hasVideoItems ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
-                    Video
-                  </button>
-                  <button
-                    onClick={() => setMediaView('photo')}
-                    disabled={!hasPhotoItems}
-                    className={`px-5 py-2 rounded-full text-base font-bold transition-all ${mediaView === 'photo' ? 'bg-gradient-to-r from-orange-500 to-amber-400 text-white shadow-sm shadow-orange-200/70' : 'text-zinc-700'} ${!hasPhotoItems ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
-                    Photo
-                  </button>
-                </div>
               </div>
             )}
 
@@ -954,7 +964,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                   </button>
                 ))}
                 <a
-                  href={`${window.location.pathname.startsWith('/demo/') ? '/demo/' : isStandalone ? '/r/' : '/'}${((restaurant as any).slug) || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/full-menu`}
+                  href={fullMenuPath}
                   className="px-5 py-2.5 rounded-full font-semibold text-sm whitespace-nowrap transition-all flex-shrink-0 bg-gradient-to-r from-orange-500 to-amber-400 text-white shadow-sm shadow-orange-200/70"
                 >
                   Full Menu
@@ -1035,6 +1045,53 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                 );
               })}
             </div>
+
+            {shouldShowPhotoContinuation && (
+              <div className="mt-5 rounded-2xl border border-orange-100 bg-gradient-to-br from-white via-white to-orange-50/25 p-4 shadow-[0_8px_20px_rgba(251,146,60,0.06)]">
+                {selectedVideoCategory !== 'All' && (
+                  <div className="mb-3 flex items-start justify-end gap-3">
+                    <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-600">Photos</span>
+                  </div>
+                )}
+
+                <div className="space-y-5">
+                  {photoContinuationGroups.map((group, groupIndex) => (
+                    <div key={`photo-group-${group.category || 'all'}`} className="space-y-2.5">
+                      {selectedVideoCategory === 'All' && (
+                        <div className="mb-1 flex items-start justify-between gap-3">
+                          <div>
+                            <h4 className="text-2xl font-black text-zinc-900">{group.category}</h4>
+                            <p className="text-sm text-zinc-500">{group.items.length} items</p>
+                          </div>
+                          {groupIndex === 0 && (
+                            <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-600">Photos</span>
+                          )}
+                        </div>
+                      )}
+
+                      {group.items.map((dish, photoIndex) => (
+                        <button
+                          key={`photo-preview-${dish.id}`}
+                          onClick={() => openDishFromGrid(dish, filteredMenuItems.length + photoIndex)}
+                          className="w-full text-left flex items-center gap-3 rounded-xl border border-zinc-100 bg-white p-2.5"
+                        >
+                          <img
+                            src={dish.photoUrl || dish.thumbnailUrl || restaurant.mainPhotoUrl}
+                            alt={dish.name}
+                            className="h-14 w-14 rounded-lg object-cover"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-bold text-zinc-900">{dish.name}</p>
+                            {dish.description && <p className="line-clamp-1 text-xs text-zinc-500">{dish.description}</p>}
+                          </div>
+                          {dish.price && <span className="text-sm font-black text-zinc-800">${Number(dish.price).toFixed(2)}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
@@ -1063,7 +1120,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
 
         {/* FULL MENU Button */}
         <a
-          href={`${window.location.pathname.startsWith('/demo/') ? '/demo/' : isStandalone ? '/r/' : '/'}${((restaurant as any).slug) || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/full-menu`}
+          href={fullMenuPath}
           className="w-full bg-gradient-to-r from-orange-500 to-amber-400 text-white rounded-2xl border border-orange-400/50 p-4 flex items-center justify-center gap-2 font-semibold text-base shadow-md shadow-orange-200/70 active:brightness-95 transition-all"
         >
           <UtensilsCrossed size={20} />
