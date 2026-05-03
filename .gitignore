@@ -34,3 +34,6 @@ supabase/.branches/
 
 # Windsurf AI files
 .windsurf/
+
+# Local Netlify folder
+.netlify
