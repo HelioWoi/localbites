@@ -65,8 +65,6 @@ Style:
 - Warm highlights and controlled shadows
 - Avoid washed-out or overly bright results`;
 
-const VERIFY_PROMPT = `You compare two menu photos. Return only PASS when the enhanced image keeps the exact same main subject/items/layout with no replacement. Return only FAIL if subject/items are replaced or materially changed.`;
-
 exports.handler = async (event) => {
   const headers = { 'Content-Type': 'application/json' };
   const { imageBase64, mimeType = 'image/jpeg', jobId } = JSON.parse(event.body || '{}');
@@ -108,53 +106,6 @@ exports.handler = async (event) => {
   const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
   const originalBuffer = Buffer.from(base64Data, 'base64');
   const originalBlob = new Blob([originalBuffer], { type: mimeType });
-  const originalDataUrl = `data:${mimeType};base64,${base64Data}`;
-
-  const isSubjectPreserved = async (enhancedB64) => {
-    const enhancedDataUrl = `data:image/png;base64,${enhancedB64}`;
-
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4.1-mini',
-        max_output_tokens: 16,
-        input: [
-          {
-            role: 'system',
-            content: [
-              {
-                type: 'input_text',
-                text: VERIFY_PROMPT,
-              },
-            ],
-          },
-          {
-            role: 'user',
-            content: [
-              { type: 'input_text', text: 'Image A is original. Image B is enhanced result. Has content been preserved?' },
-              { type: 'input_image', image_url: originalDataUrl },
-              { type: 'input_image', image_url: enhancedDataUrl },
-            ],
-          },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || `Verification error ${response.status}`);
-    }
-
-    const data = await response.json();
-    const outputText = typeof data.output_text === 'string' ? data.output_text : '';
-    if (/\bPASS\b/i.test(outputText) && !/\bFAIL\b/i.test(outputText)) return true;
-    if (/\bFAIL\b/i.test(outputText)) return false;
-    return false;
-  };
 
   const callOpenAI = async (model, quality, prompt) => {
     const formData = new FormData();
@@ -203,18 +154,6 @@ exports.handler = async (event) => {
 
     let outputBuffer = Buffer.from(b64Image, 'base64');
     let outputContentType = 'image/png';
-    let discardedReplacement = false;
-
-    try {
-      const preserved = await isSubjectPreserved(b64Image);
-      if (!preserved) {
-        discardedReplacement = true;
-        outputBuffer = originalBuffer;
-        outputContentType = mimeType;
-      }
-    } catch (verifyError) {
-      console.warn('[enhance-photo-demo-background] verification skipped (API error):', verifyError.message || verifyError);
-    }
 
     const extension = outputContentType.includes('png') ? 'png' : 'jpg';
     const outputPath = `ai-enhanced/${jobId}.${extension}`;
@@ -225,7 +164,7 @@ exports.handler = async (event) => {
     if (uploadError) throw new Error(`Image upload failed: ${uploadError.message}`);
     const { data: { publicUrl } } = supabase.storage.from('menu-videos').getPublicUrl(outputPath);
 
-    await saveJob({ status: 'done', enhancedImage: publicUrl, discardedReplacement, modelUsed: usedModel, promptProfile: 'demo-size-preserve-v2' });
+    await saveJob({ status: 'done', enhancedImage: publicUrl, modelUsed: usedModel, promptProfile: 'demo-size-preserve-v2' });
 
     return {
       statusCode: 200,
