@@ -121,7 +121,7 @@ exports.handler = async (event) => {
       },
       body: JSON.stringify({
         model: 'gpt-4.1-mini',
-        max_output_tokens: 8,
+        max_output_tokens: 16,
         input: [
           {
             role: 'system',
