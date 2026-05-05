@@ -234,15 +234,21 @@ const PartnerLandingPage: React.FC = () => {
     try {
       const jobId = crypto.randomUUID();
 
-      await fetch('/.netlify/functions/enhance-photo-demo-background', {
+      const kickoffRes = await fetch('/.netlify/functions/enhance-photo-demo-background', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageBase64: testOriginalImage, mimeType: 'image/jpeg', jobId }),
       });
 
+      if (!kickoffRes.ok) {
+        const kickoffData = await kickoffRes.json().catch(() => ({}));
+        throw new Error(kickoffData?.error || `AI enhancement request failed (${kickoffRes.status}).`);
+      }
+
       const enhancedImage = await new Promise<string>((resolve, reject) => {
         let attempts = 0;
         const maxAttempts = 120;
+        let transientStatusErrors = 0;
 
         const pollInterval = window.setInterval(async () => {
           attempts += 1;
@@ -255,7 +261,15 @@ const PartnerLandingPage: React.FC = () => {
 
           try {
             const statusRes = await fetch(`/.netlify/functions/enhance-photo-status?jobId=${jobId}`);
+            if (!statusRes.ok) {
+              const statusErrorData = await statusRes.json().catch(() => ({}));
+              window.clearInterval(pollInterval);
+              reject(new Error(statusErrorData?.error || `Status check failed (${statusRes.status}).`));
+              return;
+            }
+
             const statusData = await statusRes.json();
+            transientStatusErrors = 0;
 
             if (statusData?.status === 'done') {
               window.clearInterval(pollInterval);
@@ -269,7 +283,11 @@ const PartnerLandingPage: React.FC = () => {
               reject(new Error(statusData?.error || 'Enhancement failed. Please try again.'));
             }
           } catch {
-            // Keep polling on transient status errors
+            transientStatusErrors += 1;
+            if (transientStatusErrors >= 3) {
+              window.clearInterval(pollInterval);
+              reject(new Error('Could not check enhancement status. Please try again.'));
+            }
           }
         }, 2500);
       });
@@ -278,6 +296,7 @@ const PartnerLandingPage: React.FC = () => {
       setTestEnhancedImage(enhancedImage);
     } catch (error: any) {
       setPhotoTestError(error.message || 'Enhancement failed. Please try again.');
+      setAiProgress(0);
     } finally {
       if (aiProgressTimerRef.current) {
         window.clearInterval(aiProgressTimerRef.current);

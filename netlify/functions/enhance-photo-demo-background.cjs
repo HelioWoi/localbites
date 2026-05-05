@@ -68,13 +68,29 @@ Style:
 const VERIFY_PROMPT = `You compare two menu photos. Return only PASS when the enhanced image keeps the exact same main subject/items/layout with no replacement. Return only FAIL if subject/items are replaced or materially changed.`;
 
 exports.handler = async (event) => {
+  const headers = { 'Content-Type': 'application/json' };
   const { imageBase64, mimeType = 'image/jpeg', jobId } = JSON.parse(event.body || '{}');
 
-  if (!jobId || !imageBase64) return;
+  if (!jobId || !imageBase64) {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: 'jobId and imageBase64 are required' }),
+    };
+  }
 
   const apiKey = process.env.OPENAI_API_KEY;
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Supabase env vars are not configured' }),
+    };
+  }
+
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   const saveJob = async (payload) => {
@@ -206,8 +222,19 @@ exports.handler = async (event) => {
 
     await saveJob({ status: 'done', enhancedImage: publicUrl, discardedReplacement, modelUsed: usedModel, promptProfile: 'demo-size-preserve-v2' });
 
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ status: 'accepted', jobId }),
+    };
+
   } catch (error) {
     console.error('[enhance-photo-demo-background] error:', error);
     await saveJob({ status: 'error', error: error.message || 'Enhancement failed' });
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ status: 'error', error: error.message || 'Enhancement failed' }),
+    };
   }
 };
