@@ -79,6 +79,7 @@ exports.handler = async (event) => {
   }
 
   const { imageBase64, mimeType = 'image/jpeg', jobId } = parsedBody;
+  console.log('[demo-background] invoked jobId:', jobId, 'payloadBytes:', (event.body || '').length);
 
   if (!jobId || !imageBase64) {
     return {

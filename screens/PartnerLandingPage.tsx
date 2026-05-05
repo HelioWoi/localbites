@@ -145,8 +145,8 @@ const PartnerLandingPage: React.FC = () => {
     const originalWidth = image.naturalWidth || image.width;
     const originalHeight = image.naturalHeight || image.height;
 
-    const maxSide = 1600;
-    const minPixelsTarget = 1280 * 960;
+    const maxSide = 1280;
+    const minPixelsTarget = 1024 * 768;
     const currentPixels = originalWidth * originalHeight;
 
     let scale = Math.min(1, maxSide / Math.max(originalWidth, originalHeight));
@@ -171,7 +171,7 @@ const PartnerLandingPage: React.FC = () => {
     ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
 
     return {
-      processedDataUrl: canvas.toDataURL('image/jpeg', 0.92),
+      processedDataUrl: canvas.toDataURL('image/jpeg', 0.82),
       wasUpscaled: scale > 1.01,
       aspectRatio: originalWidth / originalHeight,
     };
@@ -233,6 +233,11 @@ const PartnerLandingPage: React.FC = () => {
 
     try {
       const jobId = crypto.randomUUID();
+
+      const payloadBytes = new TextEncoder().encode(testOriginalImage).length;
+      if (payloadBytes > 4 * 1024 * 1024) {
+        throw new Error('Photo is too large to send. Please try a smaller photo.');
+      }
 
       const kickoffRes = await fetch('/.netlify/functions/enhance-photo-demo-background', {
         method: 'POST',
