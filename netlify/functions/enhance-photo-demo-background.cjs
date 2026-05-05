@@ -94,11 +94,15 @@ exports.handler = async (event) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   const saveJob = async (payload) => {
-    await supabase.storage.from('menu-videos').upload(
+    const { error } = await supabase.storage.from('menu-videos').upload(
       `ai-jobs/${jobId}.json`,
       JSON.stringify(payload),
       { contentType: 'application/json', upsert: true }
     );
+    if (error) {
+      console.error('[enhance-photo-demo-background] saveJob storage error:', error.message);
+      throw new Error(`Storage write failed: ${error.message}`);
+    }
   };
 
   const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
@@ -214,10 +218,11 @@ exports.handler = async (event) => {
 
     const extension = outputContentType.includes('png') ? 'png' : 'jpg';
     const outputPath = `ai-enhanced/${jobId}.${extension}`;
-    await supabase.storage.from('menu-videos').upload(outputPath, outputBuffer, {
+    const { error: uploadError } = await supabase.storage.from('menu-videos').upload(outputPath, outputBuffer, {
       contentType: outputContentType,
       upsert: true,
     });
+    if (uploadError) throw new Error(`Image upload failed: ${uploadError.message}`);
     const { data: { publicUrl } } = supabase.storage.from('menu-videos').getPublicUrl(outputPath);
 
     await saveJob({ status: 'done', enhancedImage: publicUrl, discardedReplacement, modelUsed: usedModel, promptProfile: 'demo-size-preserve-v2' });
@@ -229,8 +234,12 @@ exports.handler = async (event) => {
     };
 
   } catch (error) {
-    console.error('[enhance-photo-demo-background] error:', error);
-    await saveJob({ status: 'error', error: error.message || 'Enhancement failed' });
+    console.error('[enhance-photo-demo-background] error:', error.message || error);
+    try {
+      await saveJob({ status: 'error', error: error.message || 'Enhancement failed' });
+    } catch (saveErr) {
+      console.error('[enhance-photo-demo-background] saveJob also failed:', saveErr.message);
+    }
     return {
       statusCode: 500,
       headers,
