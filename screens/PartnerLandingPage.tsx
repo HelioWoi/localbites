@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabase';
 import { ArrowRight, CheckCircle2, QrCode, Video, Sparkles, Star, Camera, Play, UtensilsCrossed, Coffee, Pizza, CloudUpload, WandSparkles, BarChart3 } from 'lucide-react';
 import LoveBotChat from '../components/LoveBotChat';
 import PromoPopup from '../components/PromoPopup';
@@ -234,15 +235,27 @@ const PartnerLandingPage: React.FC = () => {
     try {
       const jobId = crypto.randomUUID();
 
-      const payloadBytes = new TextEncoder().encode(testOriginalImage).length;
-      if (payloadBytes > 4 * 1024 * 1024) {
-        throw new Error('Photo is too large to send. Please try a smaller photo.');
-      }
+      const commaIdx = testOriginalImage.indexOf(',');
+      const base64Only = commaIdx >= 0 ? testOriginalImage.slice(commaIdx + 1) : testOriginalImage;
+      const byteChars = atob(base64Only);
+      const byteArr = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+      const imageBlob = new Blob([byteArr], { type: 'image/jpeg' });
+
+      const tempPath = `ai-temp/${jobId}.jpg`;
+      const { error: uploadErr } = await supabase.storage
+        .from('menu-videos')
+        .upload(tempPath, imageBlob, { contentType: 'image/jpeg', upsert: true });
+      if (uploadErr) throw new Error('Could not upload photo. Please try again.');
+
+      const { data: { publicUrl: imageUrl } } = supabase.storage
+        .from('menu-videos')
+        .getPublicUrl(tempPath);
 
       const kickoffRes = await fetch('/.netlify/functions/enhance-photo-demo-background', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: testOriginalImage, mimeType: 'image/jpeg', jobId }),
+        body: JSON.stringify({ imageUrl, jobId }),
       });
 
       if (!kickoffRes.ok) {

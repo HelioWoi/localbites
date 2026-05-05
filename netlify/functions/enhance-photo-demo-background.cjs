@@ -78,14 +78,14 @@ exports.handler = async (event) => {
     };
   }
 
-  const { imageBase64, mimeType = 'image/jpeg', jobId } = parsedBody;
-  console.log('[demo-background] invoked jobId:', jobId, 'payloadBytes:', (event.body || '').length);
+  const { imageUrl, mimeType = 'image/jpeg', jobId } = parsedBody;
+  console.log('[demo-background] invoked jobId:', jobId, 'imageUrl:', imageUrl?.substring(0, 60));
 
-  if (!jobId || !imageBase64) {
+  if (!jobId || !imageUrl) {
     return {
       statusCode: 400,
       headers,
-      body: JSON.stringify({ error: 'jobId and imageBase64 are required' }),
+      body: JSON.stringify({ error: 'jobId and imageUrl are required' }),
     };
   }
 
@@ -115,18 +115,19 @@ exports.handler = async (event) => {
     }
   };
 
-  let base64Data;
   let originalBuffer;
   let originalBlob;
   try {
-    base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-    originalBuffer = Buffer.from(base64Data, 'base64');
+    const imgResponse = await fetch(imageUrl);
+    if (!imgResponse.ok) throw new Error(`Image fetch failed: ${imgResponse.status}`);
+    const arrayBuffer = await imgResponse.arrayBuffer();
+    originalBuffer = Buffer.from(arrayBuffer);
     originalBlob = new Blob([originalBuffer], { type: mimeType });
-  } catch {
+  } catch (fetchErr) {
     return {
       statusCode: 400,
       headers,
-      body: JSON.stringify({ error: 'Invalid image payload' }),
+      body: JSON.stringify({ error: `Could not load image: ${fetchErr.message}` }),
     };
   }
 
