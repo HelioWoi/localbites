@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Play, Pause, Volume2, VolumeX, ChevronUp, Star, MapPin, Globe, Navigation, Heart, Bookmark, X, ChevronLeft, MessageSquare, Home, Search, Sparkles, Filter, Clock, Send, Video, UtensilsCrossed, ShoppingBag, Eye } from 'lucide-react';
 import { trackEvent } from '../services/eventsService';
 import { trackAnalyticsEvent } from '../services/analyticsV2Service';
 import { getMenuItemViewCounts } from '../services/partnerAnalyticsService';
 import { getCDNUrl } from '../utils/cdnHelper';
+import { orderCategoriesAlcoholLast } from '../utils/categoryOrder';
 
 interface MenuItem {
   id: string;
@@ -60,6 +61,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   const [showSavedOnly, setShowSavedOnly] = useState(false); // Filter for saved videos
   const videoRefsById = useRef<Map<string, HTMLVideoElement>>(new Map());
   const scrollRef = useRef<HTMLDivElement>(null);
+  const pillsScrollRef = useRef<HTMLDivElement>(null);
+  const activePillRef = useRef<HTMLButtonElement>(null);
   const [videoReady, setVideoReady] = useState<Set<number>>(new Set());
   const isInitialMount = useRef(true); // Track which videos are ready to play
   
@@ -72,6 +75,35 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   const [videoTimedOut, setVideoTimedOut] = useState<Set<number>>(new Set());
   const [playbackProgress, setPlaybackProgress] = useState(0);
   const [expandedDescriptionItemId, setExpandedDescriptionItemId] = useState<string | null>(null);
+
+  const normalizeCategory = (value?: string | null) => (value || '').trim().toLowerCase();
+
+  const categoryPills = useMemo(() => {
+    const seen = new Set<string>();
+    const allCategories: string[] = [];
+    const pushCategory = (category?: string | null) => {
+      const clean = (category || '').trim();
+      if (!clean) return;
+      const key = normalizeCategory(clean);
+      if (seen.has(key)) return;
+      seen.add(key);
+      allCategories.push(clean);
+    };
+
+    restaurant.categories.forEach(pushCategory);
+    restaurant.menuItems.forEach((item) => pushCategory(item.category));
+
+    return orderCategoriesAlcoholLast(allCategories);
+  }, [restaurant.categories, restaurant.menuItems]);
+
+  const displayedCategoryPills = useMemo(() => {
+    if (!activeCategory) return categoryPills;
+    const exists = categoryPills.some(
+      (category) => normalizeCategory(category) === normalizeCategory(activeCategory)
+    );
+    if (exists) return categoryPills;
+    return orderCategoriesAlcoholLast([...categoryPills, activeCategory]);
+  }, [categoryPills, activeCategory]);
   
   // Analytics V2: Track QR scan on mount only if ?qr=1 param present (real QR code scan)
   useEffect(() => {
@@ -110,13 +142,17 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     }
 
     if (categoryParam) {
+      const matchedCategory = categoryPills.find(
+        (category) => normalizeCategory(category) === normalizeCategory(categoryParam)
+      );
+      categoryParam = matchedCategory || categoryParam;
       setActiveCategory(categoryParam);
     }
     
     if (dishId) {
       // If category filter is active, find index in filtered list
       const itemsList = categoryParam 
-        ? restaurant.menuItems.filter(item => item.category === categoryParam)
+        ? restaurant.menuItems.filter(item => normalizeCategory(item.category) === normalizeCategory(categoryParam))
         : restaurant.menuItems;
       
       const dishIndex = itemsList.findIndex(item => item.id === dishId);
@@ -135,7 +171,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     } else if (isQRRoute || isDemoRoute) {
       // QR/demo entry: if no explicit dish was requested, prefer opening on first video item
       const itemsList = categoryParam
-        ? restaurant.menuItems.filter(item => item.category === categoryParam)
+        ? restaurant.menuItems.filter(item => normalizeCategory(item.category) === normalizeCategory(categoryParam))
         : restaurant.menuItems;
 
       const firstVideoIndex = itemsList.findIndex(item => !!(item.videoUrl && item.videoUrl !== ''));
@@ -151,7 +187,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
         }, 100);
       }
     }
-  }, [restaurant.id, restaurant.menuItems]);
+  }, [restaurant.id, restaurant.menuItems, categoryPills]);
   
   // Lazy load analytics data AFTER first video is ready (non-blocking)
   useEffect(() => {
@@ -302,7 +338,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
 
   // Filter items by category and saved status
   let filteredItems = activeCategory 
-    ? restaurant.menuItems.filter(item => item.category === activeCategory)
+    ? restaurant.menuItems.filter(item => normalizeCategory(item.category) === normalizeCategory(activeCategory))
     : restaurant.menuItems;
   
   // If showSavedOnly is true, only show saved videos
@@ -320,11 +356,14 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   const getNextCategory = (): string | null | false => {
     if (activeCategory === null) {
       // "All" view → go to first category
-      return restaurant.categories.length > 0 ? restaurant.categories[0] : false;
+      return displayedCategoryPills.length > 0 ? displayedCategoryPills[0] : false;
     }
-    const currentIdx = restaurant.categories.indexOf(activeCategory);
+    const currentIdx = displayedCategoryPills.findIndex(
+      (category) => normalizeCategory(category) === normalizeCategory(activeCategory)
+    );
+    if (currentIdx === -1) return displayedCategoryPills.length > 0 ? displayedCategoryPills[0] : false;
     const nextIdx = currentIdx + 1;
-    if (nextIdx < restaurant.categories.length) return restaurant.categories[nextIdx];
+    if (nextIdx < displayedCategoryPills.length) return displayedCategoryPills[nextIdx];
     return false; // no more categories
   };
 
@@ -443,17 +482,19 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
         }
       } else {
         // Last video of current category - switch to next category
-        const currentCategoryIndex = restaurant.categories.indexOf(activeCategory || '');
+        const currentCategoryIndex = displayedCategoryPills.findIndex(
+          (category) => normalizeCategory(category) === normalizeCategory(activeCategory || '')
+        );
         const nextCategoryIndex = currentCategoryIndex + 1;
         
         if (activeCategory === null) {
           // We're in "All" view, go to first category
-          if (restaurant.categories.length > 0) {
-            setActiveCategory(restaurant.categories[0]);
+          if (displayedCategoryPills.length > 0) {
+            setActiveCategory(displayedCategoryPills[0]);
           }
-        } else if (nextCategoryIndex < restaurant.categories.length) {
+        } else if (nextCategoryIndex < displayedCategoryPills.length) {
           // Go to next category
-          setActiveCategory(restaurant.categories[nextCategoryIndex]);
+          setActiveCategory(displayedCategoryPills[nextCategoryIndex]);
         } else {
           // All categories done, go back to "All"
           setActiveCategory(null);
@@ -463,7 +504,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     
     currentVideo.addEventListener('ended', handleVideoEnd);
     return () => currentVideo.removeEventListener('ended', handleVideoEnd);
-  }, [activeVideoIndex, filteredItems.length, activeCategory, restaurant.categories]);
+  }, [activeVideoIndex, filteredItems.length, activeCategory, displayedCategoryPills]);
 
   // Cleanup: unload all videos when component unmounts to free memory
   useEffect(() => {
@@ -578,6 +619,48 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     setExpandedDescriptionItemId(null);
   }, [activeVideoIndex, activeCategory]);
 
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const dishId = urlParams.get('dish');
+    if (!dishId || !activeItem?.category) return;
+
+    const matchedCategory = categoryPills.find(
+      (category) => normalizeCategory(category) === normalizeCategory(activeItem.category)
+    ) || activeItem.category;
+
+    if (normalizeCategory(activeCategory) !== normalizeCategory(matchedCategory)) {
+      setActiveCategory(matchedCategory);
+    }
+  }, [activeItem?.id, activeItem?.category, activeCategory, categoryPills]);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const dishId = urlParams.get('dish');
+    if (!dishId) return;
+
+    const dish = restaurant.menuItems.find((item) => item.id === dishId);
+    if (!dish?.category) return;
+
+    const matchedCategory = categoryPills.find(
+      (category) => normalizeCategory(category) === normalizeCategory(dish.category)
+    ) || dish.category;
+
+    setActiveCategory((prev) =>
+      normalizeCategory(prev) === normalizeCategory(matchedCategory) ? prev : matchedCategory
+    );
+  }, [restaurant.menuItems, categoryPills]);
+
+  useEffect(() => {
+    if (!activePillRef.current || !pillsScrollRef.current) return;
+    const pill = activePillRef.current;
+    const container = pillsScrollRef.current;
+    const pillLeft = pill.offsetLeft;
+    const pillWidth = pill.offsetWidth;
+    const containerWidth = container.offsetWidth;
+    const scrollLeft = pillLeft - containerWidth / 2 + pillWidth / 2;
+    container.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' });
+  }, [activeCategory]);
+
   return (
     <div className="h-screen w-screen bg-black overflow-hidden">
       
@@ -665,8 +748,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
         </div>
 
         {/* Category Pills */}
-        {(restaurant.categories.length > 1 || isBrazzosPilot) && (
-          <div className={`flex items-center gap-2 ${isBrazzosPilot ? 'mt-2' : 'mt-4'} overflow-x-auto no-scrollbar pb-2`}>
+        {(displayedCategoryPills.length > 1 || isBrazzosPilot) && (
+          <div ref={pillsScrollRef} className={`flex items-center gap-2 ${isBrazzosPilot ? 'mt-2' : 'mt-4'} overflow-x-auto no-scrollbar pb-2`}>
             {isBrazzosPilot && (
               <button
                 onClick={handleBackNavigation}
@@ -686,19 +769,23 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
             >
               All
             </button>
-            {restaurant.categories.map(category => (
-              <button
-                key={category}
-                onClick={() => setActiveCategory(category)}
-                className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
-                  activeCategory === category 
-                    ? 'bg-orange-500 text-white' 
-                    : 'bg-white/10 text-white/70 hover:bg-white/20'
-                }`}
-              >
-                {category}
-              </button>
-            ))}
+            {displayedCategoryPills.map(category => {
+              const isActive = normalizeCategory(activeCategory) === normalizeCategory(category);
+              return (
+                <button
+                  key={category}
+                  ref={isActive ? activePillRef : null}
+                  onClick={() => setActiveCategory(category)}
+                  className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
+                    isActive
+                      ? 'bg-orange-500 text-white' 
+                      : 'bg-white/10 text-white/70 hover:bg-white/20'
+                  }`}
+                >
+                  {category}
+                </button>
+              );
+            })}
             {/* Full Menu Link */}
             <a
               href={`${window.location.pathname.startsWith('/demo/') ? '/demo/' : window.location.pathname.startsWith('/r/') ? '/r/' : '/'}${restaurant.slug}/full-menu`}

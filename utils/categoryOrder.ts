@@ -12,6 +12,16 @@ const ALCOHOLIC_CATEGORY_KEYWORDS = [
   'alcoholic',
   'hard seltzer',
   'cider',
+  'drink',
+  'drinks',
+  'soft drink',
+  'soft drinks',
+  'softdrink',
+  'softdrinks',
+  'beverage',
+  'beverages',
+  'soda',
+  'mocktail',
 ];
 
 const normalizeCategory = (value: string) => value.trim().toLowerCase();
@@ -34,6 +44,9 @@ export const orderCategoriesAlcoholLast = (categories: string[]): string[] => {
     }
     nonAlcoholic.push(category);
   });
+
+  nonAlcoholic.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  alcoholic.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
   return [...nonAlcoholic, ...alcoholic];
 };
