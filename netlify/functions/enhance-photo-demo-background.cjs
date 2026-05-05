@@ -67,7 +67,18 @@ Style:
 
 exports.handler = async (event) => {
   const headers = { 'Content-Type': 'application/json' };
-  const { imageBase64, mimeType = 'image/jpeg', jobId } = JSON.parse(event.body || '{}');
+  let parsedBody;
+  try {
+    parsedBody = JSON.parse(event.body || '{}');
+  } catch {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: 'Invalid JSON body' }),
+    };
+  }
+
+  const { imageBase64, mimeType = 'image/jpeg', jobId } = parsedBody;
 
   if (!jobId || !imageBase64) {
     return {
@@ -103,9 +114,20 @@ exports.handler = async (event) => {
     }
   };
 
-  const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-  const originalBuffer = Buffer.from(base64Data, 'base64');
-  const originalBlob = new Blob([originalBuffer], { type: mimeType });
+  let base64Data;
+  let originalBuffer;
+  let originalBlob;
+  try {
+    base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    originalBuffer = Buffer.from(base64Data, 'base64');
+    originalBlob = new Blob([originalBuffer], { type: mimeType });
+  } catch {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: 'Invalid image payload' }),
+    };
+  }
 
   const callOpenAI = async (model, quality, prompt) => {
     const formData = new FormData();
