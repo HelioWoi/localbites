@@ -79,8 +79,10 @@ Rules:
 - Return FOOD for everything else.
 - Do not output explanations.`;
 
+const PLAN_AI_CREDITS = { free: 0, basic: 50, pro: 200 };
+
 exports.handler = async (event) => {
-  const { imageBase64, mimeType = 'image/jpeg', jobId } = JSON.parse(event.body || '{}');
+  const { imageBase64, mimeType = 'image/jpeg', jobId, partnerId } = JSON.parse(event.body || '{}');
 
   if (!jobId || !imageBase64) return;
 
@@ -89,6 +91,54 @@ exports.handler = async (event) => {
     process.env.VITE_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_KEY
   );
+
+  // Credit check when partnerId is provided
+  if (partnerId) {
+    const { data: partner } = await supabase
+      .from('partners')
+      .select('subscription_plan, ai_credits_used, ai_credits_reset_at, subscription_status, lifetime_access')
+      .eq('id', partnerId)
+      .single();
+
+    if (partner) {
+      const isActive = partner.lifetime_access ||
+        partner.subscription_status === 'active' ||
+        partner.subscription_status === 'trialing';
+
+      const rawPlan = (partner.subscription_plan || '').toLowerCase();
+      const planTier = partner.lifetime_access ? 'pro'
+        : rawPlan === 'pro' ? 'pro'
+        : (rawPlan === 'basic' || rawPlan === 'monthly' || rawPlan === 'annual') ? 'basic'
+        : 'free';
+
+      const creditLimit = isActive ? (PLAN_AI_CREDITS[planTier] || 0) : 0;
+
+      if (creditLimit === 0) {
+        await supabase.storage.from('menu-videos').upload(
+          `ai-jobs/${jobId}.json`,
+          JSON.stringify({ status: 'error', error: 'AI credits not available on your current plan.' }),
+          { contentType: 'application/json', upsert: true }
+        );
+        return { statusCode: 200, body: '{}' };
+      }
+
+      // Auto-reset credits if billing period rolled over
+      let creditsUsed = partner.ai_credits_used || 0;
+      if (partner.ai_credits_reset_at && new Date(partner.ai_credits_reset_at) < new Date()) {
+        creditsUsed = 0;
+        await supabase.from('partners').update({ ai_credits_used: 0 }).eq('id', partnerId);
+      }
+
+      if (creditsUsed >= creditLimit) {
+        await supabase.storage.from('menu-videos').upload(
+          `ai-jobs/${jobId}.json`,
+          JSON.stringify({ status: 'error', error: `Monthly AI credit limit (${creditLimit}) reached. Credits reset on your next billing date.` }),
+          { contentType: 'application/json', upsert: true }
+        );
+        return { statusCode: 200, body: '{}' };
+      }
+    }
+  }
 
   const saveJob = async (payload) => {
     await supabase.storage.from('menu-videos').upload(
@@ -201,6 +251,11 @@ exports.handler = async (event) => {
     const { data: { publicUrl } } = supabase.storage.from('menu-videos').getPublicUrl(outputPath);
 
     await saveJob({ status: 'done', enhancedImage: publicUrl, modelUsed: usedModel, detectedType: imageType });
+
+    // Increment AI credits used
+    if (partnerId) {
+      await supabase.rpc('increment_ai_credits', { partner_id_arg: partnerId });
+    }
 
   } catch (error) {
     console.error('[enhance-photo-background] error:', error);

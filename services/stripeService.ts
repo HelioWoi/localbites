@@ -1,6 +1,65 @@
 import { supabase } from '../lib/supabase';
 import { STRIPE_PRICE_IDS } from './stripeConfig';
 
+// ── Plan tiers ───────────────────────────────────────────────────────────────
+export type PlanId = 'free' | 'basic' | 'pro';
+
+export interface PlanLimits {
+  menuItems: number;       // Infinity = unlimited
+  aiCredits: number;       // per month; 0 = disabled
+  locations: number;
+  analytics: boolean;
+  analyticsAdvanced: boolean;
+  customBranding: boolean;
+  whiteLabel: boolean;
+}
+
+export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
+  free: {
+    menuItems:         10,
+    aiCredits:         0,
+    locations:         1,
+    analytics:         false,
+    analyticsAdvanced: false,
+    customBranding:    false,
+    whiteLabel:        false,
+  },
+  basic: {
+    menuItems:         Infinity,
+    aiCredits:         50,
+    locations:         1,
+    analytics:         true,
+    analyticsAdvanced: false,
+    customBranding:    true,
+    whiteLabel:        false,
+  },
+  pro: {
+    menuItems:         Infinity,
+    aiCredits:         200,
+    locations:         3,
+    analytics:         true,
+    analyticsAdvanced: true,
+    customBranding:    true,
+    whiteLabel:        true,
+  },
+};
+
+// Prices in AUD cents for display
+export const PLAN_PRICES = {
+  basic:  { monthly: 29,  annual: 313 },   // annual = ~$26.08/mo (10% off)
+  pro:    { monthly: 69,  annual: 745 },   // annual = ~$62.08/mo (10% off)
+} as const;
+
+/** Map DB value of subscription_plan → PlanId */
+export function planFromString(raw: string | null | undefined, hasActive: boolean): PlanId {
+  if (!hasActive) return 'free';
+  if (!raw) return 'free';
+  const s = raw.toLowerCase();
+  if (s === 'pro') return 'pro';
+  if (s === 'basic' || s === 'monthly' || s === 'annual') return 'basic';
+  return 'free';
+}
+
 export interface SubscriptionPlan {
   id: string;
   name: string;
@@ -12,32 +71,65 @@ export interface SubscriptionPlan {
 
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
-    id: 'monthly',
-    name: 'Monthly Premium',
-    price: 39,
+    id: 'basic_monthly',
+    name: 'Basic Monthly',
+    price: 29,
     interval: 'month',
-    priceId: STRIPE_PRICE_IDS.monthly,
+    priceId: STRIPE_PRICE_IDS.basic_monthly,
     features: [
-      'Unlimited video uploads',
-      'Premium profile badge',
-      'Featured in search results',
-      'Analytics dashboard',
+      'Unlimited menu items',
+      'Custom branding',
+      'Connect your checkout link',
+      'Analytics (basic)',
+      '50 AI photo credits / month',
       'Priority support',
     ],
   },
   {
-    id: 'annual',
-    name: 'Annual Premium',
-    price: 390,
+    id: 'basic_annual',
+    name: 'Basic Annual',
+    price: 313,
     interval: 'year',
-    priceId: STRIPE_PRICE_IDS.annual,
+    priceId: STRIPE_PRICE_IDS.basic_annual,
     features: [
-      'Unlimited video uploads',
-      'Premium profile badge',
-      'Featured in search results',
-      'Analytics dashboard',
+      'Unlimited menu items',
+      'Custom branding',
+      'Connect your checkout link',
+      'Analytics (basic)',
+      '50 AI photo credits / month',
       'Priority support',
-      'Save $78/year (17% off)',
+      'Save $35/year (10% off)',
+    ],
+  },
+  {
+    id: 'pro_monthly',
+    name: 'Pro Monthly',
+    price: 69,
+    interval: 'month',
+    priceId: STRIPE_PRICE_IDS.pro_monthly,
+    features: [
+      'Everything in Basic',
+      'Analytics (advanced)',
+      'Up to 3 locations',
+      '200 AI photo credits / month',
+      'Faster AI processing',
+      'White-label options',
+    ],
+  },
+  {
+    id: 'pro_annual',
+    name: 'Pro Annual',
+    price: 745,
+    interval: 'year',
+    priceId: STRIPE_PRICE_IDS.pro_annual,
+    features: [
+      'Everything in Basic',
+      'Analytics (advanced)',
+      'Up to 3 locations',
+      '200 AI photo credits / month',
+      'Faster AI processing',
+      'White-label options',
+      'Save $83/year (10% off)',
     ],
   },
 ];

@@ -18,6 +18,17 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
   // Helper functions with access to supabase
+  /** Map a Stripe price ID to our plan tier ('basic' | 'pro') */
+  function planTierFromPriceId(priceId: string): 'basic' | 'pro' {
+    const BASIC_MONTHLY = Deno.env.get("BASIC_MONTHLY_PRICE_ID") || '';
+    const BASIC_ANNUAL  = Deno.env.get("BASIC_ANNUAL_PRICE_ID")  || '';
+    const PRO_MONTHLY   = Deno.env.get("PRO_MONTHLY_PRICE_ID")   || '';
+    const PRO_ANNUAL    = Deno.env.get("PRO_ANNUAL_PRICE_ID")    || '';
+    if (priceId === PRO_MONTHLY || priceId === PRO_ANNUAL) return 'pro';
+    if (priceId === BASIC_MONTHLY || priceId === BASIC_ANNUAL) return 'basic';
+    return 'basic'; // legacy $39 plan migrates to basic
+  }
+
   async function handleSubscriptionUpdate(subscription: any) {
     const customerId = subscription.customer as string;
     const subscriptionId = subscription.id;
@@ -39,19 +50,19 @@ serve(async (req) => {
       return;
     }
 
-    const planName = interval === "year" ? "Annual" : "Monthly";
+    const planTier = planTierFromPriceId(priceId);
     
     // If cancel_at_period_end is true, user canceled but subscription is still active until period end
     const effectiveStatus = subscription.cancel_at_period_end ? "canceled" : status;
 
-    console.log(`[Webhook] Subscription status: ${status}, cancel_at_period_end: ${subscription.cancel_at_period_end}, effective: ${effectiveStatus}`);
+    console.log(`[Webhook] Subscription status: ${status}, plan: ${planTier}, cancel_at_period_end: ${subscription.cancel_at_period_end}, effective: ${effectiveStatus}`);
 
     await supabase
       .from("partners")
       .update({
         stripe_subscription_id: subscriptionId,
         subscription_status: effectiveStatus,
-        subscription_plan: planName,
+        subscription_plan: planTier,
         subscription_start_date: new Date(subscription.current_period_start * 1000).toISOString(),
         subscription_end_date: new Date(subscription.current_period_end * 1000).toISOString(),
       })
@@ -133,7 +144,8 @@ serve(async (req) => {
       const line = invoice.lines.data[0];
       const priceId = line.price?.id;
       const interval = line.price?.recurring?.interval || "month";
-      const planName = interval === "year" ? "Annual" : "Monthly";
+      const invoicePriceId = line.price?.id || '';
+      const planTier = planTierFromPriceId(invoicePriceId);
       
       // Check if this is a trial (amount is 0 for trial invoices)
       const isTrial = invoice.amount_paid === 0;
@@ -148,20 +160,25 @@ serve(async (req) => {
         console.log(`[Webhook] Referral moved to trial status for partner ${partner.id}`);
       }
 
-      console.log(`[Webhook] Updating subscription for partner ${partner.id}: ${subscriptionId}, isTrial: ${isTrial}`);
+      console.log(`[Webhook] Updating subscription for partner ${partner.id}: ${subscriptionId}, plan: ${planTier}, isTrial: ${isTrial}`);
       
+      // Reset AI credits on each billing period (including trial start)
+      const nextResetAt = new Date(line.period.end * 1000).toISOString();
+
       await supabase
         .from("partners")
         .update({
           stripe_subscription_id: subscriptionId,
           subscription_status: "active",
-          subscription_plan: planName,
+          subscription_plan: planTier,
           subscription_start_date: new Date(line.period.start * 1000).toISOString(),
           subscription_end_date: new Date(line.period.end * 1000).toISOString(),
+          ai_credits_used: 0,
+          ai_credits_reset_at: nextResetAt,
         })
         .eq("id", partner.id);
 
-      console.log(`[Webhook] Subscription updated: ${subscriptionId}, plan: ${planName}, isTrial: ${isTrial}, end: ${new Date(line.period.end * 1000).toISOString()}`);
+      console.log(`[Webhook] Subscription updated: ${subscriptionId}, plan: ${planTier}, isTrial: ${isTrial}, creditsReset, end: ${nextResetAt}`);
     }
 
     // Record payment

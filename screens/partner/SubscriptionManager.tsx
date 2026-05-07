@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Check, Loader2, Crown, Calendar, DollarSign } from 'lucide-react';
+import { CreditCard, Check, Loader2, Crown, Zap, Star } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { STRIPE_PRICE_IDS } from '../../services/stripeConfig';
+import { PLAN_LIMITS, PLAN_PRICES, planFromString, type PlanId } from '../../services/stripeService';
 
 interface SubscriptionManagerProps {
   partnerId: string;
@@ -15,16 +16,41 @@ interface SubscriptionData {
   cancelAtPeriodEnd: boolean;
 }
 
+const FREE_FEATURES = [
+  'QR code video menu',
+  'Video upload (basic)',
+  'Up to 10 menu items',
+  '1 location',
+  'Standard support',
+];
+
+const BASIC_FEATURES = [
+  'Everything in Free',
+  'Unlimited menu items',
+  'Custom branding',
+  'Connect your checkout link',
+  'Analytics (basic)',
+  '50 AI photo credits / month',
+  'Priority support',
+];
+
+const PRO_FEATURES = [
+  'Everything in Basic',
+  'Analytics (advanced)',
+  'Up to 3 locations',
+  '200 AI photo credits / month',
+  'Faster AI processing',
+  'White-label options',
+];
+
 const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, partnerEmail }) => {
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
+  const [currentPlan, setCurrentPlan] = useState<PlanId>('free');
+  const [aiCreditsUsed, setAiCreditsUsed] = useState(0);
+  const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [loading, setLoading] = useState(true);
-  const [processingCheckout, setProcessingCheckout] = useState(false);
+  const [processingPlan, setProcessingPlan] = useState<string | null>(null);
   const [wasCanceled, setWasCanceled] = useState(false);
-
-  const PRICE_IDS = {
-    monthly: STRIPE_PRICE_IDS.monthly,
-    annual: STRIPE_PRICE_IDS.annual,
-  };
 
   useEffect(() => {
     loadSubscription();
@@ -41,44 +67,36 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
 
   const loadSubscription = async () => {
     try {
-      console.log('[SubscriptionManager] Loading subscription for partner:', partnerId);
       const { data: partner, error } = await supabase
         .from('partners')
-        .select('subscription_status, subscription_plan, subscription_end_date, subscription_start_date, stripe_subscription_id, lifetime_access, trial_ends_at')
+        .select('subscription_status, subscription_plan, subscription_end_date, subscription_start_date, stripe_subscription_id, lifetime_access, trial_ends_at, ai_credits_used')
         .eq('id', partnerId)
         .single();
 
-      if (error) {
-        console.error('[SubscriptionManager] Error loading partner:', error);
-      }
+      if (error) console.error('[SubscriptionManager] Error loading partner:', error);
 
-      console.log('[SubscriptionManager] Partner data:', partner);
+      setAiCreditsUsed(partner?.ai_credits_used ?? 0);
 
-      // Check for lifetime access first
+      const hasActive = partner?.lifetime_access ||
+        (partner?.subscription_status === 'active' || partner?.subscription_status === 'trialing') &&
+        !!partner?.stripe_subscription_id;
+
+      setCurrentPlan(
+        partner?.lifetime_access ? 'pro'
+        : planFromString(partner?.subscription_plan, !!hasActive)
+      );
+
       if (partner?.lifetime_access === true) {
-        console.log('[SubscriptionManager] Partner has lifetime access');
-        setSubscription({
-          status: 'lifetime',
-          plan: 'Lifetime',
-          currentPeriodEnd: '2099-12-31',
-          cancelAtPeriodEnd: false,
-        });
-      } else if (partner && partner.subscription_status && partner.subscription_status !== 'inactive' && partner.subscription_status !== 'canceled' && partner.stripe_subscription_id) {
-        console.log('[SubscriptionManager] Setting subscription:', {
-          status: partner.subscription_status,
-          plan: partner.subscription_plan,
-          endDate: partner.subscription_end_date
-        });
+        setSubscription({ status: 'lifetime', plan: 'pro', currentPeriodEnd: '2099-12-31', cancelAtPeriodEnd: false });
+      } else if (partner && (partner.subscription_status === 'active' || partner.subscription_status === 'trialing') && partner.stripe_subscription_id) {
         setSubscription({
           status: partner.subscription_status,
-          plan: partner.subscription_plan || 'None',
+          plan: partner.subscription_plan || 'basic',
           currentPeriodEnd: partner.subscription_end_date,
           cancelAtPeriodEnd: false,
         });
       } else {
-        const isCanceled = partner?.subscription_status === 'canceled';
-        console.log('[SubscriptionManager] No active subscription found, canceled:', isCanceled);
-        setWasCanceled(isCanceled);
+        setWasCanceled(partner?.subscription_status === 'canceled');
         setSubscription(null);
       }
     } catch (error) {
@@ -88,20 +106,18 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
     }
   };
 
-  const handleSubscribe = async (priceId: string) => {
-    setProcessingCheckout(true);
+  const handleSubscribe = async (priceId: string, planKey: string) => {
+    if (!priceId) {
+      alert('This plan is not yet available. Please contact support.');
+      return;
+    }
+    setProcessingPlan(planKey);
     try {
-      // Verificar se usuário está autenticado
       const { data: { session } } = await supabase.auth.getSession();
-      console.log('Session:', session ? 'Authenticated' : 'Not authenticated');
-      
       if (!session) {
         alert('You need to be logged in to subscribe. Please log in and try again.');
         return;
       }
-
-      console.log('Creating checkout session for partner:', partnerId, 'with price:', priceId);
-
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
         body: {
           partnerId,
@@ -110,31 +126,14 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
           cancelUrl: `${window.location.origin}/partner?canceled=true`,
         },
       });
-
-      console.log('Checkout response:', JSON.stringify({ data, error }, null, 2));
-
-      if (error) {
-        console.error('Checkout error details:', JSON.stringify(error, null, 2));
-        throw new Error(typeof error === 'object' ? JSON.stringify(error) : error);
-      }
-
-      if (data?.error) {
-        console.error('Checkout API error:', data.error, data.stripe);
-        throw new Error(data.stripe || data.error || 'Checkout failed');
-      }
-
-      if (data?.url) {
-        console.log('Redirecting to:', data.url);
-        window.location.href = data.url;
-      } else {
-        console.error('No URL in response. Full data:', JSON.stringify(data));
-        throw new Error('No checkout URL returned. Check console for details.');
-      }
-    } catch (error: any) {
-      console.error('Error creating checkout session:', error);
-      alert(`Failed to start checkout: ${error.message || 'Please try again.'}`);
+      if (error) throw new Error(typeof error === 'object' ? JSON.stringify(error) : error);
+      if (data?.error) throw new Error(data.stripe || data.error || 'Checkout failed');
+      if (data?.url) window.location.href = data.url;
+      else throw new Error('No checkout URL returned.');
+    } catch (err: any) {
+      alert(`Failed to start checkout: ${err.message || 'Please try again.'}`);
     } finally {
-      setProcessingCheckout(false);
+      setProcessingPlan(null);
     }
   };
 
@@ -168,207 +167,199 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
 
   const isLifetime = subscription?.status === 'lifetime';
   const isActive = subscription?.status === 'active' || subscription?.status === 'trialing' || isLifetime;
-  
-  // Calculate days remaining
+
   const getDaysRemaining = () => {
     if (!subscription?.currentPeriodEnd) return 0;
-    const endDate = new Date(subscription.currentPeriodEnd);
-    const today = new Date();
-    const diffTime = endDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(0, diffDays);
+    const diff = new Date(subscription.currentPeriodEnd).getTime() - Date.now();
+    return Math.max(0, Math.ceil(diff / 86400000));
   };
-  
   const daysRemaining = getDaysRemaining();
-  
-  // Detect trial: if days remaining is <= 14, it's likely a trial period
-  const isTrialing = isActive && !isLifetime && daysRemaining > 0 && daysRemaining <= 14;
+  const isTrialing = isActive && !isLifetime && daysRemaining <= 14;
+
+  const basicPriceId  = billing === 'monthly' ? STRIPE_PRICE_IDS.basic_monthly  : STRIPE_PRICE_IDS.basic_annual;
+  const proPriceId    = billing === 'monthly' ? STRIPE_PRICE_IDS.pro_monthly    : STRIPE_PRICE_IDS.pro_annual;
+  const basicMonthly  = billing === 'monthly' ? PLAN_PRICES.basic.monthly : +(PLAN_PRICES.basic.annual / 12).toFixed(2);
+  const proMonthly    = billing === 'monthly' ? PLAN_PRICES.pro.monthly   : +(PLAN_PRICES.pro.annual   / 12).toFixed(2);
+  const aiLimit       = PLAN_LIMITS[currentPlan].aiCredits;
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-zinc-900 mb-2">Subscription</h2>
-        <p className="text-zinc-600">Manage your MenuLove premium subscription</p>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-zinc-900 mb-1">Subscription</h2>
+        <p className="text-zinc-500 text-sm">Manage your MenuLove plan</p>
       </div>
 
+      {/* Lifetime badge */}
       {isLifetime && (
-        <div className="bg-gradient-to-br from-purple-600 via-purple-500 to-pink-500 rounded-3xl p-8 text-white mb-8 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full -ml-24 -mb-24"></div>
-          
-          <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-4">
-              <Crown size={40} className="text-yellow-300" />
-              <div>
-                <h3 className="text-3xl font-bold">🎉 Lifetime Access</h3>
-                <p className="text-white/90 text-lg">You have unlimited premium access forever!</p>
-              </div>
-            </div>
-            
-            <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 mt-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-white/70 text-sm mb-1">Plan</p>
-                  <p className="font-bold text-xl">Lifetime Premium</p>
-                </div>
-                <div>
-                  <p className="text-white/70 text-sm mb-1">Expires</p>
-                  <p className="font-bold text-xl">Never ∞</p>
-                </div>
-              </div>
-              
-              <div className="mt-4 pt-4 border-t border-white/20">
-                <p className="text-sm text-white/80">✅ All premium features unlocked</p>
-                <p className="text-sm text-white/80">✅ No recurring payments</p>
-                <p className="text-sm text-white/80">✅ Priority support included</p>
-              </div>
-            </div>
+        <div className="bg-gradient-to-br from-purple-600 to-pink-500 rounded-2xl p-6 text-white mb-6 flex items-center gap-4">
+          <Crown size={36} className="text-yellow-300 shrink-0" />
+          <div>
+            <p className="text-xl font-bold">Lifetime Access — Pro tier</p>
+            <p className="text-white/80 text-sm">All features unlocked forever. No recurring payments.</p>
           </div>
         </div>
       )}
 
+      {/* Active subscription status bar */}
       {isActive && !isLifetime && (
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-8 text-white mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <Crown size={32} />
-            <div>
-              <h3 className="text-2xl font-bold">
-                {isTrialing ? "You're Premium!" : 'Premium Active'}
-              </h3>
-              <p className="text-white/80">
-                {isTrialing 
-                  ? `Enjoy all features free for ${daysRemaining} days` 
-                  : "You're all set!"}
-              </p>
-            </div>
-          </div>
-
-          {isTrialing && (
-            <p className="text-white/70 text-sm mb-4">
-              Your card will be charged A${subscription.plan === 'Monthly' ? '39/month' : '390/year'} after the trial ends. You can cancel anytime.
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="font-bold text-zinc-900 capitalize">
+              {currentPlan} Plan — {isTrialing ? `Trial (${daysRemaining}d left)` : 'Active'}
             </p>
-          )}
-          
-          <div className="grid grid-cols-2 gap-4 mt-2">
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-              <p className="text-white/60 text-sm mb-1">Plan</p>
-              <p className="font-bold text-lg">{subscription.plan}</p>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-              <p className="text-white/60 text-sm mb-1">{isTrialing ? 'Trial Ends' : 'Renews'}</p>
-              <p className="font-bold text-lg">
-                {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+            {subscription?.currentPeriodEnd && (
+              <p className="text-sm text-zinc-500 mt-0.5">
+                {isTrialing ? 'Trial ends' : 'Renews'}: {new Date(subscription.currentPeriodEnd).toLocaleDateString('en-AU')}
               </p>
-            </div>
+            )}
+            {aiLimit > 0 && (
+              <p className="text-sm text-zinc-500 mt-0.5">
+                AI credits: <span className="font-semibold text-zinc-700">{aiCreditsUsed} / {aiLimit}</span> used this month
+              </p>
+            )}
           </div>
-
           <button
             onClick={handleManageSubscription}
-            className="w-full mt-6 bg-white text-orange-500 font-bold py-4 rounded-2xl hover:bg-white/90 transition-all"
+            className="shrink-0 px-5 py-2.5 bg-orange-500 text-white font-semibold rounded-xl hover:bg-orange-600 transition-colors text-sm"
           >
             Manage Subscription
           </button>
         </div>
       )}
 
-      {!isActive && !isLifetime && wasCanceled && (
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-6 mb-6">
-          <p className="text-red-700 font-semibold">Your subscription has been canceled.</p>
-          <p className="text-red-600 text-sm mt-1">Choose a plan below to reactivate your premium features.</p>
+      {/* Canceled notice */}
+      {!isActive && wasCanceled && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+          <p className="text-red-700 font-semibold text-sm">Your subscription was canceled. Choose a plan below to reactivate.</p>
         </div>
       )}
 
-      {!isActive && !isLifetime && (
-      <div className="max-w-md mx-auto mb-8">
-            {/* Monthly Plan Only */}
-            <div className="bg-white border-2 border-zinc-200 rounded-3xl p-8 shadow-sm">
-              <div className="text-center mb-6">
-                <h3 className="text-2xl font-bold text-zinc-900 mb-2">Monthly</h3>
-                <div className="flex items-baseline justify-center gap-1">
-                  <span className="text-5xl font-bold text-zinc-900">$39</span>
-                  <span className="text-zinc-500">/month</span>
-                </div>
+      {/* Billing toggle */}
+      {!isLifetime && (
+        <div className="flex items-center justify-center mb-8">
+          <div className="inline-flex bg-zinc-100 rounded-xl p-1 gap-1">
+            <button
+              onClick={() => setBilling('monthly')}
+              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${billing === 'monthly' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'}`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setBilling('annual')}
+              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${billing === 'annual' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'}`}
+            >
+              Annual
+              <span className="bg-green-100 text-green-700 text-xs font-bold px-1.5 py-0.5 rounded-full">-10%</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Plan cards */}
+      {!isLifetime && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+
+          {/* FREE */}
+          <div className={`rounded-2xl border-2 p-6 flex flex-col ${currentPlan === 'free' ? 'border-zinc-400 bg-zinc-50' : 'border-zinc-200 bg-white'}`}>
+            <div className="mb-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-2">Free</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-black text-zinc-900">$0</span>
+                <span className="text-zinc-400 text-sm">/month</span>
               </div>
+            </div>
+            <ul className="space-y-2 mb-6 flex-1">
+              {FREE_FEATURES.map(f => (
+                <li key={f} className="flex items-start gap-2 text-sm text-zinc-600">
+                  <Check size={15} className="text-zinc-400 shrink-0 mt-0.5" />
+                  {f}
+                </li>
+              ))}
+            </ul>
+            {currentPlan === 'free' ? (
+              <div className="w-full py-2.5 rounded-xl bg-zinc-200 text-zinc-500 font-semibold text-sm text-center">Current Plan</div>
+            ) : (
+              <div className="w-full py-2.5 rounded-xl bg-zinc-100 text-zinc-400 font-semibold text-sm text-center">Free tier</div>
+            )}
+          </div>
 
-              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-6">
-                <p className="text-orange-600 text-sm font-medium text-center">
-                  14-day free trial
-                </p>
+          {/* BASIC */}
+          <div className={`rounded-2xl border-2 p-6 flex flex-col relative ${currentPlan === 'basic' ? 'border-orange-500 bg-orange-50' : 'border-orange-400 bg-white'}`}>
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+              <span className="bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full">Most popular</span>
+            </div>
+            <div className="mb-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-orange-500 mb-2">Basic</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-black text-zinc-900">${basicMonthly}</span>
+                <span className="text-zinc-400 text-sm">/month</span>
               </div>
-
-              <ul className="space-y-3 mb-6">
-                <li className="flex items-start gap-2">
-                  <Check size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-zinc-700">Unlimited video uploads</span>
+              {billing === 'annual' && (
+                <p className="text-xs text-green-600 font-medium mt-1">A${PLAN_PRICES.basic.annual}/year · save $35</p>
+              )}
+            </div>
+            <ul className="space-y-2 mb-6 flex-1">
+              {BASIC_FEATURES.map(f => (
+                <li key={f} className="flex items-start gap-2 text-sm text-zinc-600">
+                  <Check size={15} className="text-orange-500 shrink-0 mt-0.5" />
+                  {f}
                 </li>
-                <li className="flex items-start gap-2">
-                  <Check size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-zinc-700">QR Code menu for your restaurant</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-zinc-700">Smart search & discovery</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-zinc-700">Premium profile badge</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-zinc-700">Featured in search results</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-zinc-700">Analytics dashboard</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-zinc-700">Priority support</span>
-                </li>
-              </ul>
-
-              <p className="text-zinc-500 text-sm text-center mb-8">Cancel anytime</p>
-
+              ))}
+            </ul>
+            {currentPlan === 'basic' ? (
+              <div className="w-full py-2.5 rounded-xl bg-orange-500 text-white font-bold text-sm text-center">Current Plan</div>
+            ) : currentPlan === 'pro' ? (
+              <div className="w-full py-2.5 rounded-xl bg-zinc-100 text-zinc-400 font-semibold text-sm text-center">Downgrade via portal</div>
+            ) : (
               <button
-                onClick={() => handleSubscribe(PRICE_IDS.monthly)}
-                disabled={processingCheckout}
-                className="w-full bg-orange-500 text-white font-bold py-4 rounded-2xl hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                onClick={() => handleSubscribe(basicPriceId, 'basic')}
+                disabled={!!processingPlan}
+                className="w-full py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {processingCheckout ? (
-                  <>
-                    <Loader2 size={20} className="animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <CreditCard size={20} />
-                    Subscribe Monthly
-                  </>
-                )}
+                {processingPlan === 'basic' ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+                {processingPlan === 'basic' ? 'Processing…' : 'Start Basic'}
               </button>
-            </div>
+            )}
           </div>
-      )}
 
-      {!isActive && !isLifetime && (
-        <div className="bg-zinc-50 rounded-2xl p-6">
-          <h4 className="font-bold text-zinc-900 mb-3">What's included:</h4>
-          <div className="grid md:grid-cols-3 gap-4 text-sm text-zinc-600">
-            <div>
-              <p className="font-semibold text-zinc-900 mb-1">🎥 Video Content</p>
-              <p>Upload unlimited videos of your best dishes</p>
+          {/* PRO */}
+          <div className={`rounded-2xl border-2 p-6 flex flex-col ${currentPlan === 'pro' && !isLifetime ? 'border-violet-500 bg-violet-50' : 'border-zinc-200 bg-white'}`}>
+            <div className="mb-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-violet-500 mb-2">Pro</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-black text-zinc-900">${proMonthly}</span>
+                <span className="text-zinc-400 text-sm">/month</span>
+              </div>
+              {billing === 'annual' && (
+                <p className="text-xs text-green-600 font-medium mt-1">A${PLAN_PRICES.pro.annual}/year · save $83</p>
+              )}
             </div>
-            <div>
-              <p className="font-semibold text-zinc-900 mb-1">⭐ Premium Badge</p>
-              <p>Stand out with a verified premium badge</p>
-            </div>
-            <div>
-              <p className="font-semibold text-zinc-900 mb-1">📊 Analytics</p>
-              <p>Track views, saves, and engagement</p>
-            </div>
+            <ul className="space-y-2 mb-6 flex-1">
+              {PRO_FEATURES.map(f => (
+                <li key={f} className="flex items-start gap-2 text-sm text-zinc-600">
+                  <Check size={15} className="text-violet-500 shrink-0 mt-0.5" />
+                  {f}
+                </li>
+              ))}
+            </ul>
+            {currentPlan === 'pro' ? (
+              <div className="w-full py-2.5 rounded-xl bg-violet-500 text-white font-bold text-sm text-center">Current Plan</div>
+            ) : (
+              <button
+                onClick={() => handleSubscribe(proPriceId, 'pro')}
+                disabled={!!processingPlan}
+                className="w-full py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {processingPlan === 'pro' ? <Loader2 size={16} className="animate-spin" /> : <Star size={16} />}
+                {processingPlan === 'pro' ? 'Processing…' : currentPlan === 'basic' ? 'Upgrade to Pro' : 'Start Pro'}
+              </button>
+            )}
           </div>
+
         </div>
       )}
+
+      <p className="text-center text-xs text-zinc-400">14-day free trial on paid plans · No credit card required · Cancel anytime</p>
     </div>
   );
 };

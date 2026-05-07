@@ -22,6 +22,7 @@ import ChatWidget from '../../components/chat/ChatWidget';
 import WelcomeBanner from '../../components/WelcomeBanner';
 import GuidedTour from '../../components/GuidedTour';
 import CheckoutSuccessOverlay from '../../components/CheckoutSuccessOverlay';
+import { PLAN_LIMITS, planFromString, type PlanId } from '../../services/stripeService';
 
 interface PartnerDashboardProps {
   user: PartnerUser;
@@ -226,6 +227,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const [subscriptionDaysLeft, setSubscriptionDaysLeft] = useState(0);
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
   const [hasPaidSubscription, setHasPaidSubscription] = useState(false); // Stripe subscription
+  const [currentPlan, setCurrentPlan] = useState<PlanId>('free');
+  const [aiCreditsUsed, setAiCreditsUsed] = useState(0);
 
   useEffect(() => {
     setCurrentUserEmail(user.email || '');
@@ -237,7 +240,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       
       const { data: partner } = await supabase
         .from('partners')
-        .select('subscription_status, subscription_end_date, trial_ends_at, lifetime_access')
+        .select('subscription_status, subscription_plan, subscription_end_date, trial_ends_at, lifetime_access, ai_credits_used, ai_credits_reset_at')
         .eq('id', partnerData.id)
         .single();
       
@@ -254,10 +257,21 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         setSubscriptionDaysLeft(999); // Show as unlimited
         setHasActiveSubscription(true);
         setHasPaidSubscription(true); // Treat as premium
+        setCurrentPlan('pro');
+        setAiCreditsUsed(partner?.ai_credits_used ?? 0);
         console.log('[PartnerDashboard] Lifetime access detected');
         return;
       }
       
+      const hasStripeActive = partner?.subscription_status === 'trialing' || partner?.subscription_status === 'active';
+      if (hasStripeActive) {
+        setCurrentPlan(planFromString(partner?.subscription_plan, true));
+        setAiCreditsUsed(partner?.ai_credits_used ?? 0);
+      } else {
+        setCurrentPlan('free');
+        setAiCreditsUsed(0);
+      }
+
       // Priority 1: Stripe trialing status (FREE trial from Stripe)
       if (partner?.subscription_status === 'trialing' && partner?.subscription_end_date) {
         const endDate = new Date(partner.subscription_end_date);
@@ -309,7 +323,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   // Trial is active only if user is on FREE trial (not paid subscription)
   const isTrialActive = hasActiveSubscription && !hasPaidSubscription && subscriptionDaysLeft > 0 && subscriptionDaysLeft <= 30;
   const isTrialExpired = !!partnerData && !hasActiveSubscription && subscriptionDaysLeft === 0;
-  const maxVideos = hasActiveSubscription ? Infinity : 5;
+  const planLimits = PLAN_LIMITS[currentPlan];
+  const maxMenuItems = planLimits.menuItems;
+  const maxVideos = maxMenuItems; // alias kept for legacy references
+  const canUseAI = planLimits.aiCredits > 0 && aiCreditsUsed < planLimits.aiCredits;
+  const canAccessAnalytics = planLimits.analytics;
 
   // Listen for chat navigation events
   useEffect(() => {
@@ -888,7 +906,16 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
     // Block upload if trial expired
     if (isTrialExpired) {
-      alert('Your trial has ended. Please upgrade to Pro to continue uploading.');
+      alert('Your trial has ended. Please subscribe to continue uploading.');
+      setShowMenuUploadModal(false);
+      setActiveTab('subscription');
+      return;
+    }
+
+    // Block upload if free plan item limit reached
+    const activeItemCount = menuItems.filter(i => !i.deleted_at).length;
+    if (maxMenuItems !== Infinity && activeItemCount >= maxMenuItems) {
+      alert(`Free plan allows up to ${maxMenuItems} menu items. Upgrade to Basic for unlimited items.`);
       setShowMenuUploadModal(false);
       setActiveTab('subscription');
       return;
@@ -1440,6 +1467,16 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     const sourcePhoto = menuPhotoPreview || editingMenuItem?.photo_url;
     if (!sourcePhoto) return;
 
+    if (!canUseAI) {
+      if (planLimits.aiCredits === 0) {
+        alert('AI photo enhancement requires a Basic or Pro plan. Upgrade to unlock this feature.');
+      } else {
+        alert(`You've used all ${planLimits.aiCredits} AI credits for this month. They reset on your next billing date.`);
+      }
+      setActiveTab('subscription');
+      return;
+    }
+
     setIsEnhancing(true);
     setEnhanceElapsed(0);
     enhanceTimerRef.current = setInterval(() => setEnhanceElapsed(s => s + 1), 1000);
@@ -1461,7 +1498,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       await fetch('/.netlify/functions/enhance-photo-background', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64Data, jobId }),
+        body: JSON.stringify({ imageBase64: base64Data, jobId, partnerId: partnerData?.id }),
       });
 
       const enhancedImage = await new Promise<string>((resolve, reject) => {
@@ -1493,6 +1530,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       setEnhanceOriginalPreview(sourcePhoto);
       setEnhancedPreview(enhancedImage);
       setShowEnhanceModal(true);
+      setAiCreditsUsed(prev => prev + 1);
     } catch (error: any) {
       alert('Enhancement failed: ' + error.message);
     } finally {
@@ -1822,13 +1860,17 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
             <div className="flex items-center gap-2">
               {/* Plan badge */}
-              {user.plan === 'pro' ? (
-                <span className="hidden sm:flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full">
+              {currentPlan === 'pro' ? (
+                <span className="hidden sm:flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-violet-600 to-purple-600 text-white text-xs font-bold rounded-full">
                   <Crown size={12} /> PRO
+                </span>
+              ) : currentPlan === 'basic' ? (
+                <span className="hidden sm:flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full">
+                  <Sparkles size={12} /> BASIC
                 </span>
               ) : isTrialActive ? (
                 <span className="hidden sm:flex items-center gap-1 px-3 py-1 bg-orange-100 text-orange-700 text-xs font-semibold rounded-full">
-                  <Clock size={12} /> {subscriptionDaysLeft} days left
+                  <Clock size={12} /> {subscriptionDaysLeft}d trial
                 </span>
               ) : null}
 
@@ -2004,7 +2046,22 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
         {/* Analytics Tab - Analytics V2 */}
         {activeTab === 'analytics' && partnerData && (
-          <RestaurantAnalyticsV2 restaurantId={partnerData.id} />
+          canAccessAnalytics ? (
+            <RestaurantAnalyticsV2 restaurantId={partnerData.id} />
+          ) : (
+            <div className="mt-8 rounded-2xl border-2 border-dashed border-zinc-200 bg-white p-10 text-center">
+              <BarChart3 size={40} className="text-zinc-300 mx-auto mb-4" />
+              <h3 className="font-bold text-zinc-900 text-lg mb-2">Analytics requires a paid plan</h3>
+              <p className="text-zinc-500 text-sm mb-6">Upgrade to Basic or Pro to view your restaurant analytics — views, saves, engagement and more.</p>
+              <button
+                onClick={() => setActiveTab('subscription')}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl transition-colors"
+              >
+                <Crown size={16} />
+                See Plans
+              </button>
+            </div>
+          )
         )}
 
         {/* Menu Tab - QR Code Menu Items */}
