@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Check, Loader2, Crown, Zap, Star } from 'lucide-react';
+import { CreditCard, Check, Loader2, Crown, Star, Sparkles } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { STRIPE_PRICE_IDS } from '../../services/stripeConfig';
 import { PLAN_LIMITS, PLAN_PRICES, planFromString, type PlanId } from '../../services/stripeService';
@@ -30,7 +30,7 @@ const BASIC_FEATURES = [
   'Custom branding',
   'Connect your checkout link',
   'Analytics (basic)',
-  '50 AI photo credits / month',
+  '30 AI photo credits / month',
   'Priority support',
 ];
 
@@ -38,7 +38,7 @@ const PRO_FEATURES = [
   'Everything in Basic',
   'Analytics (advanced)',
   'Up to 3 locations',
-  '200 AI photo credits / month',
+  '100 AI photo credits / month',
   'Faster AI processing',
   'White-label options',
 ];
@@ -47,6 +47,8 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [currentPlan, setCurrentPlan] = useState<PlanId>('free');
   const [aiCreditsUsed, setAiCreditsUsed] = useState(0);
+  const [aiAddonRemaining, setAiAddonRemaining] = useState(0);
+  const [aiCreditsResetAt, setAiCreditsResetAt] = useState<string | null>(null);
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [loading, setLoading] = useState(true);
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
@@ -69,17 +71,22 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
     try {
       const { data: partner, error } = await supabase
         .from('partners')
-        .select('subscription_status, subscription_plan, subscription_end_date, subscription_start_date, stripe_subscription_id, lifetime_access, trial_ends_at, ai_credits_used')
+        .select('subscription_status, subscription_plan, subscription_end_date, subscription_start_date, stripe_subscription_id, lifetime_access, trial_ends_at, ai_credits_used, ai_credits_addon_remaining, ai_credits_reset_at')
         .eq('id', partnerId)
         .single();
 
       if (error) console.error('[SubscriptionManager] Error loading partner:', error);
 
       setAiCreditsUsed(partner?.ai_credits_used ?? 0);
+      setAiAddonRemaining(partner?.ai_credits_addon_remaining ?? 0);
+      setAiCreditsResetAt(partner?.ai_credits_reset_at ?? null);
 
+      const rawPlan = String(partner?.subscription_plan || '').toLowerCase();
+      const hasPaidPlanAssigned = ['basic', 'pro', 'monthly', 'annual'].includes(rawPlan);
       const hasActive = partner?.lifetime_access ||
-        (partner?.subscription_status === 'active' || partner?.subscription_status === 'trialing') &&
-        !!partner?.stripe_subscription_id;
+        partner?.subscription_status === 'active' ||
+        partner?.subscription_status === 'trialing' ||
+        (hasPaidPlanAssigned && partner?.subscription_status !== 'canceled');
 
       setCurrentPlan(
         partner?.lifetime_access ? 'pro'
@@ -88,11 +95,11 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
 
       if (partner?.lifetime_access === true) {
         setSubscription({ status: 'lifetime', plan: 'pro', currentPeriodEnd: '2099-12-31', cancelAtPeriodEnd: false });
-      } else if (partner && (partner.subscription_status === 'active' || partner.subscription_status === 'trialing') && partner.stripe_subscription_id) {
+      } else if (partner && hasActive) {
         setSubscription({
-          status: partner.subscription_status,
+          status: partner.subscription_status || 'active',
           plan: partner.subscription_plan || 'basic',
-          currentPeriodEnd: partner.subscription_end_date,
+          currentPeriodEnd: partner.subscription_end_date || partner.ai_credits_reset_at || partner.trial_ends_at || '',
           cancelAtPeriodEnd: false,
         });
       } else {
@@ -106,7 +113,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
     }
   };
 
-  const handleSubscribe = async (priceId: string, planKey: string) => {
+  const handleSubscribe = async (priceId: string, planKey: string, checkoutType: 'subscription' | 'ai_credits_addon' = 'subscription') => {
     if (!priceId) {
       alert('This plan is not yet available. Please contact support.');
       return;
@@ -122,6 +129,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
         body: {
           partnerId,
           priceId,
+          checkoutType,
           successUrl: `${window.location.origin}/partner?success=true`,
           cancelUrl: `${window.location.origin}/partner?canceled=true`,
         },
@@ -181,6 +189,12 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
   const basicMonthly  = billing === 'monthly' ? PLAN_PRICES.basic.monthly : +(PLAN_PRICES.basic.annual / 12).toFixed(2);
   const proMonthly    = billing === 'monthly' ? PLAN_PRICES.pro.monthly   : +(PLAN_PRICES.pro.annual   / 12).toFixed(2);
   const aiLimit       = PLAN_LIMITS[currentPlan].aiCredits;
+  const aiCreditsTotalAvailable = Math.max(0, aiLimit - aiCreditsUsed) + aiAddonRemaining;
+  const canBuyAddon = aiLimit > 0 && !isLifetime;
+  const aiBaseUsedPct = aiLimit > 0 ? Math.min(100, Math.round((aiCreditsUsed / aiLimit) * 100)) : 0;
+  const daysToReset = aiCreditsResetAt
+    ? Math.max(0, Math.ceil((new Date(aiCreditsResetAt).getTime() - Date.now()) / 86400000))
+    : null;
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -200,6 +214,71 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
         </div>
       )}
 
+      {canBuyAddon && (
+        <div className="rounded-2xl border border-violet-200 bg-white p-5 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles size={18} className="text-violet-500" />
+            <p className="font-bold text-zinc-900">AI Photo Credits</p>
+          </div>
+
+          {/* Base credits progress */}
+          <div className="mb-3">
+            <div className="flex justify-between text-xs text-zinc-500 mb-1.5">
+              <span>Base credits used this cycle</span>
+              <span className="font-semibold text-zinc-700">{aiCreditsUsed} / {aiLimit}</span>
+            </div>
+            <div className="h-2.5 bg-zinc-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  aiBaseUsedPct >= 90 ? 'bg-red-500' :
+                  aiBaseUsedPct >= 70 ? 'bg-orange-400' :
+                  'bg-violet-500'
+                }`}
+                style={{ width: `${aiBaseUsedPct}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Add-on & summary row */}
+          <div className="flex flex-wrap gap-3 text-sm mb-4">
+            <span className="px-2.5 py-1 bg-zinc-100 rounded-lg text-zinc-600">
+              <span className="font-semibold text-zinc-800">{Math.max(0, aiLimit - aiCreditsUsed)}</span> base left
+            </span>
+            {aiAddonRemaining > 0 && (
+              <span className="px-2.5 py-1 bg-violet-100 rounded-lg text-violet-700">
+                <span className="font-semibold">+{aiAddonRemaining}</span> add-on
+              </span>
+            )}
+            <span className="px-2.5 py-1 bg-green-50 rounded-lg text-green-700">
+              <span className="font-semibold">{aiCreditsTotalAvailable}</span> total left
+            </span>
+            {daysToReset !== null && (
+              <span className="px-2.5 py-1 bg-zinc-50 rounded-lg text-zinc-500">
+                Resets in <span className="font-semibold text-zinc-700">{daysToReset}d</span>
+              </span>
+            )}
+          </div>
+
+          {/* Upsell */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-zinc-100">
+            <div>
+              <p className="text-sm font-semibold text-zinc-800">Need more this cycle?</p>
+              <p className="text-xs text-zinc-500 mt-0.5">One-off pack of +50 credits · expires at your next billing reset</p>
+            </div>
+            <button
+              onClick={() => handleSubscribe(STRIPE_PRICE_IDS.ai_credits_50, 'addon50', 'ai_credits_addon')}
+              disabled={!!processingPlan || !STRIPE_PRICE_IDS.ai_credits_50}
+              className="shrink-0 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold disabled:opacity-50 flex items-center gap-2"
+            >
+              {processingPlan === 'addon50'
+                ? <><Loader2 size={14} className="animate-spin" /> Processing…</>
+                : <><Sparkles size={14} /> Buy +50 credits — A$19</>
+              }
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Active subscription status bar */}
       {isActive && !isLifetime && (
         <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -210,11 +289,6 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
             {subscription?.currentPeriodEnd && (
               <p className="text-sm text-zinc-500 mt-0.5">
                 {isTrialing ? 'Trial ends' : 'Renews'}: {new Date(subscription.currentPeriodEnd).toLocaleDateString('en-AU')}
-              </p>
-            )}
-            {aiLimit > 0 && (
-              <p className="text-sm text-zinc-500 mt-0.5">
-                AI credits: <span className="font-semibold text-zinc-700">{aiCreditsUsed} / {aiLimit}</span> used this month
               </p>
             )}
           </div>

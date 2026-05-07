@@ -29,6 +29,36 @@ serve(async (req) => {
     return 'basic'; // legacy $39 plan migrates to basic
   }
 
+  async function handleAiAddonCheckout(session: any) {
+    const checkoutType = session?.metadata?.checkout_type;
+    if (checkoutType !== 'ai_credits_addon') return;
+
+    const customerId = session.customer as string;
+    const creditsToAdd = Number(session?.metadata?.credits || 50);
+
+    const { data: partner } = await supabase
+      .from("partners")
+      .select("id, ai_credits_addon_remaining")
+      .eq("stripe_customer_id", customerId)
+      .single();
+
+    if (!partner) {
+      console.error("[Webhook] AI add-on checkout: partner not found for customer", customerId);
+      return;
+    }
+
+    const nextRemaining = (partner.ai_credits_addon_remaining || 0) + creditsToAdd;
+
+    await supabase
+      .from("partners")
+      .update({
+        ai_credits_addon_remaining: nextRemaining,
+      })
+      .eq("id", partner.id);
+
+    console.log(`[Webhook] Added ${creditsToAdd} AI add-on credits to partner ${partner.id}. Remaining add-on credits: ${nextRemaining}`);
+  }
+
   async function handleSubscriptionUpdate(subscription: any) {
     const customerId = subscription.customer as string;
     const subscriptionId = subscription.id;
@@ -76,7 +106,7 @@ serve(async (req) => {
         stripe_subscription_id: subscriptionId,
         stripe_price_id: priceId,
         status: status,
-        plan_name: planName,
+        plan_name: planTier,
         plan_interval: interval,
         amount: amount,
         current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
@@ -174,6 +204,7 @@ serve(async (req) => {
           subscription_start_date: new Date(line.period.start * 1000).toISOString(),
           subscription_end_date: new Date(line.period.end * 1000).toISOString(),
           ai_credits_used: 0,
+          ai_credits_addon_remaining: 0,
           ai_credits_reset_at: nextResetAt,
         })
         .eq("id", partner.id);
@@ -379,7 +410,8 @@ serve(async (req) => {
         break;
 
       case "checkout.session.completed":
-        console.log("[Webhook] Checkout session completed - subscription should be created separately");
+        console.log("[Webhook] Processing checkout.session.completed");
+        await handleAiAddonCheckout(event.data.object);
         break;
 
       default:

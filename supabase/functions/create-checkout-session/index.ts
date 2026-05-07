@@ -33,7 +33,7 @@ serve(async (req) => {
     
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     
-    const { partnerId, priceId, successUrl, cancelUrl } = await req.json();
+    const { partnerId, priceId, checkoutType = 'subscription', successUrl, cancelUrl } = await req.json();
     console.log("[Checkout] Partner:", partnerId, "Price:", priceId);
 
     if (!partnerId || !priceId) {
@@ -109,21 +109,44 @@ serve(async (req) => {
       console.log("[Checkout] Partner was referred by affiliate:", affiliateId);
     }
 
-    // Create checkout session (no Stripe trial - partner already had 14-day in-app trial)
+    const isAiAddonCheckout = checkoutType === 'ai_credits_addon';
+
+    if (isAiAddonCheckout) {
+      const rawPlan = String(partner.subscription_plan || '').toLowerCase();
+      const hasPaidPlanAssigned = ['basic', 'pro', 'monthly', 'annual'].includes(rawPlan);
+      const isPaidActive = partner.subscription_status === 'active' || partner.subscription_status === 'trialing' || partner.lifetime_access === true || (hasPaidPlanAssigned && partner.subscription_status !== 'canceled');
+      if (!isPaidActive) {
+        return new Response(
+          JSON.stringify({ error: "AI add-on is available only for active Basic/Pro partners" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+    }
+
+    // Create checkout session
     const sessionParams = new URLSearchParams({
       customer: customerId,
-      mode: 'subscription',
+      mode: isAiAddonCheckout ? 'payment' : 'subscription',
       'payment_method_types[0]': 'card',
       'line_items[0][price]': priceId,
       'line_items[0][quantity]': '1',
       success_url: successUrl || 'https://menulove.com.au/partner?success=true',
       cancel_url: cancelUrl || 'https://menulove.com.au/partner?canceled=true',
       'metadata[partner_id]': partnerId,
-      'subscription_data[metadata][partner_id]': partnerId,
+      'metadata[checkout_type]': checkoutType,
     });
 
-    // Add affiliate metadata if present
-    if (affiliateId) {
+    if (isAiAddonCheckout) {
+      sessionParams.set('payment_intent_data[metadata][partner_id]', partnerId);
+      sessionParams.set('payment_intent_data[metadata][checkout_type]', 'ai_credits_addon');
+      sessionParams.set('payment_intent_data[metadata][credits]', '50');
+    } else {
+      // Keep subscription metadata for plan checkouts
+      sessionParams.set('subscription_data[metadata][partner_id]', partnerId);
+    }
+
+    // Add affiliate metadata if present (subscription only)
+    if (affiliateId && !isAiAddonCheckout) {
       sessionParams.set('metadata[affiliate_id]', affiliateId);
       sessionParams.set('subscription_data[metadata][affiliate_id]', affiliateId);
     }

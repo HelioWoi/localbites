@@ -79,7 +79,7 @@ Rules:
 - Return FOOD for everything else.
 - Do not output explanations.`;
 
-const PLAN_AI_CREDITS = { free: 0, basic: 50, pro: 200 };
+const PLAN_AI_CREDITS = { free: 0, basic: 30, pro: 100 };
 
 exports.handler = async (event) => {
   const { imageBase64, mimeType = 'image/jpeg', jobId, partnerId } = JSON.parse(event.body || '{}');
@@ -96,7 +96,7 @@ exports.handler = async (event) => {
   if (partnerId) {
     const { data: partner } = await supabase
       .from('partners')
-      .select('subscription_plan, ai_credits_used, ai_credits_reset_at, subscription_status, lifetime_access')
+      .select('subscription_plan, ai_credits_used, ai_credits_reset_at, ai_credits_addon_remaining, subscription_status, lifetime_access')
       .eq('id', partnerId)
       .single();
 
@@ -124,15 +124,20 @@ exports.handler = async (event) => {
 
       // Auto-reset credits if billing period rolled over
       let creditsUsed = partner.ai_credits_used || 0;
+      let addonRemaining = partner.ai_credits_addon_remaining || 0;
       if (partner.ai_credits_reset_at && new Date(partner.ai_credits_reset_at) < new Date()) {
         creditsUsed = 0;
-        await supabase.from('partners').update({ ai_credits_used: 0 }).eq('id', partnerId);
+        addonRemaining = 0;
+        await supabase.from('partners').update({ ai_credits_used: 0, ai_credits_addon_remaining: 0 }).eq('id', partnerId);
       }
 
-      if (creditsUsed >= creditLimit) {
+      const baseRemaining = Math.max(0, creditLimit - creditsUsed);
+      const totalRemaining = baseRemaining + addonRemaining;
+
+      if (totalRemaining <= 0) {
         await supabase.storage.from('menu-videos').upload(
           `ai-jobs/${jobId}.json`,
-          JSON.stringify({ status: 'error', error: `Monthly AI credit limit (${creditLimit}) reached. Credits reset on your next billing date.` }),
+          JSON.stringify({ status: 'error', error: `AI credits exhausted for this cycle. Base allowance (${creditLimit}) and add-on credits are fully used.` }),
           { contentType: 'application/json', upsert: true }
         );
         return { statusCode: 200, body: '{}' };
@@ -252,9 +257,22 @@ exports.handler = async (event) => {
 
     await saveJob({ status: 'done', enhancedImage: publicUrl, modelUsed: usedModel, detectedType: imageType });
 
-    // Increment AI credits used
+    // Consume one AI credit (add-on first, then base)
     if (partnerId) {
-      await supabase.rpc('increment_ai_credits', { partner_id_arg: partnerId });
+      const { data: p } = await supabase
+        .from('partners')
+        .select('ai_credits_addon_remaining, ai_credits_used')
+        .eq('id', partnerId)
+        .single();
+
+      if ((p?.ai_credits_addon_remaining || 0) > 0) {
+        await supabase
+          .from('partners')
+          .update({ ai_credits_addon_remaining: (p.ai_credits_addon_remaining || 0) - 1 })
+          .eq('id', partnerId);
+      } else {
+        await supabase.rpc('increment_ai_credits', { partner_id_arg: partnerId });
+      }
     }
 
   } catch (error) {

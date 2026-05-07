@@ -154,7 +154,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   // AI Enhancement state
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhanceElapsed, setEnhanceElapsed] = useState(0);
+  const [enhanceProgress, setEnhanceProgress] = useState(0);
   const enhanceTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const enhancePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const enhancePromiseRejectRef = useRef<((reason?: unknown) => void) | null>(null);
+  const enhanceCanceledRef = useRef(false);
   const [enhancedPreview, setEnhancedPreview] = useState<string | null>(null);
   const [enhanceOriginalPreview, setEnhanceOriginalPreview] = useState<string | null>(null);
   const [showEnhanceModal, setShowEnhanceModal] = useState(false);
@@ -229,6 +233,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const [hasPaidSubscription, setHasPaidSubscription] = useState(false); // Stripe subscription
   const [currentPlan, setCurrentPlan] = useState<PlanId>('free');
   const [aiCreditsUsed, setAiCreditsUsed] = useState(0);
+  const [aiAddonRemaining, setAiAddonRemaining] = useState(0);
 
   useEffect(() => {
     setCurrentUserEmail(user.email || '');
@@ -240,7 +245,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       
       const { data: partner } = await supabase
         .from('partners')
-        .select('subscription_status, subscription_plan, subscription_end_date, trial_ends_at, lifetime_access, ai_credits_used, ai_credits_reset_at')
+        .select('subscription_status, subscription_plan, subscription_end_date, trial_ends_at, lifetime_access, ai_credits_used, ai_credits_addon_remaining, ai_credits_reset_at')
         .eq('id', partnerData.id)
         .single();
       
@@ -259,6 +264,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         setHasPaidSubscription(true); // Treat as premium
         setCurrentPlan('pro');
         setAiCreditsUsed(partner?.ai_credits_used ?? 0);
+        setAiAddonRemaining(partner?.ai_credits_addon_remaining ?? 0);
         console.log('[PartnerDashboard] Lifetime access detected');
         return;
       }
@@ -267,9 +273,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       if (hasStripeActive) {
         setCurrentPlan(planFromString(partner?.subscription_plan, true));
         setAiCreditsUsed(partner?.ai_credits_used ?? 0);
+        setAiAddonRemaining(partner?.ai_credits_addon_remaining ?? 0);
       } else {
         setCurrentPlan('free');
         setAiCreditsUsed(0);
+        setAiAddonRemaining(0);
       }
 
       // Priority 1: Stripe trialing status (FREE trial from Stripe)
@@ -326,8 +334,22 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const planLimits = PLAN_LIMITS[currentPlan];
   const maxMenuItems = planLimits.menuItems;
   const maxVideos = maxMenuItems; // alias kept for legacy references
-  const canUseAI = planLimits.aiCredits > 0 && aiCreditsUsed < planLimits.aiCredits;
+  const baseRemaining = Math.max(0, planLimits.aiCredits - aiCreditsUsed);
+  const totalAiRemaining = baseRemaining + aiAddonRemaining;
+  const canUseAI = planLimits.aiCredits > 0 && totalAiRemaining > 0;
   const canAccessAnalytics = planLimits.analytics;
+  const aiCreditsRemaining = totalAiRemaining;
+
+  const clearEnhanceRuntime = () => {
+    if (enhanceTimerRef.current) {
+      clearInterval(enhanceTimerRef.current);
+      enhanceTimerRef.current = null;
+    }
+    if (enhancePollRef.current) {
+      clearInterval(enhancePollRef.current);
+      enhancePollRef.current = null;
+    }
+  };
 
   // Listen for chat navigation events
   useEffect(() => {
@@ -1477,9 +1499,14 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       return;
     }
 
+    enhanceCanceledRef.current = false;
     setIsEnhancing(true);
     setEnhanceElapsed(0);
-    enhanceTimerRef.current = setInterval(() => setEnhanceElapsed(s => s + 1), 1000);
+    setEnhanceProgress(2);
+    enhanceTimerRef.current = setInterval(() => {
+      setEnhanceElapsed(s => s + 1);
+      setEnhanceProgress(prev => Math.min(95, prev + (prev < 80 ? 2 : 1)));
+    }, 1000);
 
     try {
       let base64Data = sourcePhoto;
@@ -1502,12 +1529,23 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       });
 
       const enhancedImage = await new Promise<string>((resolve, reject) => {
+        enhancePromiseRejectRef.current = reject;
         let attempts = 0;
         const maxAttempts = 80;
-        const interval = setInterval(async () => {
+
+        enhancePollRef.current = setInterval(async () => {
+          if (enhanceCanceledRef.current) {
+            if (enhancePollRef.current) clearInterval(enhancePollRef.current);
+            enhancePollRef.current = null;
+            reject(new Error('Enhancement canceled'));
+            return;
+          }
+
           attempts++;
+          setEnhanceProgress(prev => Math.max(prev, Math.min(97, Math.round((attempts / maxAttempts) * 97))));
           if (attempts > maxAttempts) {
-            clearInterval(interval);
+            if (enhancePollRef.current) clearInterval(enhancePollRef.current);
+            enhancePollRef.current = null;
             reject(new Error('Enhancement timed out. Please try again.'));
             return;
           }
@@ -1515,10 +1553,12 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             const res = await fetch(`/.netlify/functions/enhance-photo-status?jobId=${jobId}`);
             const data = await res.json();
             if (data.status === 'done') {
-              clearInterval(interval);
+              if (enhancePollRef.current) clearInterval(enhancePollRef.current);
+              enhancePollRef.current = null;
               resolve(data.enhancedImage);
             } else if (data.status === 'error') {
-              clearInterval(interval);
+              if (enhancePollRef.current) clearInterval(enhancePollRef.current);
+              enhancePollRef.current = null;
               reject(new Error(data.error || 'Enhancement failed'));
             }
           } catch {
@@ -1527,15 +1567,36 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         }, 3000);
       });
 
+      setEnhanceProgress(100);
       setEnhanceOriginalPreview(sourcePhoto);
       setEnhancedPreview(enhancedImage);
       setShowEnhanceModal(true);
-      setAiCreditsUsed(prev => prev + 1);
+      if (aiAddonRemaining > 0) {
+        setAiAddonRemaining(prev => Math.max(0, prev - 1));
+      } else {
+        setAiCreditsUsed(prev => prev + 1);
+      }
     } catch (error: any) {
-      alert('Enhancement failed: ' + error.message);
+      if (!enhanceCanceledRef.current) {
+        alert('Enhancement failed: ' + error.message);
+      }
     } finally {
       setIsEnhancing(false);
-      if (enhanceTimerRef.current) clearInterval(enhanceTimerRef.current);
+      clearEnhanceRuntime();
+      enhancePromiseRejectRef.current = null;
+    }
+  };
+
+  const handleCancelEnhancement = () => {
+    if (!isEnhancing) return;
+    enhanceCanceledRef.current = true;
+    clearEnhanceRuntime();
+    setIsEnhancing(false);
+    setEnhanceProgress(0);
+    setEnhanceElapsed(0);
+    if (enhancePromiseRejectRef.current) {
+      enhancePromiseRejectRef.current(new Error('Enhancement canceled'));
+      enhancePromiseRejectRef.current = null;
     }
   };
 
@@ -3212,26 +3273,42 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                     className="hidden"
                   />
                   {(menuPhotoPreview || editingMenuItem?.photo_url) && (
-                    <button
-                      onClick={handleEnhancePhoto}
-                      disabled={isEnhancing}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isEnhancing ? (
-                        <>
-                          <Loader2 size={15} className="animate-spin" />
-                          Enhancing with AI... ({enhanceElapsed}s)
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles size={15} />
-                          <span>Enhance with AI</span>
-                          <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-white/20 rounded-md border border-white/30">
-                            Beta
-                          </span>
-                        </>
+                    <div className="space-y-2">
+                      <button
+                        onClick={handleEnhancePhoto}
+                        disabled={isEnhancing || (!canUseAI && planLimits.aiCredits > 0)}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isEnhancing ? (
+                          <>
+                            <Loader2 size={15} className="animate-spin" />
+                            Enhancing with AI... {enhanceProgress}%
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={15} />
+                            <span>Enhance with AI</span>
+                            {planLimits.aiCredits > 0 && (
+                              <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-white/20 rounded-md border border-white/30">
+                                {aiCreditsRemaining} credits left
+                              </span>
+                            )}
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-white/20 rounded-md border border-white/30">
+                              Beta
+                            </span>
+                          </>
+                        )}
+                      </button>
+
+                      {isEnhancing && (
+                        <button
+                          onClick={handleCancelEnhancement}
+                          className="w-full py-2 text-sm font-semibold rounded-xl border border-red-300 text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          Cancel AI enhancement
+                        </button>
                       )}
-                    </button>
+                    </div>
                   )}
                 </>
               )}

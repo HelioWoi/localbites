@@ -396,12 +396,12 @@ const PartnerLandingPage: React.FC = () => {
     },
     {
       name: 'Basic', price: '$29', period: '/month', highlight: true,
-      features: ['Everything in Free', 'Unlimited menu items', 'Custom branding', 'Connect your checkout link', 'Analytics (basic)', '50 AI photo credits / month!', 'Priority support'],
+      features: ['Everything in Free', 'Unlimited menu items', 'Custom branding', 'Connect your checkout link', 'Analytics (basic)', '30 AI photo credits / month!', 'Priority support'],
       cta: 'Start Basic', href: '/partner',
     },
     {
       name: 'Pro', price: '$69', period: '/month', highlight: false,
-      features: ['Everything in Basic', 'Analytics (advanced)', 'Up to 3 locations', '200 AI photo credits / month!', 'Faster AI processing', 'White-label options'],
+      features: ['Everything in Basic', 'Analytics (advanced)', 'Up to 3 locations', '100 AI photo credits / month!', 'Faster AI processing', 'White-label options'],
       cta: 'Start Pro', href: '/partner',
     },
   ];
@@ -794,9 +794,9 @@ const PartnerLandingPage: React.FC = () => {
                               !
                             </span>
                             <span className="pointer-events-none absolute left-1/2 top-[calc(100%+8px)] -translate-x-1/2 z-20 w-[250px] rounded-xl border border-white/10 bg-[#0b111b] px-3 py-2 text-[11px] font-medium leading-relaxed text-zinc-200 opacity-0 invisible transition-all duration-150 group-hover:opacity-100 group-hover:visible">
-                              {f.includes('50 AI')
-                                ? '1 AI photo enhancement uses 3 credits. 50 credits = up to ~16 photo edits/month. Extra credit packs are available anytime.'
-                                : '1 AI photo enhancement uses 3 credits. 200 credits = up to ~66 photo edits/month. Extra credit packs are available anytime.'}
+                              {f.includes('30 AI')
+                                ? '1 AI photo enhancement uses 1 credit. 30 credits = up to 30 edits/month. Need more? Add +50 extra credits for the current billing cycle.'
+                                : '1 AI photo enhancement uses 1 credit. 100 credits = up to 100 edits/month. Need more? Add +50 extra credits for the current billing cycle.'}
                             </span>
                           </span>
                         </span>
