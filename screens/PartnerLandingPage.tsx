@@ -229,8 +229,8 @@ const PartnerLandingPage: React.FC = () => {
 
     if (aiProgressTimerRef.current) window.clearInterval(aiProgressTimerRef.current);
     aiProgressTimerRef.current = window.setInterval(() => {
-      setAiProgress((prev) => (prev < 92 ? prev + 1 : prev));
-    }, 700);
+      setAiProgress((prev) => +(prev + (91 - prev) * 0.018).toFixed(1));
+    }, 400);
 
     try {
       const jobId = crypto.randomUUID();
@@ -1088,7 +1088,7 @@ const PartnerLandingPage: React.FC = () => {
                           <Sparkles size={28} className="text-orange-300" />
                         </div>
                         <p className="mt-5 text-white font-bold text-lg">AI is processing your photo</p>
-                        <p className="text-zinc-400 text-sm mt-1">Analyzing dish, light and texture...</p>
+                        <p className="text-zinc-400 text-sm mt-1">{aiProgress < 60 ? 'Analysing dish, light and texture…' : aiProgress < 80 ? 'Applying AI enhancement…' : 'Finalising your image…'}</p>
                         <div className="mt-5 w-full max-w-[240px] mx-auto h-2.5 rounded-full bg-white/10 overflow-hidden border border-white/10">
                           <div className="h-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-300 transition-all duration-500" style={{ width: `${aiProgress}%` }} />
                         </div>
