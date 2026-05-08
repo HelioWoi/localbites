@@ -16,24 +16,49 @@ serve(async (req) => {
     const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+    const authHeader = req.headers.get("Authorization");
     
     console.log("[Checkout] Env check - STRIPE:", !!STRIPE_SECRET_KEY, "SUPABASE:", !!SUPABASE_URL);
     
-    if (!STRIPE_SECRET_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+    if (!STRIPE_SECRET_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_KEY || !SUPABASE_ANON_KEY) {
       return new Response(
         JSON.stringify({ 
           error: "Missing env vars",
           stripe: !!STRIPE_SECRET_KEY,
           supabaseUrl: !!SUPABASE_URL,
-          supabaseKey: !!SUPABASE_SERVICE_KEY
+          supabaseKey: !!SUPABASE_SERVICE_KEY,
+          supabaseAnonKey: !!SUPABASE_ANON_KEY
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
+
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Missing Authorization header" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+      );
+    }
     
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
+    });
+
+    const { data: userData, error: authError } = await supabaseAuth.auth.getUser();
+    if (authError || !userData?.user) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+      );
+    }
     
-    const { partnerId, priceId, checkoutType = 'subscription', successUrl, cancelUrl } = await req.json();
+    const { partnerId, priceId, checkoutType = 'subscription', planTier, successUrl, cancelUrl } = await req.json();
     console.log("[Checkout] Partner:", partnerId, "Price:", priceId);
 
     if (!partnerId || !priceId) {
@@ -55,6 +80,13 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: "Partner not found", details: partnerError?.message }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 }
+      );
+    }
+
+    if (!partner.user_id || partner.user_id !== userData.user.id) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 403 }
       );
     }
 
@@ -135,6 +167,12 @@ serve(async (req) => {
       'metadata[partner_id]': partnerId,
       'metadata[checkout_type]': checkoutType,
     });
+
+    const normalizedPlanTier = planTier === 'pro' ? 'pro' : planTier === 'basic' ? 'basic' : null;
+    if (!isAiAddonCheckout && normalizedPlanTier) {
+      sessionParams.set('metadata[plan_tier]', normalizedPlanTier);
+      sessionParams.set('subscription_data[metadata][plan_tier]', normalizedPlanTier);
+    }
 
     if (isAiAddonCheckout) {
       sessionParams.set('payment_intent_data[metadata][partner_id]', partnerId);

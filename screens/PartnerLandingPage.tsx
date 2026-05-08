@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { ArrowRight, CheckCircle2, QrCode, Video, Sparkles, Star, Camera, Play, UtensilsCrossed, Coffee, Pizza, CloudUpload, WandSparkles, BarChart3 } from 'lucide-react';
-import LoveBotChat from '../components/LoveBotChat';
+import { ArrowRight, CheckCircle2, QrCode, Video, Sparkles, Star, Camera, Play, UtensilsCrossed, Coffee, Pizza, CloudUpload, WandSparkles, BarChart3, X, Building2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import PromoPopup from '../components/PromoPopup';
 
 // ── Before/After Slider ──────────────────────────────────────────────────────
@@ -92,7 +91,6 @@ const BeforeAfterSlider: React.FC<SliderProps> = ({ beforeSrc, afterSrc, label, 
 };
 
 const PartnerLandingPage: React.FC = () => {
-  const [formSubmitted, setFormSubmitted] = useState(false);
   const [isPhotoTestModalOpen, setIsPhotoTestModalOpen] = useState(false);
   const [testOriginalImage, setTestOriginalImage] = useState<string | null>(null);
   const [testEnhancedImage, setTestEnhancedImage] = useState<string | null>(null);
@@ -105,6 +103,17 @@ const PartnerLandingPage: React.FC = () => {
   const photoTestInputRef = useRef<HTMLInputElement>(null);
   const photoTestCameraInputRef = useRef<HTMLInputElement>(null);
   const aiProgressTimerRef = useRef<number | null>(null);
+  const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<'free' | 'basic' | 'pro'>('free');
+  const [signupRestaurantName, setSignupRestaurantName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [signupError, setSignupError] = useState('');
+  const [signupSuccess, setSignupSuccess] = useState('');
+  const [isSignupLoading, setIsSignupLoading] = useState(false);
+  const [isNavVisible, setIsNavVisible] = useState(true);
+  const lastScrollYRef = useRef(0);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -120,8 +129,156 @@ const PartnerLandingPage: React.FC = () => {
     }
   }, []);
 
-  const scrollToForm = () => {
-    document.getElementById('signup-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentY = window.scrollY;
+
+      if (currentY < 24) {
+        setIsNavVisible(true);
+        lastScrollYRef.current = currentY;
+        return;
+      }
+
+      if (currentY > lastScrollYRef.current + 6) {
+        setIsNavVisible(true);
+      } else if (currentY < lastScrollYRef.current - 6) {
+        setIsNavVisible(false);
+      }
+
+      lastScrollYRef.current = currentY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToPricing = () => {
+    const pricingEl = document.getElementById('pricing');
+    if (!pricingEl) return;
+
+    const navOffset = 120;
+    const top = pricingEl.getBoundingClientRect().top + window.scrollY - navOffset;
+    window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  };
+
+  const openSignupModal = (plan: 'free' | 'basic' | 'pro' = 'free') => {
+    setSelectedPlan(plan);
+    setSignupError('');
+    setSignupSuccess('');
+    setIsSignupModalOpen(true);
+  };
+
+  const closeSignupModal = () => {
+    setIsSignupModalOpen(false);
+    setSignupError('');
+    setSignupSuccess('');
+  };
+
+  const getPlanCtaLabel = (plan: 'free' | 'basic' | 'pro') => {
+    if (plan === 'basic') return 'Create My Basic Account';
+    if (plan === 'pro') return 'Create My Pro Account';
+    return 'Create My Free Account';
+  };
+
+  const handleSignupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const restaurantName = signupRestaurantName.trim();
+    const email = signupEmail.trim().toLowerCase();
+
+    if (!restaurantName || !email || !signupPassword.trim()) {
+      setSignupError('Please fill in all required fields.');
+      return;
+    }
+
+    if (signupPassword.trim().length < 6) {
+      setSignupError('Password must be at least 6 characters.');
+      return;
+    }
+
+    setIsSignupLoading(true);
+    setSignupError('');
+
+    try {
+      await supabase.auth.signOut();
+
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password: signupPassword,
+      });
+
+      if (error) throw error;
+      if (!data.user) throw new Error('Could not create your account. Please try again.');
+
+      const now = new Date();
+      const trialEndDate = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString();
+      const baseSlug = restaurantName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+      const uniqueSlug = `${baseSlug || 'restaurant'}-${Date.now().toString(36)}`;
+
+      const { error: partnerError } = await supabase
+        .from('partners')
+        .upsert({
+          id: data.user.id,
+          email,
+          restaurant_name: restaurantName,
+          slug: uniqueSlug,
+          abn: null,
+          address: '',
+          postal_code: '',
+          phone: '',
+          website: null,
+          plan: 'trial',
+          subscription_plan: selectedPlan,
+          subscription_status: 'trialing',
+          subscription_start_date: now.toISOString(),
+          subscription_end_date: trialEndDate,
+          trial_ends_at: trialEndDate,
+          trial_end_date: trialEndDate,
+          lifetime_access: false,
+          is_verified: false,
+          email_confirmed: false,
+        }, {
+          onConflict: 'id',
+          ignoreDuplicates: false,
+        });
+
+      if (partnerError) throw partnerError;
+
+      localStorage.setItem('selected_signup_plan', selectedPlan);
+
+      setSignupSuccess('Account created. Please check your email to confirm your account.');
+      setSignupPassword('');
+      setTimeout(() => {
+        window.location.href = '/partner/login';
+      }, 1200);
+    } catch (err: any) {
+      if (err?.message?.toLowerCase()?.includes('already registered')) {
+        setSignupError('This email is already registered. Please sign in.');
+      } else {
+        setSignupError(err?.message || 'Signup failed. Please try again.');
+      }
+    } finally {
+      setIsSignupLoading(false);
+    }
+  };
+
+  const handleGoogleSignup = async () => {
+    setSignupError('');
+    localStorage.setItem('selected_signup_plan', selectedPlan);
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/partner`,
+      },
+    });
+
+    if (error) {
+      setSignupError(error.message || 'Google signup is unavailable right now.');
+    }
   };
 
   const readFileAsDataUrl = (file: File) =>
@@ -392,17 +549,20 @@ const PartnerLandingPage: React.FC = () => {
     {
       name: 'Free', price: '$0', period: '/month', highlight: false,
       features: ['QR code video menu', 'Video upload (basic)', 'Up to 10 menu items', '1 location', 'Standard support'],
-      cta: 'Get Started Free', href: '/partner',
+      cta: 'Get Started Free',
+      planId: 'free' as const,
     },
     {
       name: 'Basic', price: '$29', period: '/month', highlight: true,
       features: ['Everything in Free', 'Unlimited menu items', 'Custom branding', 'Connect your checkout link', 'Analytics (basic)', '30 AI photo credits / month!', 'Priority support'],
-      cta: 'Start Basic', href: '/partner',
+      cta: 'Start Basic',
+      planId: 'basic' as const,
     },
     {
       name: 'Pro', price: '$69', period: '/month', highlight: false,
       features: ['Everything in Basic', 'Analytics (advanced)', 'Up to 3 locations', '100 AI photo credits / month!', 'Faster AI processing', 'White-label options'],
-      cta: 'Start Pro', href: '/partner',
+      cta: 'Start Pro',
+      planId: 'pro' as const,
     },
   ];
 
@@ -411,7 +571,7 @@ const PartnerLandingPage: React.FC = () => {
       <style>{`@keyframes dragHintSlide { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } } @keyframes aiPulse { 0%,100% { opacity: .45; transform: scale(1); } 50% { opacity: 1; transform: scale(1.03); } } @keyframes aiShimmer { 0% { transform: translateX(-120%); } 100% { transform: translateX(220%); } } @keyframes marqueeLogos { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }`}</style>
 
       {/* ── NAV ─────────────────────────────────────────────────────────────── */}
-      <nav className="sticky top-0 z-50 bg-[#0a0a0a]/90 backdrop-blur-md border-b border-white/5">
+      <nav className={`fixed top-0 left-0 right-0 z-50 bg-[#0a0a0a]/90 backdrop-blur-md border-b border-white/5 transition-transform duration-500 ${isNavVisible ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-7 pb-3 sm:py-4 flex items-center justify-between">
           <a href="https://menulove.com.au">
             <img
@@ -423,20 +583,20 @@ const PartnerLandingPage: React.FC = () => {
           <div className="hidden md:flex items-center gap-8 text-sm text-zinc-400">
             <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
             <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+            <button onClick={scrollToPricing} className="hover:text-white transition-colors">Pricing</button>
             <a href="/live-examples" className="hover:text-white transition-colors">Live Examples</a>
           </div>
           <a
-            href="/partner"
+            href="/partner/login"
             className="px-5 py-2.5 bg-orange-500 hover:bg-orange-400 text-white font-bold text-sm rounded-xl transition-colors shadow-md shadow-orange-500/20"
           >
-            Start Free
+            Partner Portal
           </a>
         </div>
       </nav>
 
       {/* ── HERO ─────────────────────────────────────────────────────────────── */}
-      <section className="pt-12 sm:pt-16 lg:pt-28 pb-16 sm:pb-24 lg:pb-32 px-4 sm:px-6">
+      <section className="pt-28 sm:pt-32 lg:pt-36 pb-16 sm:pb-24 lg:pb-32 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto grid lg:grid-cols-[0.85fr_1.15fr] gap-10 sm:gap-12 lg:gap-16 items-center lg:items-center">
           <div className="order-1 lg:col-start-1 lg:row-start-1">
             <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/20 text-orange-400 text-sm font-semibold px-4 py-2 rounded-full mb-8">
@@ -465,7 +625,7 @@ const PartnerLandingPage: React.FC = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-12">
               <button
-                onClick={scrollToForm}
+                onClick={() => openSignupModal('free')}
                 className="flex items-center justify-center gap-2 min-w-[230px] h-14 px-6 bg-orange-500 hover:bg-orange-400 text-white font-bold text-[1.03rem] rounded-xl transition-colors shadow-lg shadow-orange-500/20 whitespace-nowrap"
               >
                 <Sparkles size={20} />
@@ -537,6 +697,17 @@ const PartnerLandingPage: React.FC = () => {
         </div>
       </section>
 
+      <section className="md:hidden relative h-[290px] overflow-hidden">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{
+            backgroundImage: "url('https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/new-landing/img2.jpg')",
+          }}
+        />
+        <div className="absolute inset-0 bg-black/28" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-black/18 to-black/35" />
+      </section>
+
       {/* ── QR / VIDEO MENU SECTION ──────────────────────────────────────────── */}
       <section className="pt-12 pb-16 sm:pt-16 sm:pb-24 lg:pt-20 lg:pb-28 px-4 sm:px-6 bg-zinc-950">
         <div className="max-w-7xl mx-auto rounded-[30px] border border-orange-500/20 bg-[#090d15] overflow-hidden shadow-[0_0_0_1px_rgba(249,115,22,0.07)]">
@@ -590,6 +761,17 @@ const PartnerLandingPage: React.FC = () => {
         </div>
       </section>
 
+      <section className="hidden md:block relative h-[220px] sm:h-[300px] lg:h-[380px] overflow-hidden">
+        <div
+          className="absolute inset-0 bg-cover bg-center md:bg-fixed"
+          style={{
+            backgroundImage: "url('https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/new-landing/img2.jpg')",
+          }}
+        />
+        <div className="absolute inset-0 bg-black/28" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-black/18 to-black/35" />
+      </section>
+
       {/* ── PRODUCT EXPERIENCE ───────────────────────────────────────────────── */}
       <section id="features" className="py-20 sm:py-28 lg:py-36 px-4 sm:px-6 bg-zinc-950">
         <div className="max-w-4xl mx-auto text-center mb-16">
@@ -623,7 +805,7 @@ const PartnerLandingPage: React.FC = () => {
               ))}
             </div>
             <button
-              onClick={scrollToForm}
+              onClick={() => openSignupModal('free')}
               className="flex items-center gap-2 px-8 py-4 bg-orange-500 hover:bg-orange-400 text-white font-bold rounded-2xl transition-colors shadow-md shadow-orange-500/20"
             >
               Start Free <ArrowRight size={18} />
@@ -750,7 +932,7 @@ const PartnerLandingPage: React.FC = () => {
       </section>
 
       {/* ── PRICING ──────────────────────────────────────────────────────────── */}
-      <section id="pricing" className="py-20 sm:py-28 lg:py-36 px-4 sm:px-6">
+      <section id="pricing" className="py-20 sm:py-28 lg:py-36 px-4 sm:px-6 scroll-mt-32">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-20">
             <p className="text-orange-500 text-sm font-bold uppercase tracking-widest mb-4">Choose your plan</p>
@@ -806,8 +988,8 @@ const PartnerLandingPage: React.FC = () => {
                     </li>
                   ))}
                 </ul>
-                <a
-                  href={plan.href}
+                <button
+                  onClick={() => openSignupModal(plan.planId)}
                   className={`block text-center py-3 font-bold rounded-xl transition-colors ${
                     plan.highlight
                       ? 'bg-white text-orange-600 hover:bg-orange-50'
@@ -815,7 +997,7 @@ const PartnerLandingPage: React.FC = () => {
                   }`}
                 >
                   {plan.cta}
-                </a>
+                </button>
               </div>
             ))}
             <div className="p-9 rounded-3xl bg-zinc-900 border border-white/10">
@@ -836,9 +1018,6 @@ const PartnerLandingPage: React.FC = () => {
           </p>
         </div>
       </section>
-
-
-      <div id="signup-form" className="h-0" />
 
       {/* ── PROOF + CTA BLOCK ───────────────────────────────────────────────── */}
       <section className="pt-6 pb-14 sm:pt-8 sm:pb-20 lg:pb-24 px-4 sm:px-6">
@@ -910,12 +1089,12 @@ const PartnerLandingPage: React.FC = () => {
                 >
                   See Live Example <ArrowRight size={16} />
                 </a>
-                <a
-                  href="/partner"
+                <button
+                  onClick={() => openSignupModal('free')}
                   className="inline-flex items-center justify-center gap-2 h-12 px-7 border border-white/25 hover:border-orange-400/60 hover:bg-white/5 text-white font-bold text-base rounded-xl transition-colors"
                 >
                   Start FREE <ArrowRight size={16} />
-                </a>
+                </button>
               </div>
             </div>
 
@@ -987,6 +1166,187 @@ const PartnerLandingPage: React.FC = () => {
           </div>
         </div>
       </footer>
+
+      {isSignupModalOpen && (
+        <div className="fixed inset-0 z-[90] bg-black/70 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
+          <div className="max-w-6xl mx-auto my-4 sm:my-8 rounded-[28px] overflow-hidden border border-white/10 bg-[#f3ede7] text-zinc-900 shadow-[0_25px_80px_rgba(0,0,0,0.45)]">
+            <div className="grid lg:grid-cols-[1.08fr_1fr] min-h-[620px]">
+              <div className="relative bg-[linear-gradient(145deg,#f6ede4_0%,#f2e6da_45%,#ffe4cc_100%)] px-8 sm:px-10 pt-8 pb-9 lg:pb-12 border-b lg:border-b-0 lg:border-r border-zinc-200/70">
+                <div className="flex items-center gap-3">
+                  <img
+                    src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png"
+                    alt="MenuLove"
+                    className="w-11 h-11 rounded-xl"
+                  />
+                  <div>
+                    <p className="text-3xl font-black leading-none text-zinc-900">MenuLove</p>
+                    <p className="text-orange-500 font-semibold">Partner</p>
+                  </div>
+                </div>
+
+                <div className="mt-7 inline-flex items-center gap-2 rounded-full bg-orange-100 text-orange-700 px-3 py-1.5 text-sm font-semibold">
+                  <Sparkles size={14} />
+                  Start your 14-day free trial
+                </div>
+
+                <h3 className="mt-6 text-4xl sm:text-[2.8rem] leading-[1.08] font-black text-zinc-900">
+                  Transform your menu into a
+                  <span className="text-orange-500"> video experience</span>
+                </h3>
+                <p className="mt-4 text-zinc-600 text-lg leading-relaxed max-w-xl">
+                  Create beautiful video menus that attract customers, showcase your dishes and increase orders.
+                </p>
+
+                <div className="mt-8 space-y-4">
+                  {[
+                    { title: 'QR Code Menu', desc: 'Instant access for your customers' },
+                    { title: 'AI Photo Enhancement', desc: 'Make your food look irresistible' },
+                    { title: 'Engaging Video Menus', desc: 'TikTok-style experience' },
+                    { title: 'More Orders', desc: 'Increase engagement and sales' },
+                  ].map((item) => (
+                    <div key={item.title} className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center mt-0.5">
+                        <Sparkles size={16} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-zinc-900">{item.title}</p>
+                        <p className="text-sm text-zinc-600">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="relative bg-white px-6 sm:px-10 py-8 sm:py-10">
+                <button
+                  type="button"
+                  onClick={closeSignupModal}
+                  className="absolute top-4 right-4 inline-flex items-center justify-center w-9 h-9 rounded-full border border-zinc-200 text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 transition-colors"
+                  aria-label="Close signup modal"
+                >
+                  <X size={18} />
+                </button>
+
+                <div className="text-center mb-8">
+                  <img
+                    src="https://quybuvapflnzcaedjbkl.supabase.co/storage/v1/object/public/media/icon.png"
+                    alt="MenuLove"
+                    className="w-14 h-14 rounded-xl mx-auto"
+                  />
+                  <h3 className="mt-4 text-[2rem] font-black text-zinc-900">Create your account</h3>
+                  <p className="text-zinc-500 mt-1">Start your 14-day free trial. No credit card required.</p>
+                  <div className="mt-3 inline-flex items-center rounded-full bg-orange-100 text-orange-700 text-xs font-bold px-3 py-1 uppercase tracking-wider">
+                    Selected plan: {selectedPlan}
+                  </div>
+                </div>
+
+                <form onSubmit={handleSignupSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-zinc-700 mb-2">Restaurant name</label>
+                    <div className="relative">
+                      <Building2 size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                      <input
+                        type="text"
+                        value={signupRestaurantName}
+                        onChange={(e) => setSignupRestaurantName(e.target.value)}
+                        placeholder="e.g. Bella Italia Restaurant"
+                        className="w-full pl-11 pr-4 h-12 border border-zinc-200 rounded-xl bg-zinc-50 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-zinc-700 mb-2">Email</label>
+                    <div className="relative">
+                      <Mail size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                      <input
+                        type="email"
+                        value={signupEmail}
+                        onChange={(e) => setSignupEmail(e.target.value)}
+                        placeholder="you@restaurant.com"
+                        className="w-full pl-11 pr-4 h-12 border border-zinc-200 rounded-xl bg-zinc-50 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-zinc-700 mb-2">Password</label>
+                    <div className="relative">
+                      <Lock size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                      <input
+                        type={showSignupPassword ? 'text' : 'password'}
+                        value={signupPassword}
+                        onChange={(e) => setSignupPassword(e.target.value)}
+                        placeholder="Minimum 6 characters"
+                        className="w-full pl-11 pr-12 h-12 border border-zinc-200 rounded-xl bg-zinc-50 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        required
+                        minLength={6}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSignupPassword((prev) => !prev)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                        aria-label="Toggle password visibility"
+                      >
+                        {showSignupPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {signupError && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      {signupError}
+                    </div>
+                  )}
+
+                  {signupSuccess && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                      {signupSuccess}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isSignupLoading}
+                    className="w-full h-12 rounded-xl bg-orange-500 hover:bg-orange-400 text-white font-bold transition-colors disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                  >
+                    {isSignupLoading ? 'Creating account...' : getPlanCtaLabel(selectedPlan)}
+                    {!isSignupLoading && <ArrowRight size={16} />}
+                  </button>
+                </form>
+
+                <div className="my-5 flex items-center gap-3 text-zinc-400 text-sm">
+                  <span className="flex-1 h-px bg-zinc-200" />
+                  OR
+                  <span className="flex-1 h-px bg-zinc-200" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleSignup}
+                  className="w-full h-12 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 font-semibold transition-colors inline-flex items-center justify-center gap-2"
+                >
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-zinc-300 text-xs font-black">G</span>
+                  Continue with Google
+                </button>
+
+                <p className="text-center text-sm text-zinc-500 mt-7">
+                  Already have an account?{' '}
+                  <a href="/partner/login" className="text-orange-600 font-semibold hover:text-orange-500">
+                    Sign in
+                  </a>
+                </p>
+
+                <p className="text-center text-xs text-zinc-400 mt-6">
+                  Your data is secure and always protected.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isPhotoTestModalOpen && (
         <div className="fixed inset-0 z-[80] bg-black/75 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
@@ -1143,7 +1503,7 @@ const PartnerLandingPage: React.FC = () => {
                       type="button"
                       onClick={() => {
                         setIsPhotoTestModalOpen(false);
-                        scrollToForm();
+                        openSignupModal('free');
                       }}
                       className="inline-flex items-center justify-center gap-2 h-12 px-6 bg-orange-500 hover:bg-orange-400 text-white font-bold rounded-xl transition-colors"
                     >
@@ -1157,7 +1517,6 @@ const PartnerLandingPage: React.FC = () => {
         </div>
       )}
 
-      <LoveBotChat />
       <PromoPopup />
     </div>
   );

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import Stripe from "https://esm.sh/stripe@13.0.0?target=deno";
 
 serve(async (req) => {
   console.log("[Webhook] ===== NEW REQUEST =====");
@@ -9,24 +10,45 @@ serve(async (req) => {
   // Get env vars inside handler
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
+  const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET");
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !STRIPE_SECRET_KEY || !STRIPE_WEBHOOK_SECRET) {
     console.error("[Webhook] Missing Supabase env vars");
     return new Response("Missing environment variables", { status: 500 });
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const stripe = new Stripe(STRIPE_SECRET_KEY, {
+    apiVersion: "2023-10-16",
+    httpClient: Stripe.createFetchHttpClient(),
+  });
 
   // Helper functions with access to supabase
+  function normalizePlanTier(value: unknown): 'basic' | 'pro' | null {
+    const plan = String(value || '').toLowerCase();
+    if (plan === 'pro') return 'pro';
+    if (plan === 'basic' || plan === 'monthly' || plan === 'annual') return 'basic';
+    return null;
+  }
+
   /** Map a Stripe price ID to our plan tier ('basic' | 'pro') */
-  function planTierFromPriceId(priceId: string): 'basic' | 'pro' {
+  function planTierFromPriceId(priceId: string): 'basic' | 'pro' | null {
     const BASIC_MONTHLY = Deno.env.get("BASIC_MONTHLY_PRICE_ID") || '';
     const BASIC_ANNUAL  = Deno.env.get("BASIC_ANNUAL_PRICE_ID")  || '';
     const PRO_MONTHLY   = Deno.env.get("PRO_MONTHLY_PRICE_ID")   || '';
     const PRO_ANNUAL    = Deno.env.get("PRO_ANNUAL_PRICE_ID")    || '';
     if (priceId === PRO_MONTHLY || priceId === PRO_ANNUAL) return 'pro';
     if (priceId === BASIC_MONTHLY || priceId === BASIC_ANNUAL) return 'basic';
-    return 'basic'; // legacy $39 plan migrates to basic
+    return null;
+  }
+
+  /** Fallback mapping by Stripe recurring unit_amount (AUD cents) */
+  function planTierFromAmount(unitAmount: number | null | undefined): 'basic' | 'pro' | null {
+    if (!unitAmount) return null;
+    if (unitAmount === 6900 || unitAmount === 74500) return 'pro';
+    if (unitAmount === 2900 || unitAmount === 31300 || unitAmount === 3900 || unitAmount === 39000) return 'basic';
+    return null;
   }
 
   async function handleAiAddonCheckout(session: any) {
@@ -71,7 +93,7 @@ serve(async (req) => {
 
     const { data: partner } = await supabase
       .from("partners")
-      .select("id")
+      .select("id, subscription_plan, ai_credits_addon_remaining, ai_credits_reset_at")
       .eq("stripe_customer_id", customerId)
       .single();
 
@@ -80,7 +102,11 @@ serve(async (req) => {
       return;
     }
 
-    const planTier = planTierFromPriceId(priceId);
+    const metadataPlanTier = normalizePlanTier(subscription?.metadata?.plan_tier);
+    const mappedPlanTier = priceId ? planTierFromPriceId(priceId) : null;
+    const amountPlanTier = planTierFromAmount(amount);
+    const existingPlanTier = normalizePlanTier(partner?.subscription_plan);
+    const planTier = metadataPlanTier || mappedPlanTier || amountPlanTier || existingPlanTier || 'basic';
     
     // If cancel_at_period_end is true, user canceled but subscription is still active until period end
     const effectiveStatus = subscription.cancel_at_period_end ? "canceled" : status;
@@ -126,7 +152,7 @@ serve(async (req) => {
 
     const { data: partner } = await supabase
       .from("partners")
-      .select("id")
+      .select("id, subscription_plan")
       .eq("stripe_customer_id", customerId)
       .single();
 
@@ -160,7 +186,7 @@ serve(async (req) => {
 
     const { data: partner } = await supabase
       .from("partners")
-      .select("id")
+      .select("id, subscription_plan")
       .eq("stripe_customer_id", customerId)
       .single();
 
@@ -175,7 +201,10 @@ serve(async (req) => {
       const priceId = line.price?.id;
       const interval = line.price?.recurring?.interval || "month";
       const invoicePriceId = line.price?.id || '';
-      const planTier = planTierFromPriceId(invoicePriceId);
+      const mappedPlanTier = invoicePriceId ? planTierFromPriceId(invoicePriceId) : null;
+      const amountPlanTier = planTierFromAmount(line.price?.unit_amount);
+      const existingPlanTier = normalizePlanTier(partner?.subscription_plan);
+      const planTier = mappedPlanTier || amountPlanTier || existingPlanTier || 'basic';
       
       // Check if this is a trial (amount is 0 for trial invoices)
       const isTrial = invoice.amount_paid === 0;
@@ -194,6 +223,10 @@ serve(async (req) => {
       
       // Reset AI credits on each billing period (including trial start)
       const nextResetAt = new Date(line.period.end * 1000).toISOString();
+      const periodStartMs = line?.period?.start ? line.period.start * 1000 : 0;
+      const previousResetMs = partner?.ai_credits_reset_at ? new Date(partner.ai_credits_reset_at).getTime() : 0;
+      const shouldResetAddonCredits = !!previousResetMs && !!periodStartMs && periodStartMs >= previousResetMs;
+      const nextAddonRemaining = shouldResetAddonCredits ? 0 : (partner?.ai_credits_addon_remaining || 0);
 
       await supabase
         .from("partners")
@@ -204,12 +237,12 @@ serve(async (req) => {
           subscription_start_date: new Date(line.period.start * 1000).toISOString(),
           subscription_end_date: new Date(line.period.end * 1000).toISOString(),
           ai_credits_used: 0,
-          ai_credits_addon_remaining: 0,
+          ai_credits_addon_remaining: nextAddonRemaining,
           ai_credits_reset_at: nextResetAt,
         })
         .eq("id", partner.id);
 
-      console.log(`[Webhook] Subscription updated: ${subscriptionId}, plan: ${planTier}, isTrial: ${isTrial}, creditsReset, end: ${nextResetAt}`);
+      console.log(`[Webhook] Subscription updated: ${subscriptionId}, plan: ${planTier}, isTrial: ${isTrial}, creditsReset, addOnReset=${shouldResetAddonCredits}, end: ${nextResetAt}`);
     }
 
     // Record payment
@@ -371,11 +404,22 @@ serve(async (req) => {
 
   try {
     const body = await req.text();
+    const signature = req.headers.get("stripe-signature");
+
+    if (!signature) {
+      console.error("[Webhook] Missing stripe-signature header");
+      return new Response("Missing stripe-signature", { status: 400 });
+    }
     
     console.log("[Webhook] Raw body received:", body.substring(0, 200));
     
-    // Parse event without SDK verification (Stripe will retry if signature is invalid)
-    const event = JSON.parse(body);
+    let event: Stripe.Event;
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, STRIPE_WEBHOOK_SECRET);
+    } catch (sigErr: any) {
+      console.error("[Webhook] Signature verification failed:", sigErr?.message || sigErr);
+      return new Response(`Webhook signature error: ${sigErr?.message || 'invalid signature'}`, { status: 400 });
+    }
 
     console.log(`[Webhook] ========================================`);
     console.log(`[Webhook] Event Type: ${event.type}`);
