@@ -21,8 +21,8 @@ import { sanitizeFileName } from '../../utils/fileUtils';
 import ChatWidget from '../../components/chat/ChatWidget';
 import WelcomeBanner from '../../components/WelcomeBanner';
 import GuidedTour from '../../components/GuidedTour';
-import CheckoutSuccessOverlay from '../../components/CheckoutSuccessOverlay';
-import { PLAN_LIMITS, planFromString, type PlanId } from '../../services/stripeService';
+import CheckoutSuccessOverlay, { type CheckoutSuccessVariant } from '../../components/CheckoutSuccessOverlay';
+import { PLAN_LIMITS, PLAN_PRICES, planFromString, type PlanId } from '../../services/stripeService';
 
 interface PartnerDashboardProps {
   user: PartnerUser;
@@ -207,6 +207,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
   // Checkout success celebration
   const [showSuccessCelebration, setShowSuccessCelebration] = useState(false);
+  const [checkoutSuccessVariant, setCheckoutSuccessVariant] = useState<CheckoutSuccessVariant>('pro');
 
   // Edit category state
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
@@ -339,6 +340,14 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   const canUseAI = planLimits.aiCredits > 0 && totalAiRemaining > 0;
   const canAccessAnalytics = planLimits.analytics;
   const aiCreditsRemaining = totalAiRemaining;
+  const isProPaidPlan = hasPaidSubscription && currentPlan === 'pro';
+  const paidPlanLabel = isProPaidPlan ? 'Pro Plan' : 'Basic Plan';
+  const paidPlanPriceLabel = isProPaidPlan
+    ? `$${PLAN_PRICES.pro.monthly}/month`
+    : `$${PLAN_PRICES.basic.monthly}/month`;
+  const paidPlanFeatures = isProPaidPlan
+    ? ['Unlimited videos', 'Advanced analytics', 'Up to 3 locations', '100 AI credits / month']
+    : ['Unlimited videos', 'Basic analytics', '1 location', '30 AI credits / month'];
 
   const clearEnhanceRuntime = () => {
     if (enhanceTimerRef.current) {
@@ -375,6 +384,12 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     // Check if returning from successful checkout
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('success') === 'true') {
+      const successType = urlParams.get('successType');
+      if (successType === 'basic' || successType === 'pro' || successType === 'ai_credits_addon') {
+        setCheckoutSuccessVariant(successType);
+      } else {
+        setCheckoutSuccessVariant('pro');
+      }
       setShowSuccessCelebration(true);
       window.history.replaceState({}, '', '/partner');
     }
@@ -920,8 +935,10 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       return handleUpdateMenuItem();
     }
 
-    const hasVideo = mediaType === 'video' && uploadFile;
-    const hasPhoto = mediaType === 'photo' && menuPhotoFile;
+    const hasVideo = mediaType === 'video' && !!uploadFile;
+    const hasPhotoFile = mediaType === 'photo' && !!menuPhotoFile;
+    const hasAcceptedEnhancedPhoto = mediaType === 'photo' && !!acceptedPhotoUrl;
+    const hasPhoto = hasPhotoFile || hasAcceptedEnhancedPhoto;
     
     // Only require name and partner data - media is optional
     if (!menuItemName.trim() || !partnerData) return;
@@ -974,6 +991,43 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       } catch (error: any) {
         console.error('Item creation error:', error);
         alert('Failed to create item: ' + error.message);
+      } finally {
+        setIsUploading(false);
+      }
+      return;
+    }
+
+    // === PHOTO ALREADY ENHANCED (PUBLIC URL) ===
+    if (mediaType === 'photo' && acceptedPhotoUrl) {
+      setIsUploading(true);
+      setUploadProgress(80);
+
+      try {
+        const item = await insertMenuItem({
+          partner_id: partnerData.id,
+          name: menuItemName.trim(),
+          category: finalCategory,
+          description: menuItemDescription.trim() || null,
+          price: menuItemPrice ? parseFloat(menuItemPrice) : null,
+          photo_url: acceptedPhotoUrl,
+          video_url: '',
+          dish_order_url: menuItemOrderingUrl.trim() || null,
+          sort_order: menuItems.filter(i => i.category === finalCategory).length,
+        });
+        setUploadProgress(100);
+
+        setMenuItems([...menuItems, item]);
+        if (!categories.includes(finalCategory)) {
+          setCategories([...categories, finalCategory]);
+        }
+
+        setTimeout(() => {
+          resetMenuUploadModal();
+        }, 400);
+      } catch (error: any) {
+        console.error('Enhanced photo item creation error:', error);
+        alert('Upload failed: ' + error.message);
+        setUploadProgress(0);
       } finally {
         setIsUploading(false);
       }
@@ -1888,7 +1942,10 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
   return (
     <div className="min-h-screen bg-zinc-50 partner-portal">
       {showSuccessCelebration && (
-        <CheckoutSuccessOverlay onDismiss={() => setShowSuccessCelebration(false)} />
+        <CheckoutSuccessOverlay
+          variant={checkoutSuccessVariant}
+          onDismiss={() => setShowSuccessCelebration(false)}
+        />
       )}
 
       {/* Onboarding Modal */}
@@ -2942,11 +2999,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-lg">
                 <div>
                   <p className="font-semibold text-zinc-900">
-                    {hasPaidSubscription ? 'Pro Plan' : isTrialActive ? 'Trial Plan' : 'Free Plan'}
+                    {hasPaidSubscription ? paidPlanLabel : isTrialActive ? 'Trial Plan' : 'Free Plan'}
                   </p>
                   <p className="text-xs text-zinc-500">
                     {hasPaidSubscription 
-                      ? '$39/month • Renews automatically' 
+                      ? `${paidPlanPriceLabel} • Renews automatically`
                       : isTrialActive 
                         ? `${subscriptionDaysLeft} days remaining`
                         : 'Trial ended'}
@@ -2974,14 +3031,18 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               <div className="mt-4">
                 <div className={`p-4 rounded-lg border ${hasPaidSubscription ? 'border-amber-300 bg-amber-50' : isTrialActive ? 'border-orange-200 bg-orange-50' : 'border-zinc-200'}`}>
                   <p className="font-semibold text-zinc-900 mb-2">
-                    {hasPaidSubscription ? 'Pro Plan Active' : isTrialActive ? 'Trial Period' : 'No Active Plan'}
-                    {hasPaidSubscription && <span className="text-amber-600 ml-2">$39/month</span>}
+                    {hasPaidSubscription ? `${paidPlanLabel} Active` : isTrialActive ? 'Trial Period' : 'No Active Plan'}
+                    {hasPaidSubscription && <span className="text-amber-600 ml-2">{paidPlanPriceLabel}</span>}
                   </p>
                   <ul className="text-xs text-zinc-600 space-y-1">
-                    <li>• Unlimited videos</li>
-                    <li>• Full analytics</li>
-                    <li>• Partner badge</li>
-                    <li>• Priority in feed</li>
+                    {hasPaidSubscription ? (
+                      paidPlanFeatures.map((feature) => <li key={feature}>• {feature}</li>)
+                    ) : (
+                      <>
+                        <li>• Upgrade from trial/free anytime</li>
+                        <li>• Access billing and plan controls in Subscription tab</li>
+                      </>
+                    )}
                   </ul>
                   {hasPaidSubscription && (
                     <p className="text-xs text-zinc-500 mt-3 pt-3 border-t border-zinc-200">
@@ -3454,7 +3515,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                 </button>
                 <button
                   onClick={handleMenuUpload}
-                  disabled={isUploading || (!editingMenuItem && !uploadFile && !menuPhotoFile) || !menuItemName.trim() || (!menuItemCategory.trim() && menuItemCategory !== '__new__') || (menuItemCategory === '__new__' && !newCategory.trim())}
+                  disabled={isUploading || (!editingMenuItem && !uploadFile && !menuPhotoFile && !acceptedPhotoUrl) || !menuItemName.trim() || (!menuItemCategory.trim() && menuItemCategory !== '__new__') || (menuItemCategory === '__new__' && !newCategory.trim())}
                   className="flex-1 py-3 bg-orange-500 text-white font-semibold rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
                 >
                   {isUploading ? (

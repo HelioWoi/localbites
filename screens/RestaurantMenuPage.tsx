@@ -352,6 +352,16 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   const isActiveVideoUnsupported = activeItemHasVideo &&
     isLikelyUnsupportedVideo(activeItem.videoUrl);
 
+  // Analytics V2: track item view when active item changes
+  useEffect(() => {
+    if (!currentActiveItemId) return;
+    trackAnalyticsEvent({
+      eventType: 'view',
+      restaurantId: restaurant.id,
+      itemId: currentActiveItemId,
+    }).catch(() => {});
+  }, [currentActiveItemId, restaurant.id]);
+
   // Get next category helper
   const getNextCategory = (): string | null | false => {
     if (activeCategory === null) {
@@ -910,6 +920,14 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                     playsInline
                     preload="metadata"
                     onPlaying={() => setVideoReady(prev => new Set(prev).add(index))}
+                    onPlay={() => {
+                      if (item.id !== currentActiveItemId) return;
+                      trackAnalyticsEvent({
+                        eventType: 'play',
+                        restaurantId: restaurant.id,
+                        itemId: item.id,
+                      }).catch(() => {});
+                    }}
                     onCanPlay={() => {
                       setVideoReady(prev => new Set(prev).add(index));
                       const video = videoRefsById.current.get(item.id);

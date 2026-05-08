@@ -24,7 +24,9 @@ const extractEdgeFunctionErrorMessage = (err: any): string => {
 const EmailNotConfirmedPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [isResending, setIsResending] = useState(false);
+  const [isCheckingConfirmation, setIsCheckingConfirmation] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
+  const [confirmationChecked, setConfirmationChecked] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -64,6 +66,44 @@ const EmailNotConfirmedPage: React.FC = () => {
       setError(extractEdgeFunctionErrorMessage(err));
     } finally {
       setIsResending(false);
+    }
+  };
+
+  const handleAlreadyConfirmed = async () => {
+    if (!email) {
+      setError('Email not found. Please login again.');
+      return;
+    }
+
+    setIsCheckingConfirmation(true);
+    setError('');
+    setConfirmationChecked(false);
+
+    try {
+      const { data: partner, error: partnerError } = await supabase
+        .from('partners')
+        .select('email_confirmed')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (partnerError) {
+        throw partnerError;
+      }
+
+      if (partner?.email_confirmed) {
+        setConfirmationChecked(true);
+        setTimeout(() => {
+          window.location.href = '/partner/login?email_confirmed=true';
+        }, 1000);
+        return;
+      }
+
+      setError('Email is not confirmed yet. Please refresh your inbox and click the confirmation link.');
+    } catch (err: any) {
+      console.error('Confirmation check error:', err);
+      setError('Unable to validate confirmation right now. Please try again in a few seconds.');
+    } finally {
+      setIsCheckingConfirmation(false);
     }
   };
 
@@ -108,6 +148,16 @@ const EmailNotConfirmedPage: React.FC = () => {
               <div className="bg-zinc-50 rounded-xl p-4 mb-6">
                 <p className="text-sm text-zinc-500 mb-1">Email sent to:</p>
                 <p className="text-zinc-900 font-medium break-all">{email}</p>
+              </div>
+            )}
+
+            {confirmationChecked && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+                <CheckCircle size={20} className="text-green-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-green-900 mb-1">Email confirmed successfully</p>
+                  <p className="text-sm text-green-700">Redirecting to login...</p>
+                </div>
               </div>
             )}
 
@@ -159,6 +209,24 @@ const EmailNotConfirmedPage: React.FC = () => {
                 <>
                   <Mail size={20} />
                   Resend confirmation email
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleAlreadyConfirmed}
+              disabled={isCheckingConfirmation}
+              className="w-full mt-3 bg-white border border-zinc-200 text-zinc-800 font-semibold py-3 rounded-xl hover:bg-zinc-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isCheckingConfirmation ? (
+                <>
+                  <RefreshCw size={20} className="animate-spin" />
+                  Checking confirmation...
+                </>
+              ) : (
+                <>
+                  <CheckCircle size={20} />
+                  I already confirmed
                 </>
               )}
             </button>

@@ -2,12 +2,42 @@ import React, { useEffect, useState } from 'react';
 import { Crown, Sparkles, ArrowRight } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
+export type CheckoutSuccessVariant = 'basic' | 'pro' | 'ai_credits_addon';
+
 interface CheckoutSuccessOverlayProps {
   onDismiss: () => void;
+  variant?: CheckoutSuccessVariant;
 }
 
-const CheckoutSuccessOverlay: React.FC<CheckoutSuccessOverlayProps> = ({ onDismiss }) => {
+const CONTENT_BY_VARIANT: Record<CheckoutSuccessVariant, {
+  title: string;
+  subtitle: string;
+  heading: string;
+  description: string;
+}> = {
+  basic: {
+    title: "You're on Basic!",
+    subtitle: 'Basic features unlocked',
+    heading: 'Welcome to MenuLove Basic!',
+    description: 'You now have 30 AI photo credits per cycle, unlimited menu items, and enhanced tools to grow your orders.',
+  },
+  pro: {
+    title: "You're on Pro!",
+    subtitle: 'Pro features unlocked',
+    heading: 'Welcome to MenuLove Pro!',
+    description: 'You now have 100 AI photo credits per cycle, advanced analytics, and premium growth features for your business.',
+  },
+  ai_credits_addon: {
+    title: 'Credits Added!',
+    subtitle: '+50 AI credits purchased',
+    heading: 'Your +50 AI credits are ready!',
+    description: 'Great choice. Your add-on credits were applied and will be used before base monthly credits.',
+  },
+};
+
+const CheckoutSuccessOverlay: React.FC<CheckoutSuccessOverlayProps> = ({ onDismiss, variant = 'pro' }) => {
   const [show, setShow] = useState(false);
+  const content = CONTENT_BY_VARIANT[variant];
 
   useEffect(() => {
     // Trigger entrance animation
@@ -88,11 +118,11 @@ const CheckoutSuccessOverlay: React.FC<CheckoutSuccessOverlayProps> = ({ onDismi
               <Crown size={40} className="text-white" />
             </div>
             <h2 className="text-3xl font-extrabold text-white mb-1">
-              You're Premium!
+              {content.title}
             </h2>
             <div className="flex items-center justify-center gap-1.5 text-white/90">
               <Sparkles size={16} />
-              <span className="text-sm font-medium">All features unlocked</span>
+              <span className="text-sm font-medium">{content.subtitle}</span>
               <Sparkles size={16} />
             </div>
           </div>
@@ -101,10 +131,18 @@ const CheckoutSuccessOverlay: React.FC<CheckoutSuccessOverlayProps> = ({ onDismi
         {/* Body */}
         <div className="px-8 py-6 text-center">
           <p className="text-zinc-700 text-base mb-2">
-            Welcome to <span className="font-bold text-orange-600">MenuLove Premium</span>!
+            {content.heading.includes('MenuLove') ? (
+              <>
+                {content.heading.replace('MenuLove', '') ? content.heading.split('MenuLove')[0] : ''}
+                <span className="font-bold text-orange-600">MenuLove</span>
+                {content.heading.split('MenuLove')[1] || ''}
+              </>
+            ) : (
+              <span className="font-bold text-orange-600">{content.heading}</span>
+            )}
           </p>
           <p className="text-zinc-500 text-sm mb-6">
-            Your restaurant now has access to unlimited video uploads, analytics, QR code menus, and priority support.
+            {content.description}
           </p>
 
           <button

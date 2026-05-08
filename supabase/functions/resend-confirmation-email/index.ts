@@ -75,6 +75,7 @@ serve(async (req) => {
         email: partner.email,
         restaurantName: partner.restaurant_name,
         confirmationToken,
+        selectedPlan: partner.subscription_plan,
       },
     });
 

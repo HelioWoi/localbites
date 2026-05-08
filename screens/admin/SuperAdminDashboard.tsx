@@ -126,8 +126,8 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ user, onLogou
       const trialCount = processedPartners.filter(p => p.subscription_status === 'trial').length;
       const totalVideos = processedPartners.reduce((sum, p) => sum + p.total_videos, 0);
       
-      // Revenue calculation (assuming $39/month per active subscription)
-      const monthlyRevenue = activeCount * 39;
+      // Revenue calculation (minimum estimate using Basic plan A$29/month)
+      const monthlyRevenue = activeCount * 29;
       const totalRevenue = monthlyRevenue; // For now, same as monthly
 
       // Conversion rate: active / (active + trial + cancelled)
@@ -161,6 +161,18 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ user, onLogou
   };
 
   const getSubscriptionStatus = (partner: any): 'trial' | 'active' | 'cancelled' | 'expired' => {
+    const dbStatus = typeof partner.subscription_status === 'string'
+      ? partner.subscription_status.toLowerCase()
+      : '';
+
+    if (dbStatus === 'canceled') {
+      return 'cancelled';
+    }
+
+    if (dbStatus === 'trial' || dbStatus === 'active' || dbStatus === 'cancelled' || dbStatus === 'expired') {
+      return dbStatus;
+    }
+
     if (partner.stripe_subscription_id) {
       return 'active';
     }
@@ -569,7 +581,7 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ user, onLogou
                 <div>
                   <div className="flex justify-between mb-2">
                     <span className="text-sm text-zinc-600">Active Subscriptions</span>
-                    <span className="text-sm font-bold text-zinc-900">{metrics.activeSubscriptions} × $39</span>
+                    <span className="text-sm font-bold text-zinc-900">{metrics.activeSubscriptions} × A$29 min</span>
                   </div>
                   <div className="w-full bg-zinc-100 rounded-full h-2">
                     <div 
@@ -582,7 +594,7 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ user, onLogou
                 <div>
                   <div className="flex justify-between mb-2">
                     <span className="text-sm text-zinc-600">Trial Users (Potential)</span>
-                    <span className="text-sm font-bold text-zinc-900">{metrics.trialUsers} × $39</span>
+                    <span className="text-sm font-bold text-zinc-900">{metrics.trialUsers} × A$29 min</span>
                   </div>
                   <div className="w-full bg-zinc-100 rounded-full h-2">
                     <div 

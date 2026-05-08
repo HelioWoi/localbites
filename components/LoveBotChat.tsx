@@ -375,7 +375,7 @@ const LoveBotChat: React.FC = () => {
       if (lastLower.includes('would you like to know') || lastLower.includes('what would you like')) {
         if (lowerMessage.includes('pricing') || lowerMessage.includes('price') || lowerMessage.includes('cost')) {
           return {
-            text: "We offer a 14-day free trial with no credit card required. After that, plans start at $39/month. You can cancel anytime - no contracts, no hidden fees.\n\nReady to try it out? I can scroll you to the signup form.",
+            text: "We offer a 14-day free trial with no credit card required. After that, plans start at A$29/month (Basic), or A$69/month for Pro. You can cancel anytime - no contracts, no hidden fees.\n\nReady to try it out? I can scroll you to the signup form.",
             action: () => scrollToElement('signup-form'),
             setContext: null
           };
@@ -442,7 +442,7 @@ const LoveBotChat: React.FC = () => {
       // User is answering the payment clarification question
       if (lowerMessage.includes('1') || lowerMessage.includes('subscription') || lowerMessage.includes('plan') || lowerMessage.includes('pricing')) {
         return {
-          text: "I understand your question! There are two different payments:\n\n1️⃣ **Your MenuLove subscription**: You pay $39/month (after 14-day free trial) to use the platform.\n\n2️⃣ **Customer payments**: Your customers pay YOU directly through your existing system (Square, Bopple, etc). MenuLove doesn't take any commission from customer orders.\n\nSo you only pay the monthly subscription - that's it! No hidden fees, no commission on sales.",
+          text: "I understand your question! There are two different payments:\n\n1️⃣ **Your MenuLove subscription**: You pay A$29/month (Basic) or A$69/month (Pro) after the 14-day free trial.\n\n2️⃣ **Customer payments**: Your customers pay YOU directly through your existing system (Square, Bopple, etc). MenuLove doesn't take any commission from customer orders.\n\nSo you only pay the subscription - that's it! No hidden fees, no commission on sales.",
           action: () => scrollToElement('signup-form'),
           setContext: null
         };
@@ -457,7 +457,7 @@ const LoveBotChat: React.FC = () => {
     if (context === 'cost_clarification') {
       if (lowerMessage.includes('1') || lowerMessage.includes('subscription') || lowerMessage.includes('menulove')) {
         return {
-          text: "We offer a 14-day free trial with no credit card required. After that, plans start at $39/month. You can cancel anytime - no contracts, no hidden fees.\n\nReady to try it out? I can scroll you to the signup form.",
+          text: "We offer a 14-day free trial with no credit card required. After that, plans start at A$29/month (Basic), or A$69/month for Pro. You can cancel anytime - no contracts, no hidden fees.\n\nReady to try it out? I can scroll you to the signup form.",
           action: () => scrollToElement('signup-form'),
           setContext: null
         };
@@ -533,7 +533,7 @@ const LoveBotChat: React.FC = () => {
         (lowerMessage.includes('i') && lowerMessage.includes('pay')) ||
         lowerMessage.includes('platform cost')) {
       return {
-        text: "I understand your question! There are two different payments:\n\n1️⃣ **Your MenuLove subscription**: You pay $39/month (after 14-day free trial) to use the platform.\n\n2️⃣ **Customer payments**: Your customers pay YOU directly through your existing system (Square, Bopple, etc). MenuLove doesn't take any commission from customer orders.\n\nSo you only pay the monthly subscription - that's it! No hidden fees, no commission on sales.",
+        text: "I understand your question! There are two different payments:\n\n1️⃣ **Your MenuLove subscription**: You pay A$29/month (Basic) or A$69/month (Pro) after the 14-day free trial.\n\n2️⃣ **Customer payments**: Your customers pay YOU directly through your existing system (Square, Bopple, etc). MenuLove doesn't take any commission from customer orders.\n\nSo you only pay the subscription - that's it! No hidden fees, no commission on sales.",
         action: () => scrollToElement('signup-form')
       };
     }
@@ -553,7 +553,7 @@ const LoveBotChat: React.FC = () => {
     // Pricing / Cost
     if (lowerMessage.includes('cost') || lowerMessage.includes('price') || lowerMessage.includes('pricing') || lowerMessage.includes('much')) {
       return {
-        text: "We offer a 14-day free trial with no credit card required. After that, plans start at $39/month. You can cancel anytime - no contracts, no hidden fees.\n\nReady to try it out? I can scroll you to the signup form.",
+        text: "We offer a 14-day free trial with no credit card required. After that, plans start at A$29/month (Basic), or A$69/month for Pro. You can cancel anytime - no contracts, no hidden fees.\n\nReady to try it out? I can scroll you to the signup form.",
         action: () => scrollToElement('signup-form')
       };
     }

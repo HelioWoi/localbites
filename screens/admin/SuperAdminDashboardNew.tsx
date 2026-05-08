@@ -367,6 +367,18 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
   };
 
   const getSubscriptionStatus = (partner: any): 'trial' | 'active' | 'cancelled' | 'expired' => {
+    const dbStatus = typeof partner.subscription_status === 'string'
+      ? partner.subscription_status.toLowerCase()
+      : '';
+
+    if (dbStatus === 'canceled') {
+      return 'cancelled';
+    }
+
+    if (dbStatus === 'trial' || dbStatus === 'active' || dbStatus === 'cancelled' || dbStatus === 'expired') {
+      return dbStatus;
+    }
+
     if (partner.stripe_subscription_id) {
       return 'active';
     }
@@ -1890,7 +1902,7 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                     </div>
                     <div className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg">
                       <span className="text-sm text-zinc-600">Plan Price</span>
-                      <span className="text-sm font-bold text-zinc-900">$39/month</span>
+                      <span className="text-sm font-bold text-zinc-900">A$29–A$69/month</span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg">
                       <span className="text-sm text-zinc-600">Trial Period</span>
@@ -1933,7 +1945,7 @@ const SuperAdminDashboardNew: React.FC<SuperAdminDashboardNewProps> = ({ user, o
                           <td className="py-3 px-4 text-center">
                             <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">Active</span>
                           </td>
-                          <td className="py-3 px-4 text-right text-sm font-bold text-zinc-900">$39.00</td>
+                          <td className="py-3 px-4 text-right text-sm font-bold text-zinc-900">A$29–A$69</td>
                           <td className="py-3 px-4 text-center">
                             <button
                               onClick={() => handlePartnerAction(partner.id, 'stripe')}

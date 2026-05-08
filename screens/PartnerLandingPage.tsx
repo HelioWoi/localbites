@@ -232,7 +232,7 @@ const PartnerLandingPage: React.FC = () => {
           website: null,
           plan: 'trial',
           subscription_plan: selectedPlan,
-          subscription_status: 'trialing',
+          subscription_status: 'trial',
           subscription_start_date: now.toISOString(),
           subscription_end_date: trialEndDate,
           trial_ends_at: trialEndDate,
@@ -262,22 +262,6 @@ const PartnerLandingPage: React.FC = () => {
       }
     } finally {
       setIsSignupLoading(false);
-    }
-  };
-
-  const handleGoogleSignup = async () => {
-    setSignupError('');
-    localStorage.setItem('selected_signup_plan', selectedPlan);
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/partner`,
-      },
-    });
-
-    if (error) {
-      setSignupError(error.message || 'Google signup is unavailable right now.');
     }
   };
 
@@ -1316,21 +1300,6 @@ const PartnerLandingPage: React.FC = () => {
                     {!isSignupLoading && <ArrowRight size={16} />}
                   </button>
                 </form>
-
-                <div className="my-5 flex items-center gap-3 text-zinc-400 text-sm">
-                  <span className="flex-1 h-px bg-zinc-200" />
-                  OR
-                  <span className="flex-1 h-px bg-zinc-200" />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleGoogleSignup}
-                  className="w-full h-12 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 font-semibold transition-colors inline-flex items-center justify-center gap-2"
-                >
-                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-zinc-300 text-xs font-black">G</span>
-                  Continue with Google
-                </button>
 
                 <p className="text-center text-sm text-zinc-500 mt-7">
                   Already have an account?{' '}

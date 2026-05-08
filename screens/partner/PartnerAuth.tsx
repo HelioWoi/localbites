@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Utensils, Mail, Lock, ArrowRight, CheckCircle, Loader2, Eye, EyeOff, Building2, Hash, AlertCircle, MapPin, Phone, Globe, X } from 'lucide-react';
+import { Mail, Lock, ArrowRight, CheckCircle, Loader2, Eye, EyeOff, Building2, AlertCircle, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { verifyABN, formatABN, isValidABNFormat } from '../../services/abnVerification';
 
 interface PartnerAuthProps {
   onAuthSuccess: () => void;
@@ -43,19 +42,9 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   
-  // ABN verification fields (only for signup)
+  // Signup fields
   const [restaurantName, setRestaurantName] = useState('');
-  const [abn, setAbn] = useState('');
-  const [businessIdType, setBusinessIdType] = useState<'ABN' | 'ACN'>('ABN');
-  const [address, setAddress] = useState('');
-  const [postalCode, setPostalCode] = useState('');
-  const [phone, setPhone] = useState('');
-  const [website, setWebsite] = useState('');
-  const [promoCode, setPromoCode] = useState('');
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationResult, setVerificationResult] = useState<any>(null);
-  const [isValidatingPromo, setIsValidatingPromo] = useState(false);
-  const [promoValidation, setPromoValidation] = useState<{ valid: boolean; type?: string; error?: string } | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<'free' | 'basic' | 'pro'>('free');
 
   // Track if user came from landing page
   const [isFromLandingPage, setIsFromLandingPage] = useState(false);
@@ -144,8 +133,6 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
         const data = JSON.parse(savedData);
         if (data.restaurantName) setRestaurantName(data.restaurantName);
         if (data.email) setEmail(data.email);
-        if (data.phone) setPhone(data.phone);
-        if (data.address) setAddress(data.address);
         // Auto-switch to signup mode if coming from landing page
         setMode('signup');
         setIsFromLandingPage(true);
@@ -157,50 +144,12 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
         console.error('Error loading signup data:', err);
       }
     }
+
+    const plan = (localStorage.getItem('selected_signup_plan') || '').toLowerCase();
+    if (plan === 'basic' || plan === 'pro' || plan === 'free') {
+      setSelectedPlan(plan);
+    }
   }, []);
-
-  const handleVerifyABN = async () => {
-    const cleanValue = abn.replace(/\s/g, '').replace(/[^0-9]/g, '');
-    const expectedLength = businessIdType === 'ABN' ? 11 : 9;
-    if (cleanValue.length !== expectedLength) return;
-    if (!restaurantName.trim()) {
-      setError(`Please enter your restaurant name first to verify ${businessIdType}`);
-      return;
-    }
-    
-    setIsVerifying(true);
-    setVerificationResult(null);
-    setError('');
-    
-    try {
-      const result = await verifyABN(abn, restaurantName, businessIdType);
-      setVerificationResult(result);
-    } catch (err) {
-      setVerificationResult({ isValid: false, message: 'Error verifying ABN' });
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const handleABNChange = (value: string) => {
-    if (businessIdType === 'ABN') {
-      const formatted = formatABN(value);
-      setAbn(formatted);
-    } else {
-      // ACN: 9 digits, format as XXX XXX XXX
-      const clean = value.replace(/\s/g, '').replace(/[^0-9]/g, '').slice(0, 9);
-      const parts = [clean.slice(0, 3), clean.slice(3, 6), clean.slice(6, 9)].filter(Boolean);
-      setAbn(parts.join(' '));
-    }
-    setVerificationResult(null);
-  };
-
-  const handleToggleBusinessIdType = () => {
-    const newType = businessIdType === 'ABN' ? 'ACN' : 'ABN';
-    setBusinessIdType(newType);
-    setAbn('');
-    setVerificationResult(null);
-  };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,13 +175,7 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim() || !restaurantName.trim() || !address.trim() || !postalCode.trim() || !phone.trim()) return;
-    
-    // Require ABN or ACN
-    if (!abn.trim()) {
-      setError(`Please enter your ${businessIdType}`);
-      return;
-    }
+    if (!email.trim() || !password.trim() || !restaurantName.trim()) return;
     
     if (password.length < 6) {
       setError('Password must be at least 6 characters');
@@ -251,28 +194,14 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
       console.log('[Signup] Signed out any existing session');
       
 
-      // Validate promo code if provided
-      let hasLifetimeAccess = false;
-      if (promoCode.trim()) {
-        const { data: promoResult } = await supabase.functions.invoke('validate-promo-code', {
-          body: { code: promoCode.trim() }
-        });
-        
-        if (promoResult?.valid && promoResult.type === 'lifetime') {
-          hasLifetimeAccess = true;
-        }
-      }
+      const normalizedPlan = selectedPlan === 'basic' || selectedPlan === 'pro' ? selectedPlan : 'free';
+      const hasLifetimeAccess = false;
 
       // Save signup data to localStorage in case email confirmation is required
       localStorage.setItem('pending_partner_signup', JSON.stringify({
         restaurant_name: restaurantName.trim(),
-        abn: abn.trim() || null,
-        address: address.trim(),
-        postal_code: postalCode.trim(),
-        phone: phone.trim(),
-        website: website.trim() || null,
+        subscription_plan: normalizedPlan,
         hasLifetimeAccess,
-        promoCode: promoCode.trim() || null,
       }));
 
       // Generate confirmation token
@@ -289,38 +218,6 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
       
       // Create partner record immediately with email_confirmed = false
       if (data.user) {
-        // Auto-geocode address to get lat/lng via Google Places API
-        let latitude: number | null = null;
-        let longitude: number | null = null;
-        let googlePlaceId: string | null = null;
-        let googleMapsUrl: string | null = null;
-        
-        try {
-          const { textSearchRestaurants } = await import('../../services/googlePlacesProxy');
-          // Use Sunshine Coast center as search origin
-          const results = await textSearchRestaurants(
-            -26.6833,
-            153.0667,
-            50000, // 50km radius
-            `${restaurantName.trim()} ${address.trim()}`
-          );
-          
-          if (results.length > 0) {
-            const place = results[0];
-            latitude = place.location.lat;
-            longitude = place.location.lng;
-            googlePlaceId = place.id;
-            googleMapsUrl = place.googleMapsUrl;
-            console.log('[Auto-geocoding] ✓ Signup - Found coordinates:', {
-              name: restaurantName.trim(),
-              lat: latitude,
-              lng: longitude
-            });
-          }
-        } catch (geoErr) {
-          console.warn('[Auto-geocoding] ✗ Signup - Failed, continuing without coordinates:', geoErr);
-        }
-
         // Create partner record with all business info
         // Generate unique slug with timestamp to avoid conflicts
         const baseSlug = restaurantName.trim()
@@ -333,19 +230,23 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
           id: data.user.id,
           email: email.trim(),
           restaurant_name: restaurantName.trim(),
-          abn: abn.trim() ? abn.trim().replace(/\s/g, '') : null,
-          address: address.trim(),
-          postal_code: postalCode.trim().replace(/\s/g, ''),
-          phone: phone.trim().replace(/\s/g, ''),
-          website: website.trim() || null,
-          latitude,
-          longitude,
-          google_place_id: googlePlaceId,
-          google_maps_url: googleMapsUrl,
+          abn: null,
+          address: '',
+          postal_code: '',
+          phone: '',
+          website: null,
+          latitude: null,
+          longitude: null,
+          google_place_id: null,
+          google_maps_url: null,
           slug: uniqueSlug,
           plan: hasLifetimeAccess ? 'lifetime' : 'trial',
           trial_ends_at: hasLifetimeAccess ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-          subscription_status: 'active',
+          trial_end_date: hasLifetimeAccess ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+          subscription_plan: normalizedPlan,
+          subscription_status: hasLifetimeAccess ? 'active' : 'trial',
+          subscription_start_date: new Date().toISOString(),
+          subscription_end_date: hasLifetimeAccess ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
           lifetime_access: hasLifetimeAccess,
           is_verified: false,
           email_confirmed: false,
@@ -367,25 +268,6 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
         if (upsertError) {
           console.error('[Signup] Error creating/updating partner:', upsertError);
           throw upsertError;
-        }
-
-        // Record promo code usage if valid
-        if (hasLifetimeAccess && promoCode.trim()) {
-          const { data: promoData } = await supabase
-            .from('promo_codes')
-            .select('id')
-            .eq('code', promoCode.trim().toUpperCase())
-            .single();
-          
-          if (promoData) {
-            await supabase.from('promo_code_usage').insert({
-              promo_code_id: promoData.id,
-              partner_id: data.user.id
-            });
-            
-            // Increment usage count
-            await supabase.rpc('increment_promo_usage', { promo_id: promoData.id });
-          }
         }
 
         // Track affiliate referral if present (non-blocking)
@@ -426,7 +308,8 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
             body: {
               email: email.trim(),
               restaurantName: restaurantName.trim(),
-              confirmationToken
+              confirmationToken,
+              selectedPlan: normalizedPlan,
             }
           });
           
@@ -698,6 +581,12 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
                   : 'Sign in to manage your restaurant'}
             </p>
 
+            {mode === 'signup' && (
+              <div className="mb-4 inline-flex items-center rounded-full bg-orange-100 text-orange-700 text-xs font-bold px-3 py-1 uppercase tracking-wider">
+                Selected plan: {selectedPlan}
+              </div>
+            )}
+
             {/* Email Not Confirmed Warning */}
             {showEmailNotConfirmedWarning && mode === 'login' && (
               <div className="mb-6 bg-orange-50 border border-orange-200 rounded-xl p-4">
@@ -738,159 +627,6 @@ const PartnerAuth: React.FC<PartnerAuthProps> = ({ onAuthSuccess }) => {
                           placeholder="Your restaurant name"
                           className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                           required
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-zinc-500 mb-2">
-                        {businessIdType} <span className="text-red-500">*</span>
-                      </label>
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <Hash size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
-                          <input
-                            type="text"
-                            value={abn}
-                            onChange={(e) => handleABNChange(e.target.value)}
-                            placeholder={businessIdType === 'ABN' ? '12 345 678 901' : '123 456 789'}
-                            maxLength={businessIdType === 'ABN' ? 14 : 11}
-                            required
-                            className={`w-full pl-12 pr-4 py-3 bg-zinc-50 border rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all ${
-                              verificationResult?.isValid ? 'border-emerald-400 bg-emerald-50/50' : 
-                              verificationResult && !verificationResult.isValid ? 'border-red-300 bg-red-50/50' : 
-                              'border-zinc-200'
-                            }`}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleVerifyABN}
-                          disabled={(() => { const clean = abn.replace(/\s/g, '').replace(/[^0-9]/g, ''); return clean.length !== (businessIdType === 'ABN' ? 11 : 9); })() || isVerifying || !restaurantName.trim()}
-                          className="px-4 py-3 bg-zinc-900 text-white text-sm font-semibold rounded-xl hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 whitespace-nowrap"
-                        >
-                          {isVerifying ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                          Verify
-                        </button>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleToggleBusinessIdType}
-                        className="mt-1.5 text-xs text-orange-600 hover:text-orange-700 font-medium transition-colors"
-                      >
-                        {businessIdType === 'ABN' ? 'Have an ACN instead? Click here' : 'Have an ABN instead? Click here'}
-                      </button>
-                      {/* Verification Result */}
-                      {verificationResult && (
-                        <div className={`mt-2 p-3 rounded-lg text-sm ${
-                          verificationResult.isValid 
-                            ? 'bg-emerald-50 border border-emerald-200' 
-                            : 'bg-red-50 border border-red-200'
-                        }`}>
-                          {verificationResult.isValid ? (
-                            <div className="flex items-start gap-2">
-                              <CheckCircle size={16} className="text-emerald-600 mt-0.5 flex-shrink-0" />
-                              <div>
-                                <p className="font-semibold text-emerald-800">{businessIdType} Verified</p>
-                                <p className="text-emerald-700 text-xs mt-0.5">{verificationResult.businessName}</p>
-                                <p className="text-emerald-600 text-xs">{verificationResult.entityType} • {verificationResult.isActive ? 'Active' : 'Inactive'}{verificationResult.gst ? ' • GST Registered' : ''}</p>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-start gap-2">
-                              <AlertCircle size={16} className="text-red-600 mt-0.5 flex-shrink-0" />
-                              <div>
-                                <p className="font-semibold text-red-800">Verification Failed</p>
-                                <p className="text-red-700 text-xs mt-0.5">{verificationResult.message}</p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-zinc-500 mb-2">
-                        Address
-                      </label>
-                      <div className="relative">
-                        <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
-                        <input
-                          type="text"
-                          value={address}
-                          onChange={(e) => setAddress(e.target.value)}
-                          placeholder="Your address"
-                          className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-zinc-500 mb-2">
-                        Postal code
-                      </label>
-                      <div className="relative">
-                        <Hash size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
-                        <input
-                          type="text"
-                          value={postalCode}
-                          onChange={(e) => setPostalCode(e.target.value)}
-                          placeholder="4557"
-                          className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-zinc-500 mb-2">
-                        Phone
-                      </label>
-                      <div className="relative">
-                        <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
-                        <input
-                          type="tel"
-                          value={phone}
-                          onChange={(e) => {
-                            const value = e.target.value.replace(/[^0-9+]/g, '');
-                            setPhone(value);
-                          }}
-                          placeholder="+61 400 000 000"
-                          className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-zinc-500 mb-2">
-                        Website <span className="text-zinc-400">(optional)</span>
-                      </label>
-                      <div className="relative">
-                        <Globe size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
-                        <input
-                          type="text"
-                          value={website}
-                          onChange={(e) => setWebsite(e.target.value)}
-                          placeholder="www.yourrestaurant.com.au"
-                          className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-zinc-500 mb-2">
-                        Promo code <span className="text-zinc-400">(optional)</span>
-                      </label>
-                      <div className="relative">
-                        <Hash size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
-                        <input
-                          type="text"
-                          value={promoCode}
-                          onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                          placeholder="Enter promo code"
-                          className="w-full pl-12 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all uppercase"
                         />
                       </div>
                     </div>

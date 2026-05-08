@@ -49,8 +49,6 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
 
     window.location.href = orderUrl;
   };
-  const [enlargedPhoto, setEnlargedPhoto] = useState<{ url: string; name: string } | null>(null);
-
   // Toggle saved dish
   const toggleSaveDish = (dishId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -277,13 +275,7 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
                           <div 
                             className="relative w-20 h-20 rounded-xl overflow-hidden bg-zinc-100 flex-shrink-0 cursor-pointer"
                             onClick={() => {
-                              if (isVideo(dish)) {
-                                // Video: open video modal
-                                onSelectItem(dish.id);
-                              } else if (dish.photoUrl) {
-                                // Photo: open lightbox
-                                setEnlargedPhoto({ url: dish.photoUrl, name: dish.name });
-                              }
+                              onSelectItem(dish.id);
                             }}
                           >
                             {isVideo(dish) && dish.videoUrl ? (
@@ -386,95 +378,6 @@ const FullMenuModal: React.FC<FullMenuModalProps> = ({
         </div>
       </div>
 
-      {/* Photo Lightbox */}
-      {enlargedPhoto && (
-        <div 
-          className="fixed inset-0 bg-black/95 z-[60] flex items-center justify-center p-4"
-          onClick={(e) => {
-            e.stopPropagation();
-            setEnlargedPhoto(null);
-          }}
-        >
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setEnlargedPhoto(null);
-            }}
-            className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm hover:bg-white/20 flex items-center justify-center transition-colors z-10"
-          >
-            <X size={24} className="text-white" />
-          </button>
-          
-          <div 
-            className="max-w-4xl w-full flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Dish Name */}
-            <p className="text-white text-center text-lg font-semibold mb-4">
-              {enlargedPhoto.name}
-            </p>
-            
-            {/* Photo */}
-            <img
-              src={enlargedPhoto.url}
-              alt={enlargedPhoto.name}
-              className="w-full max-h-[70vh] object-contain rounded-2xl"
-            />
-            
-            {/* Action Buttons */}
-            <div className="flex items-center justify-center gap-3 mt-6">
-              {/* Save Button */}
-              {!isQRRoute && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const dish = allDishes.find(d => d.photoUrl === enlargedPhoto.url);
-                    if (dish) {
-                      toggleSaveDish(dish.id, e);
-                    }
-                  }}
-                  className="flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white rounded-full font-semibold transition-colors border border-white/20"
-                >
-                  <Bookmark size={18} className={
-                    allDishes.find(d => d.photoUrl === enlargedPhoto.url) && 
-                    savedDishes.has(allDishes.find(d => d.photoUrl === enlargedPhoto.url)!.id) 
-                      ? 'fill-white' 
-                      : ''
-                  } />
-                  Save
-                </button>
-              )}
-              
-              {/* Order Button */}
-              {restaurant.enable_ordering_button && (restaurant.ordering_url || allDishes.find(d => d.photoUrl === enlargedPhoto.url)?.dish_order_url) && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const dish = allDishes.find(d => d.photoUrl === enlargedPhoto.url);
-                    const orderUrl = dish?.dish_order_url || restaurant.ordering_url;
-                    if (orderUrl) {
-                      trackEvent({
-                        restaurantId: restaurant.id,
-                        eventType: 'order_button_click',
-                        eventValue: dish?.id || 'enlarged_photo',
-                      });
-                      // Analytics V2: Track order click
-                      if (dish?.id) {
-                        trackAnalyticsEvent({ eventType: 'order_click', restaurantId: restaurant.id, itemId: dish.id }).catch(() => {});
-                      }
-                      window.location.href = orderUrl;
-                    }
-                  }}
-                  className="flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-full font-semibold transition-colors"
-                >
-                  <ShoppingBag size={18} />
-                  Order
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Heart, Bookmark, Share2, Phone, MapPin, Star, Clock, Video, ChevronRight, Instagram, Facebook, Globe, ShoppingBag, Eye, Image as ImageIcon, Play } from 'lucide-react';
+import { ChevronLeft, Heart, Bookmark, Share2, Clock, Video, ShoppingBag, Eye, Image as ImageIcon, Play, X, List } from 'lucide-react';
 import { Restaurant } from '../types';
 import FullMenuModal from './FullMenuModal';
 import { trackEvent } from '../services/eventsService';
@@ -19,8 +19,6 @@ interface DesktopRestaurantProfileProps {
   onSelectVideo?: (videoId: string) => void;
   isQRRoute?: boolean;
 }
-
-const CATEGORIES = ['All', 'Breakfast', 'Lunch', 'Dinner', 'Drinks', 'Desserts'];
 
 const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
   restaurant,
@@ -43,6 +41,7 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
     }
   }, [restaurant.id]);
   const [selectedDishId, setSelectedDishId] = useState<string | null>(null);
+  const [previewDish, setPreviewDish] = useState<any | null>(null);
   const [likedVideos, setLikedVideos] = useState<Set<string>>(new Set());
   const [savedVideos, setSavedVideos] = useState<Set<string>>(() => {
     // Load saved dishes from localStorage (synced with FullMenuModal)
@@ -154,43 +153,74 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
   const featuredDishes = [...featuredSource, ...nonFeaturedSource].slice(0, 3);
   const heroDish = featuredDishes[0] || filteredDishes[0] || mediaDishes[0] || null;
   const restaurantLogoUrl = (restaurant as any).logoUrl as string | undefined;
-  const allowDishNavigation = true;
+  const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+  const todayOpeningHoursRaw = restaurant.openingHours?.find((hourString) => hourString.startsWith(todayDayName));
+  const todayOpeningHours = todayOpeningHoursRaw
+    ? todayOpeningHoursRaw.replace(/^[A-Za-z]+:\s*/, '')
+    : 'Hours unavailable';
+  const socialLinks = [
+    { label: 'Instagram', url: restaurant.instagramUrl },
+    { label: 'Facebook', url: restaurant.facebookUrl },
+    { label: 'TikTok', url: restaurant.tiktokUrl },
+    { label: 'Website', url: restaurant.website },
+  ].filter((link): link is { label: string; url: string } => !!link.url && link.url.trim().length > 0);
 
   const handleDishCardClick = (dish: any) => {
-    if (!dish.videoUrl) {
-      setSelectedDishId(dish.id);
-      setShowFullMenu(true);
-      trackAnalyticsEvent({ eventType: 'view', restaurantId: restaurant.id, itemId: dish.id }).catch(() => {});
-      return;
-    }
-
-    if (onSelectVideo) {
-      onSelectVideo(dish.id);
-      return;
-    }
-
-    const restaurantSlug = (restaurant as any).slug as string | undefined;
-    if (restaurantSlug) {
-      const pathname = window.location.pathname;
-      const isDemoPath = pathname.startsWith('/demo/');
-      const isQRPath = pathname.startsWith('/r/');
-      const prefix = isDemoPath ? '/demo/' : isQRPath ? '/r/' : '/';
-
-      const params = new URLSearchParams();
-      params.set('dish', dish.id);
-      if (dish.category) params.set('category', dish.category);
-      params.set('from', 'desktop-profile');
-
-      window.location.href = `${prefix}${restaurantSlug}/menu?${params.toString()}`;
-      return;
-    }
-
-    // Fallback to previous modal flow if slug is unavailable
-    setSelectedDishId(dish.id);
-    setShowFullMenu(true);
+    setPreviewDish(dish);
     trackAnalyticsEvent({ eventType: 'view', restaurantId: restaurant.id, itemId: dish.id }).catch(() => {});
-    if (dish.videoUrl) {
-      trackAnalyticsEvent({ eventType: 'play', restaurantId: restaurant.id, itemId: dish.id }).catch(() => {});
+  };
+
+  const handleToggleDishLike = (dishId: string) => {
+    setLikedVideos(prev => {
+      const next = new Set(prev);
+      if (next.has(dishId)) {
+        next.delete(dishId);
+      } else {
+        next.add(dishId);
+        trackAnalyticsEvent({ eventType: 'like', restaurantId: restaurant.id, itemId: dishId }).catch(() => {});
+      }
+      return next;
+    });
+  };
+
+  const handleToggleDishSave = (dishId: string) => {
+    setSavedVideos(prev => {
+      const next = new Set(prev);
+      if (next.has(dishId)) {
+        next.delete(dishId);
+      } else {
+        next.add(dishId);
+        trackAnalyticsEvent({ eventType: 'save', restaurantId: restaurant.id, itemId: dishId }).catch(() => {});
+      }
+      localStorage.setItem(`saved_dishes_${restaurant.id}`, JSON.stringify([...next]));
+      window.dispatchEvent(new Event('savedDishesChanged'));
+      return next;
+    });
+  };
+
+  const handleOpenFullMenu = () => {
+    onOpenFullMenu?.();
+    setShowFullMenu(true);
+  };
+
+  const handleBookTable = () => {
+    if (!restaurant.phone) return;
+    window.location.href = `tel:${restaurant.phone}`;
+  };
+
+  const handleShareDish = (dish: any) => {
+    trackAnalyticsEvent({ eventType: 'share', restaurantId: restaurant.id, itemId: dish.id }).catch(() => {});
+    const restaurantSlug = (restaurant as any).slug as string | undefined;
+    const shareUrl = restaurantSlug
+      ? `${window.location.origin}/r/${restaurantSlug}/menu?dish=${dish.id}`
+      : `${window.location.origin}${window.location.pathname}?restaurant=${encodeURIComponent(restaurant.id)}`;
+
+    if (navigator.share) {
+      navigator.share({
+        title: dish.name,
+        text: `Check out ${dish.name} at ${restaurant.name}`,
+        url: shareUrl,
+      }).catch(() => {});
     }
   };
 
@@ -215,367 +245,382 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-8"
+      className="fixed inset-0 z-50 bg-zinc-100/95 flex items-center justify-center p-6"
       onClick={isQRRoute ? undefined : onClose}
     >
       <div 
-        className="relative rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-[0_24px_90px_rgba(0,0,0,0.22)] bg-white border border-zinc-100 ring-1 ring-black/5"
+        className="relative w-full max-w-[1320px] max-h-[94vh] overflow-y-auto rounded-[28px] bg-white border border-zinc-200 shadow-[0_30px_80px_rgba(15,23,42,0.14)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_50%_at_92%_2%,rgba(251,146,60,0.16),transparent_62%),radial-gradient(40%_30%_at_12%_88%,rgba(255,190,110,0.08),transparent_68%)]" />
-        {/* Top area (dish-focused, desktop) */}
-        <div className="relative px-6 pt-6 pb-2">
-          <div className="grid grid-cols-[120px_1fr_120px] items-center mb-4">
-            {!isQRRoute && onClose ? (
-              <button
-                onClick={onClose}
-                className="w-8 h-8 rounded-full hover:bg-zinc-100 flex items-center justify-center transition-colors"
-              >
-                <ChevronLeft size={20} className="text-zinc-700" />
-              </button>
-            ) : <div className="w-8 h-8" />}
-            <h1 className="text-xl font-black text-center truncate px-3 bg-gradient-to-r from-zinc-900 to-zinc-600 bg-clip-text text-transparent">
-              {restaurant.name}
-            </h1>
-            <button
-              onClick={handleShare}
-              className="justify-self-end px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-400 text-white text-sm font-semibold flex items-center gap-2 shadow-md shadow-orange-200/70 hover:brightness-105 transition-all"
-            >
-              <Share2 size={16} />
-              Share
-            </button>
-          </div>
+        <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-zinc-100 px-8 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-6 min-w-0">
+              {!isQRRoute && onClose && (
+                <button
+                  onClick={onClose}
+                  className="w-10 h-10 rounded-full border border-zinc-200 hover:bg-zinc-50 flex items-center justify-center transition-colors"
+                >
+                  <ChevronLeft size={18} className="text-zinc-700" />
+                </button>
+              )}
+              {restaurantLogoUrl ? (
+                <img src={restaurantLogoUrl} alt={restaurant.name} className="h-9 w-auto object-contain" />
+              ) : (
+                <div className="text-zinc-900 font-bold text-xl tracking-tight">{restaurant.name}</div>
+              )}
+            </div>
 
+            <div className="flex items-center gap-3">
+              <div className="hidden lg:flex items-center gap-2 rounded-full border border-zinc-200 px-4 py-2 text-xs font-semibold text-zinc-700">
+                <Clock size={14} className="text-zinc-500" />
+                Today: {todayOpeningHours}
+              </div>
+              <button
+                onClick={handleShare}
+                className="px-4 py-2 rounded-full border border-zinc-200 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors"
+              >
+                Share
+              </button>
+              <button
+                onClick={handleBookTable}
+                disabled={!restaurant.phone}
+                className="px-5 py-2.5 rounded-full bg-gradient-to-r from-orange-500 to-amber-400 text-white text-sm font-semibold shadow-sm hover:brightness-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Book a Table
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-8 pt-6 space-y-6">
           {heroDish && (
-            <div className="grid grid-cols-2 gap-6 items-stretch mb-4 rounded-3xl border border-orange-100 bg-white p-4 shadow-[0_12px_40px_rgba(251,146,60,0.10)]">
+            <div className="relative overflow-hidden rounded-[26px] border border-zinc-200 bg-zinc-900 min-h-[320px]">
               <div
-                onClick={allowDishNavigation ? () => handleDishCardClick(heroDish) : undefined}
-                className={`relative rounded-2xl overflow-hidden bg-zinc-100 aspect-square group border border-white/60 shadow-lg ${allowDishNavigation ? 'cursor-pointer' : 'cursor-default'}`}
+                onClick={() => handleDishCardClick(heroDish)}
+                className="absolute inset-0 cursor-pointer"
               >
                 {heroDish.videoUrl ? (
                   <video
                     src={getCDNUrl(heroDish.videoUrl)}
-                    className="w-full h-full object-cover bg-zinc-900"
+                    className="w-full h-full object-cover"
                     playsInline
                     loop
+                    muted
+                    autoPlay
                     preload="metadata"
-                    poster={heroDish.thumbnailUrl || heroDish.photoUrl || restaurant.mainPhotoUrl}
-                    onLoadedData={(e) => {
-                      e.currentTarget.currentTime = 0.1;
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.currentTime = 0;
-                      e.currentTarget.play().catch(() => {});
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.pause();
-                      e.currentTarget.currentTime = 0.1;
+                    onPlay={() => {
+                      trackAnalyticsEvent({ eventType: 'play', restaurantId: restaurant.id, itemId: heroDish.id }).catch(() => {});
                     }}
                   />
                 ) : (heroDish.photoUrl || heroDish.thumbnailUrl || restaurant.mainPhotoUrl) ? (
                   <img
                     src={heroDish.photoUrl || heroDish.thumbnailUrl || restaurant.mainPhotoUrl}
                     alt={heroDish.name}
-                    className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                    className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full bg-zinc-200" />
-                )}
-
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
-                <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/55 text-white text-xs font-bold">Bestseller</div>
-                {heroDish.videoUrl && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                      <Play size={24} className="text-zinc-900 fill-zinc-900 ml-0.5" />
-                    </div>
-                  </div>
+                  <div className="w-full h-full bg-zinc-800" />
                 )}
               </div>
 
-              <div className="flex flex-col justify-center rounded-2xl px-5 py-4 bg-gradient-to-br from-white via-orange-50/40 to-white border border-orange-100/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                {restaurantLogoUrl ? (
-                  <img src={restaurantLogoUrl} alt={restaurant.name} className="h-12 w-auto object-contain mb-4" />
-                ) : (
-                  <h2 className="text-2xl font-bold text-zinc-900 mb-4">{restaurant.name}</h2>
-                )}
-                <h3 className="text-4xl font-black leading-tight bg-gradient-to-br from-zinc-900 to-zinc-600 bg-clip-text text-transparent">{heroDish.name}</h3>
-                {heroDish.price && <p className="text-3xl font-black text-orange-500 mt-2">${heroDish.price}</p>}
-                {heroDish.description && (
-                  <p className="text-zinc-600 mt-4 text-lg leading-relaxed max-w-[36ch]">{heroDish.description}</p>
-                )}
+              <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/45 to-black/15" />
+              <div className="relative z-10 px-8 py-8 h-full flex items-center">
+                <div className="max-w-[560px]">
+                  <span className="inline-flex px-3 py-1 rounded-full border border-orange-300/40 bg-black/35 text-orange-200 text-xs font-bold tracking-wide uppercase">
+                    Weekly Bestseller
+                  </span>
+                  <h2 className="mt-4 text-5xl font-black text-white leading-tight">{heroDish.name}</h2>
+                  {heroDish.description && (
+                    <p className="mt-3 text-white/85 text-lg leading-relaxed">{heroDish.description}</p>
+                  )}
+                  <div className="mt-4 text-sm text-white/80 font-medium">House-made • Fresh Ingredients • Big Flavour</div>
+                  <button
+                    onClick={() => handleDishCardClick(heroDish)}
+                    className="mt-6 px-5 py-2.5 rounded-full bg-gradient-to-r from-orange-500 to-amber-400 text-white font-semibold"
+                  >
+                    Explore Menu
+                  </button>
+                </div>
               </div>
             </div>
           )}
-        </div>
 
-        <div className="h-px mx-6 bg-gradient-to-r from-transparent via-orange-100 to-transparent" />
+          {(hasVideos || hasPhotos) && (
+            <section className="space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-3xl font-black text-zinc-900">Our Menu</h3>
+                  <p className="text-sm text-zinc-500 mt-1">Made fresh daily with quality ingredients.</p>
+                </div>
 
-        {/* Media Menu Section (desktop only) */}
-        {(hasVideos || hasPhotos) && (
-          <div className="mx-6 mb-6 rounded-2xl border border-orange-100 bg-gradient-to-br from-white via-white to-orange-50/25 px-5 py-5 shadow-[0_10px_30px_rgba(251,146,60,0.08)]">
-            <div className="flex items-center gap-2 mb-4">
-              <Video size={18} className="text-orange-500" />
-              <h3 className="text-lg font-bold text-zinc-900">Menu</h3>
-            </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleOpenFullMenu}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full border border-zinc-200 bg-white hover:bg-zinc-50 text-sm font-semibold text-zinc-700"
+                  >
+                    <List size={15} />
+                    View Full Menu
+                  </button>
+                  {savedCount > 0 && (
+                    <button
+                      onClick={() => {
+                        setShowFullMenu(true);
+                        setTimeout(() => {
+                          window.dispatchEvent(new CustomEvent('openYourPicks'));
+                        }, 100);
+                      }}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full border border-orange-200 bg-orange-50 text-sm font-semibold text-orange-600"
+                    >
+                      <Bookmark size={15} className="fill-orange-500" />
+                      Your Picks ({savedCount})
+                    </button>
+                  )}
+                </div>
+              </div>
 
-            {/* Featured top 3 */}
-            {featuredDishes.length > 0 && (
-              <div className="grid grid-cols-3 gap-3 mb-5">
-                {featuredDishes.map((dish) => {
-                  const mediaSrc = dish.photoUrl || dish.thumbnailUrl;
+              <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                {mediaCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
+                      selectedCategory === cat
+                        ? 'bg-gradient-to-r from-orange-500 to-amber-400 text-white'
+                        : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                {filteredDishes.map((dish) => {
+                  const mediaSrc = dish.photoUrl || dish.thumbnailUrl || restaurant.mainPhotoUrl;
 
                   return (
-                    <div
-                      key={`featured-${dish.id}`}
-                      onClick={allowDishNavigation ? () => handleDishCardClick(dish) : undefined}
-                      className={`relative aspect-[16/10] rounded-2xl overflow-hidden group ${allowDishNavigation ? 'cursor-pointer' : 'cursor-default'}`}
+                    <article
+                      key={dish.id}
+                      className="rounded-2xl border border-zinc-200 bg-white overflow-hidden shadow-[0_6px_20px_rgba(15,23,42,0.06)]"
                     >
-                      {dish.videoUrl ? (
-                        <video
-                          src={getCDNUrl(dish.videoUrl)}
-                          className="w-full h-full object-cover bg-zinc-900"
-                          playsInline
-                          loop
-                          preload="metadata"
-                          onLoadedData={(e) => {
-                            e.currentTarget.currentTime = 0.1;
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.currentTime = 0;
-                            e.currentTarget.play().catch(() => {});
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.pause();
-                            e.currentTarget.currentTime = 0.1;
-                          }}
-                        />
-                      ) : mediaSrc ? (
-                        <img
-                          src={mediaSrc}
-                          alt={dish.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-zinc-200" />
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
-                      {dish.isFeatured && (
-                        <div className="absolute top-2 left-2 px-2 py-1 rounded-full bg-black/55 text-white text-[10px] font-bold">Bestseller</div>
-                      )}
-                      <div className="absolute bottom-3 left-3 right-3">
-                        <p className="text-white text-sm font-bold line-clamp-1">{dish.name}</p>
-                        {dish.price && <p className="text-orange-300 text-sm font-semibold mt-0.5">${dish.price}</p>}
+                      <button
+                        onClick={() => handleDishCardClick(dish)}
+                        className="relative h-48 w-full bg-zinc-100 text-left"
+                      >
+                        {dish.videoUrl ? (
+                          <video
+                            src={getCDNUrl(dish.videoUrl)}
+                            className="w-full h-full object-cover"
+                            playsInline
+                            loop
+                            muted
+                            preload="metadata"
+                            onMouseEnter={(e) => {
+                              e.currentTarget.currentTime = 0;
+                              e.currentTarget.play().catch(() => {});
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.pause();
+                              e.currentTarget.currentTime = 0.1;
+                            }}
+                          />
+                        ) : mediaSrc ? (
+                          <img src={mediaSrc} alt={dish.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <ImageIcon size={26} className="text-zinc-400" />
+                          </div>
+                        )}
+
+                        <div className="absolute top-3 left-3 flex items-center gap-1 bg-black/45 text-white px-2 py-1 rounded-full text-[11px] font-semibold">
+                          <Eye size={11} />
+                          {viewCounts.get(dish.id) || 0}
+                        </div>
+                        {dish.videoUrl && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center">
+                              <Play size={18} className="fill-zinc-900 text-zinc-900 ml-0.5" />
+                            </div>
+                          </div>
+                        )}
+                      </button>
+
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-bold text-zinc-900 leading-tight line-clamp-1">{dish.name}</h4>
+                          {dish.price && <span className="text-orange-500 font-black">${dish.price}</span>}
+                        </div>
+                        {dish.description && (
+                          <p className="text-sm text-zinc-500 mt-2 line-clamp-2">{dish.description}</p>
+                        )}
+
+                        <div className="mt-3 flex items-center justify-between">
+                          <span className="text-[11px] text-emerald-600 font-semibold">Vegetarian</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleDishLike(dish.id);
+                              }}
+                              className="w-8 h-8 rounded-full border border-zinc-200 flex items-center justify-center hover:bg-zinc-50"
+                            >
+                              <Heart size={14} className={likedVideos.has(dish.id) ? 'text-red-500 fill-red-500' : 'text-zinc-500'} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleDishSave(dish.id);
+                              }}
+                              className="w-8 h-8 rounded-full border border-zinc-200 flex items-center justify-center hover:bg-zinc-50"
+                            >
+                              <Bookmark size={14} className={savedVideos.has(dish.id) ? 'text-orange-500 fill-orange-500' : 'text-zinc-500'} />
+                            </button>
+                            {(dish.dish_order_url || restaurant.ordering_url) && restaurant.enable_ordering_button && (
+                              <button
+                                onClick={(e) => handleOrderNow(dish, e)}
+                                className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center hover:bg-orange-600"
+                              >
+                                <ShoppingBag size={14} className="text-white" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    </article>
                   );
                 })}
               </div>
-            )}
+            </section>
+          )}
 
-            {/* Category Filters + Full Menu + Your Picks */}
-            <div className="flex items-center gap-4 mb-4 overflow-x-auto pb-2 scrollbar-hide">
-              {mediaCategories.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all ${
-                    selectedCategory === cat
-                      ? 'bg-gradient-to-r from-orange-500 to-amber-400 text-white shadow-sm shadow-orange-200/70'
-                      : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-              <button
-                onClick={() => setShowFullMenu(true)}
-                className="px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap bg-gradient-to-r from-orange-500 to-amber-400 text-white transition-all flex items-center gap-1 shadow-sm shadow-orange-200/70 hover:brightness-105"
-              >
-                Full Menu
-                <ChevronRight size={14} />
-              </button>
-
-              {/* Your Picks Button - Opens Full Menu with saved filter */}
-              {savedCount > 0 && (
-                <button
-                  onClick={() => {
-                    setShowFullMenu(true);
-                    // Signal to FullMenuModal to show saved only
-                    setTimeout(() => {
-                      window.dispatchEvent(new CustomEvent('openYourPicks'));
-                    }, 100);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 rounded-2xl border border-zinc-200 bg-white hover:border-orange-300 hover:bg-orange-50 transition-all whitespace-nowrap flex-shrink-0"
-                >
-                  <Bookmark size={16} className="text-orange-500 fill-orange-500" />
-                  <span className="font-bold text-sm text-zinc-900">
-                    Your Picks
-                  </span>
-                  <span className="text-sm text-orange-500">({savedCount})</span>
-                </button>
+          <footer className="mt-2 rounded-2xl border border-zinc-200 bg-zinc-50/60 px-6 py-5">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-wider font-semibold text-zinc-500">Address</p>
+                <p className="text-sm text-zinc-700 mt-1">{restaurant.address || 'Address unavailable'}</p>
+              </div>
+              {socialLinks.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {socialLinks.map((social) => (
+                    <a
+                      key={social.label}
+                      href={social.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-full border border-zinc-200 bg-white text-xs font-semibold text-zinc-700 hover:border-orange-300 hover:text-orange-600 transition-colors"
+                    >
+                      {social.label}
+                    </a>
+                  ))}
+                </div>
               )}
             </div>
+          </footer>
+        </div>
 
-            {/* Video Grid - Scrollable */}
-            <div className="max-h-[600px] overflow-y-auto">
-              <div className="grid grid-cols-4 gap-4">
-                {filteredDishes.map((dish) => (
-                <div
-                  key={dish.id}
-                  className="relative aspect-[9/16] rounded-2xl overflow-hidden group"
+        {previewDish && (
+          <div
+            className="fixed inset-0 z-[80] bg-black/85 backdrop-blur-sm flex items-center justify-center p-6"
+            onClick={() => setPreviewDish(null)}
+          >
+            <div
+              className="w-full max-w-5xl rounded-3xl bg-white overflow-hidden border border-zinc-200 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
+                <h4 className="font-bold text-zinc-900 truncate">{previewDish.name}</h4>
+                <button
+                  onClick={() => setPreviewDish(null)}
+                  className="w-9 h-9 rounded-full hover:bg-zinc-100 flex items-center justify-center"
                 >
-                  {/* Video */}
-                  <div 
-                    onClick={allowDishNavigation ? () => handleDishCardClick(dish) : undefined}
-                    className={`w-full h-full ${allowDishNavigation ? 'cursor-pointer' : 'cursor-default'}`}
-                  >
-                    {dish.videoUrl ? (
-                      <video
-                        src={getCDNUrl(dish.videoUrl)}
-                        className="w-full h-full object-cover bg-zinc-900"
-                        playsInline
-                        loop
-                        preload="metadata"
-                        onLoadedData={(e) => {
-                          e.currentTarget.currentTime = 0.1;
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.currentTime = 0;
-                          e.currentTarget.play().catch(() => {});
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.pause();
-                          e.currentTarget.currentTime = 0.1;
-                        }}
-                      />
-                    ) : (dish.photoUrl || dish.thumbnailUrl) ? (
-                      <img
-                        src={dish.photoUrl || dish.thumbnailUrl}
-                        alt={dish.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-zinc-200 flex items-center justify-center">
-                        <ImageIcon size={24} className="text-zinc-400" />
-                      </div>
-                    )}
-                  </div>
+                  <X size={18} className="text-zinc-700" />
+                </button>
+              </div>
 
-                  {/* Gradient overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-                  
-                  {/* View counter - top left */}
-                  {viewCounts.get(dish.id) !== undefined && viewCounts.get(dish.id)! > 0 && (
-                    <div className="absolute top-3 left-3 flex items-center gap-1 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full z-10">
-                      <Eye size={11} className="text-white/80" />
-                      <span className="text-white/80 text-[10px] font-medium">{viewCounts.get(dish.id)}</span>
+              <div className="grid md:grid-cols-[1.4fr_1fr]">
+                <div className="bg-zinc-950 min-h-[360px] flex items-center justify-center">
+                  {previewDish.videoUrl ? (
+                    <video
+                      src={getCDNUrl(previewDish.videoUrl)}
+                      className="w-full h-full max-h-[68vh] object-contain"
+                      controls
+                      autoPlay
+                      playsInline
+                      onPlay={() => {
+                        trackAnalyticsEvent({ eventType: 'play', restaurantId: restaurant.id, itemId: previewDish.id }).catch(() => {});
+                      }}
+                    />
+                  ) : (previewDish.photoUrl || previewDish.thumbnailUrl || restaurant.mainPhotoUrl) ? (
+                    <img
+                      src={previewDish.photoUrl || previewDish.thumbnailUrl || restaurant.mainPhotoUrl}
+                      alt={previewDish.name}
+                      className="w-full h-full max-h-[68vh] object-contain"
+                    />
+                  ) : (
+                    <div className="text-zinc-500 flex items-center gap-2">
+                      <ImageIcon size={20} />
+                      No media
                     </div>
                   )}
-                  
-                  {/* Dish info */}
-                  <div className="absolute bottom-3 left-3 right-3 pointer-events-none">
-                    <p className="text-white text-sm font-bold line-clamp-2">
-                      {dish.name.length > 40 ? `${dish.name.substring(0, 40)}...` : dish.name}
-                    </p>
-                    {dish.price && (
-                      <p className="text-white text-xs mt-1 font-semibold">${dish.price}</p>
-                    )}
+                </div>
+
+                <div className="p-6 space-y-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider font-semibold text-zinc-500">{previewDish.category || 'Menu Item'}</p>
+                    <h5 className="text-2xl font-black text-zinc-900 mt-1">{previewDish.name}</h5>
+                    {previewDish.price && <p className="text-xl font-black text-orange-500 mt-1">${previewDish.price}</p>}
                   </div>
 
-                  {/* Action buttons - Mobile style */}
-                  <div className="absolute right-3 bottom-20 flex flex-col gap-3">
-                    {/* Like button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setLikedVideos(prev => {
-                          const next = new Set(prev);
-                          if (next.has(dish.id)) {
-                            next.delete(dish.id);
-                          } else {
-                            next.add(dish.id);
-                            // Analytics V2: Track like
-                            trackAnalyticsEvent({ eventType: 'like', restaurantId: restaurant.id, itemId: dish.id }).catch(() => {});
-                          }
-                          return next;
-                        });
-                      }}
-                      className="flex flex-col items-center gap-1"
-                    >
-                      <div className="w-9 h-9 rounded-full bg-zinc-800/30 backdrop-blur-sm flex items-center justify-center hover:bg-zinc-700/30 transition-colors">
-                        <Heart 
-                          size={16} 
-                          className={likedVideos.has(dish.id) ? 'text-red-500 fill-red-500' : 'text-white'}
-                        />
-                      </div>
-                    </button>
+                  {previewDish.description && (
+                    <p className="text-sm text-zinc-600 leading-relaxed">{previewDish.description}</p>
+                  )}
 
-                    {/* Save button */}
+                  <div className="flex flex-wrap gap-2 pt-2">
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSavedVideos(prev => {
-                          const next = new Set(prev);
-                          if (next.has(dish.id)) {
-                            next.delete(dish.id);
-                          } else {
-                            next.add(dish.id);
-                            // Analytics V2: Track save
-                            trackAnalyticsEvent({ eventType: 'save', restaurantId: restaurant.id, itemId: dish.id }).catch(() => {});
-                          }
-                          // Sync with localStorage (shared with FullMenuModal)
-                          localStorage.setItem(`saved_dishes_${restaurant.id}`, JSON.stringify([...next]));
-                          
-                          // Dispatch custom event to sync with FullMenuModal
-                          window.dispatchEvent(new Event('savedDishesChanged'));
-                          
-                          return next;
-                        });
-                      }}
-                      className="flex flex-col items-center gap-1"
+                      onClick={() => handleToggleDishLike(previewDish.id)}
+                      className="px-3 py-2 rounded-xl border border-zinc-200 text-sm font-semibold text-zinc-700 inline-flex items-center gap-2"
                     >
-                      <div className="w-9 h-9 rounded-full bg-zinc-800/30 backdrop-blur-sm flex items-center justify-center hover:bg-zinc-700/30 transition-colors">
-                        <Bookmark 
-                          size={16} 
-                          className={savedVideos.has(dish.id) ? 'text-orange-500 fill-orange-500' : 'text-white'}
-                        />
-                      </div>
+                      <Heart size={15} className={likedVideos.has(previewDish.id) ? 'text-red-500 fill-red-500' : 'text-zinc-500'} />
+                      Like
                     </button>
-
-                    {/* Order Now button */}
-                    {restaurant.enable_ordering_button && (dish.dish_order_url || restaurant.ordering_url) && (
+                    <button
+                      onClick={() => handleToggleDishSave(previewDish.id)}
+                      className="px-3 py-2 rounded-xl border border-zinc-200 text-sm font-semibold text-zinc-700 inline-flex items-center gap-2"
+                    >
+                      <Bookmark size={15} className={savedVideos.has(previewDish.id) ? 'text-orange-500 fill-orange-500' : 'text-zinc-500'} />
+                      Save
+                    </button>
+                    <button
+                      onClick={() => handleShareDish(previewDish)}
+                      className="px-3 py-2 rounded-xl border border-zinc-200 text-sm font-semibold text-zinc-700 inline-flex items-center gap-2"
+                    >
+                      <Share2 size={15} className="text-zinc-500" />
+                      Share
+                    </button>
+                    {previewDish.videoUrl && onSelectVideo && (
                       <button
-                        onClick={(e) => handleOrderNow(dish, e)}
-                        className="flex flex-col items-center gap-1"
+                        onClick={() => onSelectVideo(previewDish.id)}
+                        className="px-3 py-2 rounded-xl border border-zinc-200 text-sm font-semibold text-zinc-700 inline-flex items-center gap-2"
                       >
-                        <div className="w-9 h-9 rounded-full bg-orange-500 flex items-center justify-center hover:bg-orange-600 transition-colors">
-                          <ShoppingBag size={16} className="text-white" />
-                        </div>
+                        <Video size={15} className="text-zinc-500" />
+                        Open Feed
                       </button>
                     )}
-
-                    {/* Share button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleShare();
-                      }}
-                      className="flex flex-col items-center gap-1"
-                    >
-                      <div className="w-9 h-9 rounded-full bg-zinc-800/30 backdrop-blur-sm flex items-center justify-center hover:bg-zinc-700/30 transition-colors">
-                        <Share2 size={16} className="text-white" />
-                      </div>
-                    </button>
+                    {restaurant.enable_ordering_button && (previewDish.dish_order_url || restaurant.ordering_url) && (
+                      <button
+                        onClick={(e) => handleOrderNow(previewDish, e)}
+                        className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-sm font-semibold text-white inline-flex items-center gap-2"
+                      >
+                        <ShoppingBag size={15} />
+                        Order Now
+                      </button>
+                    )}
                   </div>
                 </div>
-              ))}
               </div>
             </div>
           </div>
         )}
-
-        {/* No footer disclaimer for partners */}
       </div>
 
       {/* Full Menu Modal */}
@@ -592,7 +637,10 @@ const DesktopRestaurantProfile: React.FC<DesktopRestaurantProfileProps> = ({
           onSelectItem={(itemId) => {
             setShowFullMenu(false);
             setSelectedDishId(null);
-            onSelectVideo?.(itemId);
+            const selectedDish = restaurant.dishes.find((dish) => dish.id === itemId);
+            if (!selectedDish) return;
+            setPreviewDish(selectedDish);
+            trackAnalyticsEvent({ eventType: 'view', restaurantId: restaurant.id, itemId }).catch(() => {});
           }}
           isQRRoute={isQRRoute}
         />

@@ -495,18 +495,21 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
     openDishFromGrid(heroDish, heroIndex >= 0 ? heroIndex : 0);
   };
 
-  const openDishFromGrid = (dish: Dish, fallbackIndex: number) => {
-    if (isPartnerExperience && mediaView === 'photo') {
-      const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      const isDemoMode = window.location.pathname.startsWith('/demo/');
+  const navigateToMenuFeedFromDish = (dish?: Dish) => {
+    const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const isDemoMode = window.location.pathname.startsWith('/demo/');
+    const params = new URLSearchParams();
+    if (dish?.id) params.set('dish', dish.id);
+    const normalizedCategory = normalizeCategoryForPartner(dish?.category);
+    if (normalizedCategory) params.set('category', normalizedCategory);
+    if (isStandalone && !isDemoMode) params.set('qr', '1');
+    const basePath = isDemoMode ? `/demo/${slug}/menu` : isStandalone ? `/r/${slug}/menu` : `/${slug}/menu`;
+    window.location.href = params.toString() ? `${basePath}?${params.toString()}` : basePath;
+  };
 
-      if (isDemoMode) {
-        window.location.href = `/demo/${slug}/full-menu`;
-      } else if (isStandalone) {
-        window.location.href = `/r/${slug}/full-menu`;
-      } else {
-        window.location.href = `/${slug}/full-menu`;
-      }
+  const openDishFromGrid = (dish: Dish, fallbackIndex: number) => {
+    if (isPartnerExperience) {
+      navigateToMenuFeedFromDish(dish);
       return;
     }
 
@@ -514,17 +517,6 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
       const realIndex = dishesWithVideo.findIndex(d => d.id === dish.id);
       openVideoReels(realIndex >= 0 ? realIndex : fallbackIndex);
       return;
-    }
-
-    if (isPartnerExperience) {
-      const slug = (restaurant as any).slug || restaurant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      const isDemoMode = window.location.pathname.startsWith('/demo/');
-      const params = new URLSearchParams();
-      params.set('dish', dish.id);
-      if (dish.category) params.set('category', normalizeCategoryForPartner(dish.category));
-      if (isStandalone && !isDemoMode) params.set('qr', '1');
-      const basePath = isDemoMode ? `/demo/${slug}/menu` : isStandalone ? `/r/${slug}/menu` : `/${slug}/menu`;
-      window.location.href = `${basePath}?${params.toString()}`;
     }
   };
 

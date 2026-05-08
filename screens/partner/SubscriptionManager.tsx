@@ -115,11 +115,21 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
 
   const handleSubscribe = async (priceId: string, planKey: string, checkoutType: 'subscription' | 'ai_credits_addon' = 'subscription') => {
     if (!priceId) {
-      alert('This plan is not yet available. Please contact support.');
+      const missingEnvVar = checkoutType === 'ai_credits_addon'
+        ? 'VITE_STRIPE_AI_CREDITS_50_PRICE_ID'
+        : planKey === 'basic'
+          ? (billing === 'annual' ? 'VITE_STRIPE_BASIC_ANNUAL_PRICE_ID' : 'VITE_STRIPE_BASIC_MONTHLY_PRICE_ID')
+          : planKey === 'pro'
+            ? (billing === 'annual' ? 'VITE_STRIPE_PRO_ANNUAL_PRICE_ID' : 'VITE_STRIPE_PRO_MONTHLY_PRICE_ID')
+            : 'VITE_STRIPE_*_PRICE_ID';
+      alert(`Missing Stripe price config: ${missingEnvVar}. Update Netlify/Vite env and redeploy.`);
       return;
     }
     setProcessingPlan(planKey);
     try {
+      const successType = checkoutType === 'ai_credits_addon'
+        ? 'ai_credits_addon'
+        : (planKey === 'basic' ? 'basic' : 'pro');
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         alert('You need to be logged in to subscribe. Please log in and try again.');
@@ -130,11 +140,28 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
           partnerId,
           priceId,
           checkoutType,
-          successUrl: `${window.location.origin}/partner?success=true`,
+          planTier: checkoutType === 'subscription' ? (planKey === 'pro' ? 'pro' : 'basic') : null,
+          successUrl: `${window.location.origin}/partner?success=true&successType=${successType}`,
           cancelUrl: `${window.location.origin}/partner?canceled=true`,
         },
       });
-      if (error) throw new Error(typeof error === 'object' ? JSON.stringify(error) : error);
+      if (error) {
+        let details = '';
+        const errorContext = (error as any)?.context;
+        if (errorContext) {
+          try {
+            const payload = await errorContext.json();
+            details = payload?.stripe || payload?.error || JSON.stringify(payload);
+          } catch {
+            try {
+              details = await errorContext.text();
+            } catch {
+              details = '';
+            }
+          }
+        }
+        throw new Error(details || (error as any)?.message || 'Checkout request failed');
+      }
       if (data?.error) throw new Error(data.stripe || data.error || 'Checkout failed');
       if (data?.url) window.location.href = data.url;
       else throw new Error('No checkout URL returned.');
@@ -189,9 +216,15 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
   const basicMonthly  = billing === 'monthly' ? PLAN_PRICES.basic.monthly : +(PLAN_PRICES.basic.annual / 12).toFixed(2);
   const proMonthly    = billing === 'monthly' ? PLAN_PRICES.pro.monthly   : +(PLAN_PRICES.pro.annual   / 12).toFixed(2);
   const aiLimit       = PLAN_LIMITS[currentPlan].aiCredits;
-  const aiCreditsTotalAvailable = Math.max(0, aiLimit - aiCreditsUsed) + aiAddonRemaining;
+  const aiBaseRemaining = Math.max(0, aiLimit - aiCreditsUsed);
+  const aiCreditsTotalAvailable = aiBaseRemaining + aiAddonRemaining;
+  const estimatedAddonPackTotal = aiAddonRemaining > 0 ? Math.ceil(aiAddonRemaining / 50) * 50 : 0;
+  const aiCombinedTotal = aiLimit + estimatedAddonPackTotal;
+  const aiCombinedUsed = Math.max(0, aiCombinedTotal - aiCreditsTotalAvailable);
+  const aiProgressUsed = aiAddonRemaining > 0 ? aiCombinedUsed : aiCreditsUsed;
+  const aiProgressTotal = aiAddonRemaining > 0 ? aiCombinedTotal : aiLimit;
   const canBuyAddon = aiLimit > 0 && !isLifetime;
-  const aiBaseUsedPct = aiLimit > 0 ? Math.min(100, Math.round((aiCreditsUsed / aiLimit) * 100)) : 0;
+  const aiBaseUsedPct = aiProgressTotal > 0 ? Math.min(100, Math.round((aiProgressUsed / aiProgressTotal) * 100)) : 0;
   const daysToReset = aiCreditsResetAt
     ? Math.max(0, Math.ceil((new Date(aiCreditsResetAt).getTime() - Date.now()) / 86400000))
     : null;
@@ -224,8 +257,8 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
           {/* Base credits progress */}
           <div className="mb-3">
             <div className="flex justify-between text-xs text-zinc-500 mb-1.5">
-              <span>Base credits used this cycle</span>
-              <span className="font-semibold text-zinc-700">{aiCreditsUsed} / {aiLimit}</span>
+              <span>{aiAddonRemaining > 0 ? 'Credits used this cycle' : 'Base credits used this cycle'}</span>
+              <span className="font-semibold text-zinc-700">{aiProgressUsed} / {aiProgressTotal}</span>
             </div>
             <div className="h-2.5 bg-zinc-100 rounded-full overflow-hidden">
               <div
@@ -267,12 +300,12 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ partnerId, pa
             </div>
             <button
               onClick={() => handleSubscribe(STRIPE_PRICE_IDS.ai_credits_50, 'addon50', 'ai_credits_addon')}
-              disabled={!!processingPlan || !STRIPE_PRICE_IDS.ai_credits_50}
+              disabled={!!processingPlan}
               className="shrink-0 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold disabled:opacity-50 flex items-center gap-2"
             >
               {processingPlan === 'addon50'
                 ? <><Loader2 size={14} className="animate-spin" /> Processing…</>
-                : <><Sparkles size={14} /> Buy +50 credits — A$19</>
+                : <><Sparkles size={14} /> Buy +50 credits (A$19)</>
               }
             </button>
           </div>
