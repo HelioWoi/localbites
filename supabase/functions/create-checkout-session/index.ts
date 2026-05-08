@@ -83,7 +83,11 @@ serve(async (req) => {
       );
     }
 
-    if (!partner.user_id || partner.user_id !== userData.user.id) {
+    const partnerOwnerId = (typeof partner.user_id === "string" && partner.user_id)
+      ? partner.user_id
+      : partner.id;
+
+    if (!partnerOwnerId || partnerOwnerId !== userData.user.id) {
       return new Response(
         JSON.stringify({ error: "Forbidden" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 403 }

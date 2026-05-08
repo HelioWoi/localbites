@@ -2400,7 +2400,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             <div className="space-y-3">
               <div>
                 <h2 className="text-lg font-bold text-zinc-900">Menu Items</h2>
-                <p className="text-sm text-zinc-500">{menuItems.filter(i => !i.deleted_at).length} items • {categories.length} categories</p>
+                <p className="text-sm text-zinc-500">
+                  {menuItems.filter(i => !i.deleted_at).length} items • {categories.length} categories{currentPlan === 'free' ? ' • 0-10' : ''}
+                </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 {/* Search Input */}
