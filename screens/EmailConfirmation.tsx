@@ -20,58 +20,75 @@ const EmailConfirmation: React.FC = () => {
       }
 
       try {
-        // Find partner by token
-        const { data: partner, error: fetchError } = await supabase
-          .from('partners')
-          .select('*')
-          .eq('email_confirmation_token', token)
-          .single();
+        const { data, error } = await supabase.functions.invoke('confirm-email', {
+          body: { token },
+        });
 
-        if (fetchError || !partner) {
+        if (error) {
+          const messageFromContext = typeof error.context === 'string'
+            ? (() => {
+                try {
+                  const parsed = JSON.parse(error.context) as { message?: string; error?: string };
+                  return parsed.message || parsed.error;
+                } catch {
+                  return null;
+                }
+              })()
+            : null;
+
+          const fallbackMessage = (data as { message?: string; error?: string } | null)?.message
+            || (data as { message?: string; error?: string } | null)?.error
+            || messageFromContext
+            || 'Failed to confirm email. Please try again.';
+
+          if (fallbackMessage.toLowerCase().includes('expired')) {
+            setStatus('expired');
+            setMessage(fallbackMessage);
+            return;
+          }
+
           setStatus('error');
-          setMessage('Invalid or expired confirmation link');
+          setMessage(fallbackMessage);
           return;
         }
 
-        // Check if already confirmed
-        if (partner.email_confirmed) {
+        const response = data as {
+          status?: 'confirmed' | 'already_confirmed' | 'expired' | 'invalid';
+          message?: string;
+          restaurantName?: string;
+          error?: string;
+        } | null;
+
+        if (!response) {
+          setStatus('error');
+          setMessage('Invalid confirmation response');
+          return;
+        }
+
+        if (response.status === 'already_confirmed') {
           setStatus('success');
-          setRestaurantName(partner.restaurant_name);
-          setMessage('Your email is already confirmed!');
+          setRestaurantName(response.restaurantName || '');
+          setMessage(response.message || 'Your email is already confirmed!');
           setTimeout(() => window.location.href = '/partner/login', 3000);
           return;
         }
 
-        // Check if token expired
-        const expiresAt = new Date(partner.email_confirmation_expires_at);
-        if (expiresAt < new Date()) {
+        if (response.status === 'expired') {
           setStatus('expired');
-          setMessage('This confirmation link has expired. Please request a new one.');
+          setMessage(response.message || 'This confirmation link has expired. Please request a new one.');
           return;
         }
 
-        // Update partner to mark email as confirmed
-        const { error: updateError } = await supabase
-          .from('partners')
-          .update({
-            email_confirmed: true,
-            email_confirmation_token: null,
-            email_confirmation_sent_at: null,
-            email_confirmation_expires_at: null,
-          })
-          .eq('id', partner.id);
-
-        if (updateError) {
-          console.error('Error confirming email:', updateError);
+        if (response.status === 'invalid') {
           setStatus('error');
-          setMessage('Failed to confirm email. Please try again.');
+          setMessage(response.message || 'Invalid or expired confirmation link');
           return;
         }
 
         // Success!
         setStatus('success');
-        setRestaurantName(partner.restaurant_name);
-        setMessage('Email confirmed successfully!');
+        setRestaurantName(response.restaurantName || '');
+        setMessage(response.message || 'Email confirmed successfully!');
 
         // Redirect to login after 3 seconds
         setTimeout(() => window.location.href = '/partner/login', 3000);
