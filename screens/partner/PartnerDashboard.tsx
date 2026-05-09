@@ -1564,7 +1564,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
     const compressImageForAI = (dataUrl: string): Promise<string> =>
       new Promise((resolve) => {
-        const img = new Image();
+        const img = document.createElement('img') as HTMLImageElement;
         img.onload = () => {
           const MAX_DIM = 1024;
           let { width, height } = img;
