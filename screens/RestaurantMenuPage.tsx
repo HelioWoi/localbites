@@ -580,13 +580,15 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     if (!isPlaying) return;
     setVideoReady(prev => new Set(prev).add(activeVideoIndex));
     const timer = setTimeout(() => {
-      if (activeVideoIndex < filteredItems.length - 1) {
-        setActiveVideoIndex(activeVideoIndex + 1);
-        if (scrollRef.current) {
-          scrollRef.current.scrollTo({ top: (activeVideoIndex + 1) * window.innerHeight, behavior: 'smooth' });
+      if (shouldAutoAdvanceCategories) {
+        if (activeVideoIndex < filteredItems.length - 1) {
+          setActiveVideoIndex(activeVideoIndex + 1);
+          if (scrollRef.current) {
+            scrollRef.current.scrollTo({ top: (activeVideoIndex + 1) * window.innerHeight, behavior: 'smooth' });
+          }
+        } else {
+          goToNextCategoryStart();
         }
-      } else if (shouldAutoAdvanceCategories) {
-        goToNextCategoryStart();
       }
     }, 6000);
     return () => clearTimeout(timer);
