@@ -920,7 +920,9 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                     muted
                     autoPlay
                     playsInline
+                    webkit-playsinline=""
                     preload="metadata"
+                    poster={restaurant.coverPhotoUrl || ''}
                     onPlaying={() => setVideoReady(prev => new Set(prev).add(index))}
                     onPlay={() => {
                       if (item.id !== currentActiveItemId) return;
