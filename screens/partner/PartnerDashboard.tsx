@@ -1562,6 +1562,26 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       setEnhanceProgress(prev => Math.min(95, prev + (prev < 80 ? 2 : 1)));
     }, 1000);
 
+    const compressImageForAI = (dataUrl: string): Promise<string> =>
+      new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX_DIM = 1024;
+          let { width, height } = img;
+          if (width > MAX_DIM || height > MAX_DIM) {
+            if (width >= height) { height = Math.round((height * MAX_DIM) / width); width = MAX_DIM; }
+            else { width = Math.round((width * MAX_DIM) / height); height = MAX_DIM; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
+        };
+        img.onerror = () => resolve(dataUrl);
+        img.src = dataUrl;
+      });
+
     try {
       let base64Data = sourcePhoto;
       if (!sourcePhoto.startsWith('data:')) {
@@ -1573,6 +1593,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           reader.readAsDataURL(blob);
         });
       }
+
+      base64Data = await compressImageForAI(base64Data);
 
       const jobId = crypto.randomUUID();
 
