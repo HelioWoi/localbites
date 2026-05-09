@@ -135,7 +135,7 @@ const RestaurantMenuLoader: React.FC<RestaurantMenuLoaderProps> = ({ slug }) => 
           rating: partnerRating,
           totalReviews: partnerTotalReviews,
           logoUrl: partnerData.logo_url,
-          coverPhotoUrl: partnerData.cover_photo_url,
+          coverPhotoUrl: partnerData.cover_photo_url || partnerData.photo_url || null,
           googleMapsUrl: partnerData.google_maps_url,
           website: partnerData.website,
           ordering_url: partnerData.ordering_url,
