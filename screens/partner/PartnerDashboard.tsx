@@ -1576,16 +1576,27 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
       const jobId = crypto.randomUUID();
 
-      await fetch('/.netlify/functions/enhance-photo-background', {
+      const kickoffRes = await fetch('/.netlify/functions/enhance-photo-background', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageBase64: base64Data, jobId, partnerId: partnerData?.id }),
       });
 
+      if (!kickoffRes.ok) {
+        const kickoffPayload = await kickoffRes.json().catch(() => ({} as { error?: string }));
+        throw new Error(kickoffPayload?.error || `Could not start enhancement (${kickoffRes.status}).`);
+      }
+
+      const kickoffData = await kickoffRes.json().catch(() => ({} as { status?: string; error?: string }));
+      if (kickoffData?.status === 'error') {
+        throw new Error(kickoffData?.error || 'Enhancement request was rejected.');
+      }
+
       const enhancedImage = await new Promise<string>((resolve, reject) => {
         enhancePromiseRejectRef.current = reject;
         let attempts = 0;
-        const maxAttempts = 80;
+        const maxAttempts = 120;
+        let transientStatusErrors = 0;
 
         enhancePollRef.current = setInterval(async () => {
           if (enhanceCanceledRef.current) {
@@ -1605,7 +1616,18 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           }
           try {
             const res = await fetch(`/.netlify/functions/enhance-photo-status?jobId=${jobId}`);
+            if (!res.ok) {
+              transientStatusErrors++;
+              if (transientStatusErrors >= 3) {
+                if (enhancePollRef.current) clearInterval(enhancePollRef.current);
+                enhancePollRef.current = null;
+                reject(new Error(`Status check failed (${res.status}).`));
+              }
+              return;
+            }
+
             const data = await res.json();
+            transientStatusErrors = 0;
             if (data.status === 'done') {
               if (enhancePollRef.current) clearInterval(enhancePollRef.current);
               enhancePollRef.current = null;
@@ -1616,7 +1638,12 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
               reject(new Error(data.error || 'Enhancement failed'));
             }
           } catch {
-            // silently retry
+            transientStatusErrors++;
+            if (transientStatusErrors >= 3) {
+              if (enhancePollRef.current) clearInterval(enhancePollRef.current);
+              enhancePollRef.current = null;
+              reject(new Error('Could not check enhancement status. Please try again.'));
+            }
           }
         }, 3000);
       });

@@ -82,15 +82,65 @@ Rules:
 const PLAN_AI_CREDITS = { free: 0, basic: 30, pro: 100 };
 
 exports.handler = async (event) => {
-  const { imageBase64, mimeType = 'image/jpeg', jobId, partnerId } = JSON.parse(event.body || '{}');
+  const headers = { 'Content-Type': 'application/json' };
+  let parsedBody;
+  try {
+    parsedBody = JSON.parse(event.body || '{}');
+  } catch {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: 'Invalid JSON body' }),
+    };
+  }
 
-  if (!jobId || !imageBase64) return;
+  const { imageBase64, mimeType = 'image/jpeg', jobId, partnerId } = parsedBody;
+
+  if (!jobId || !imageBase64) {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: 'jobId and imageBase64 are required' }),
+    };
+  }
 
   const apiKey = process.env.OPENAI_API_KEY;
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Supabase env vars are not configured' }),
+    };
+  }
+
   const supabase = createClient(
-    process.env.VITE_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_KEY
+    supabaseUrl,
+    supabaseServiceKey
   );
+
+  const saveJob = async (payload) => {
+    const { error } = await supabase.storage.from('menu-videos').upload(
+      `ai-jobs/${jobId}.json`,
+      JSON.stringify(payload),
+      { contentType: 'application/json', upsert: true }
+    );
+    if (error) {
+      throw new Error(`Storage write failed: ${error.message}`);
+    }
+  };
+
+  try {
+    await saveJob({ status: 'processing' });
+  } catch (saveErr) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: saveErr.message || 'Could not initialize enhancement job' }),
+    };
+  }
 
   // Credit check when partnerId is provided
   if (partnerId) {
@@ -114,12 +164,8 @@ exports.handler = async (event) => {
       const creditLimit = isActive ? (PLAN_AI_CREDITS[planTier] || 0) : 0;
 
       if (creditLimit === 0) {
-        await supabase.storage.from('menu-videos').upload(
-          `ai-jobs/${jobId}.json`,
-          JSON.stringify({ status: 'error', error: 'AI credits not available on your current plan.' }),
-          { contentType: 'application/json', upsert: true }
-        );
-        return { statusCode: 200, body: '{}' };
+        await saveJob({ status: 'error', error: 'AI credits not available on your current plan.' });
+        return { statusCode: 200, headers, body: JSON.stringify({ status: 'error', error: 'AI credits not available on your current plan.' }) };
       }
 
       // Auto-reset credits if billing period rolled over
@@ -135,23 +181,11 @@ exports.handler = async (event) => {
       const totalRemaining = baseRemaining + addonRemaining;
 
       if (totalRemaining <= 0) {
-        await supabase.storage.from('menu-videos').upload(
-          `ai-jobs/${jobId}.json`,
-          JSON.stringify({ status: 'error', error: `AI credits exhausted for this cycle. Base allowance (${creditLimit}) and add-on credits are fully used.` }),
-          { contentType: 'application/json', upsert: true }
-        );
-        return { statusCode: 200, body: '{}' };
+        await saveJob({ status: 'error', error: `AI credits exhausted for this cycle. Base allowance (${creditLimit}) and add-on credits are fully used.` });
+        return { statusCode: 200, headers, body: JSON.stringify({ status: 'error', error: `AI credits exhausted for this cycle. Base allowance (${creditLimit}) and add-on credits are fully used.` }) };
       }
     }
   }
-
-  const saveJob = async (payload) => {
-    await supabase.storage.from('menu-videos').upload(
-      `ai-jobs/${jobId}.json`,
-      JSON.stringify(payload),
-      { contentType: 'application/json', upsert: true }
-    );
-  };
 
   const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
   const originalBuffer = Buffer.from(base64Data, 'base64');
@@ -277,6 +311,21 @@ exports.handler = async (event) => {
 
   } catch (error) {
     console.error('[enhance-photo-background] error:', error);
-    await saveJob({ status: 'error', error: error.message || 'Enhancement failed' });
+    try {
+      await saveJob({ status: 'error', error: error.message || 'Enhancement failed' });
+    } catch (saveErr) {
+      console.error('[enhance-photo-background] saveJob also failed:', saveErr.message || saveErr);
+    }
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ status: 'error', error: error.message || 'Enhancement failed' }),
+    };
   }
+
+  return {
+    statusCode: 200,
+    headers,
+    body: JSON.stringify({ status: 'accepted', jobId }),
+  };
 };
