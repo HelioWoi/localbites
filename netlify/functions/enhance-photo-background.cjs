@@ -305,7 +305,10 @@ exports.handler = async (event) => {
           .update({ ai_credits_addon_remaining: (p.ai_credits_addon_remaining || 0) - 1 })
           .eq('id', partnerId);
       } else {
-        await supabase.rpc('increment_ai_credits', { partner_id_arg: partnerId });
+        await supabase
+          .from('partners')
+          .update({ ai_credits_used: (p?.ai_credits_used || 0) + 1 })
+          .eq('id', partnerId);
       }
     }
 
