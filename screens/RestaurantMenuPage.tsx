@@ -65,6 +65,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
   const activePillRef = useRef<HTMLButtonElement>(null);
   const [videoReady, setVideoReady] = useState<Set<number>>(new Set());
   const isInitialMount = useRef(true); // Track which videos are ready to play
+  const isProgrammaticScrollRef = useRef(false); // Blocks handleScroll during auto-advance
   
   // Likes and saves state
   const [likedItems, setLikedItems] = useState<Set<string>>(new Set());
@@ -394,6 +395,7 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
 
   // Handle scroll to update active video
   const handleScroll = () => {
+    if (isProgrammaticScrollRef.current) return;
     if (!scrollRef.current) return;
     const scrollTop = scrollRef.current.scrollTop;
     const itemHeight = window.innerHeight;
@@ -581,11 +583,12 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     setVideoReady(prev => new Set(prev).add(activeVideoIndex));
     const timer = setTimeout(() => {
       if (activeVideoIndex < filteredItems.length - 1) {
+        isProgrammaticScrollRef.current = true;
+        setActiveVideoIndex(activeVideoIndex + 1);
         if (scrollRef.current) {
           scrollRef.current.scrollTo({ top: (activeVideoIndex + 1) * window.innerHeight, behavior: 'smooth' });
         }
-      } else if (shouldAutoAdvanceCategories) {
-        goToNextCategoryStart();
+        setTimeout(() => { isProgrammaticScrollRef.current = false; }, 700);
       }
     }, 6000);
     return () => clearTimeout(timer);
