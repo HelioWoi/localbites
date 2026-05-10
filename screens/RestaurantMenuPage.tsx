@@ -580,7 +580,11 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     if (!isPlaying) return;
     setVideoReady(prev => new Set(prev).add(activeVideoIndex));
     const timer = setTimeout(() => {
-      if (shouldAutoAdvanceCategories && activeVideoIndex >= filteredItems.length - 1) {
+      if (activeVideoIndex < filteredItems.length - 1) {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTo({ top: (activeVideoIndex + 1) * window.innerHeight, behavior: 'smooth' });
+        }
+      } else if (shouldAutoAdvanceCategories) {
         goToNextCategoryStart();
       }
     }, 6000);
