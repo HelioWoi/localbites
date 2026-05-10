@@ -583,12 +583,15 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
     setVideoReady(prev => new Set(prev).add(activeVideoIndex));
     const timer = setTimeout(() => {
       if (activeVideoIndex < filteredItems.length - 1) {
+        const nextIndex = activeVideoIndex + 1;
         isProgrammaticScrollRef.current = true;
-        setActiveVideoIndex(activeVideoIndex + 1);
         if (scrollRef.current) {
-          scrollRef.current.scrollTo({ top: (activeVideoIndex + 1) * window.innerHeight, behavior: 'smooth' });
+          scrollRef.current.scrollTo({ top: nextIndex * window.innerHeight, behavior: 'smooth' });
         }
-        setTimeout(() => { isProgrammaticScrollRef.current = false; }, 700);
+        setTimeout(() => {
+          setActiveVideoIndex(nextIndex);
+          isProgrammaticScrollRef.current = false;
+        }, 700);
       }
     }, 6000);
     return () => clearTimeout(timer);
@@ -834,8 +837,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                       src={item.photoUrl}
                       alt=""
                       aria-hidden="true"
-                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
-                        index === activeVideoIndex ? 'opacity-100 animate-ken-burns-feed-bg' : 'opacity-0'
+                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 opacity-100 ${
+                        index === activeVideoIndex ? 'animate-ken-burns-feed-bg' : ''
                       }`}
                       style={{
                         filter: 'blur(52px) brightness(0.6)',
@@ -845,8 +848,8 @@ const RestaurantMenuPage: React.FC<RestaurantMenuPageProps> = ({ restaurant }) =
                     <img
                       src={item.photoUrl}
                       alt={item.name}
-                      className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-700 ${
-                        index === activeVideoIndex ? 'opacity-100 animate-ken-burns-feed' : 'opacity-0'
+                      className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-700 opacity-100 ${
+                        index === activeVideoIndex ? 'animate-ken-burns-feed' : ''
                       }`}
                       style={{
                         animationPlayState: index === activeVideoIndex && !isPlaying ? 'paused' : 'running'
