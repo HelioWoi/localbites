@@ -1,5 +1,7 @@
 'use strict';
 
+const { createClient } = require('@supabase/supabase-js');
+
 const FOOD_PROMPT = `Transform this image into a premium commercial-style visual for a modern restaurant menu, while preserving the original item exactly as it is.
 
 The input image may be low-quality, poorly lit, or taken casually with a phone. Your task is to elevate it to a professional level without altering the actual product.
@@ -115,6 +117,8 @@ Rules:
 - Return FOOD for everything else.
 - Do not output explanations.`;
 
+const PLAN_AI_CREDITS = { free: 0, basic: 30, pro: 100 };
+
 exports.handler = async (event) => {
   const headers = { 'Content-Type': 'application/json' };
 
@@ -131,11 +135,12 @@ exports.handler = async (event) => {
     };
   }
 
-  let imageBase64, mimeType;
+  let imageBase64, mimeType, partnerId;
   try {
     const body = JSON.parse(event.body || '{}');
     imageBase64 = body.imageBase64;
     mimeType = body.mimeType || 'image/jpeg';
+    partnerId = body.partnerId;
   } catch {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid JSON body' }) };
   }
@@ -144,7 +149,71 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'imageBase64 is required' }) };
   }
 
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabase = (supabaseUrl && supabaseServiceKey) ? createClient(supabaseUrl, supabaseServiceKey) : null;
+
   try {
+    // Optional partner credit validation for dashboard usage
+    if (partnerId) {
+      if (!supabase) {
+        throw new Error('Supabase env vars are not configured');
+      }
+
+      const { data: partner, error: partnerError } = await supabase
+        .from('partners')
+        .select('subscription_plan, ai_credits_used, ai_credits_reset_at, ai_credits_addon_remaining, subscription_status, lifetime_access')
+        .eq('id', partnerId)
+        .single();
+
+      if (partnerError) {
+        throw new Error(`Could not validate AI credits: ${partnerError.message}`);
+      }
+
+      if (partner) {
+        const isActive = partner.lifetime_access ||
+          partner.subscription_status === 'active' ||
+          partner.subscription_status === 'trialing';
+
+        const rawPlan = (partner.subscription_plan || '').toLowerCase();
+        const planTier = partner.lifetime_access ? 'pro'
+          : rawPlan === 'pro' ? 'pro'
+          : (rawPlan === 'basic' || rawPlan === 'monthly' || rawPlan === 'annual') ? 'basic'
+          : 'free';
+
+        const creditLimit = isActive ? (PLAN_AI_CREDITS[planTier] || 0) : 0;
+        if (creditLimit === 0) {
+          return {
+            statusCode: 403,
+            headers,
+            body: JSON.stringify({ error: 'AI credits not available on your current plan.' }),
+          };
+        }
+
+        let creditsUsed = partner.ai_credits_used || 0;
+        let addonRemaining = partner.ai_credits_addon_remaining || 0;
+
+        if (partner.ai_credits_reset_at && new Date(partner.ai_credits_reset_at) < new Date()) {
+          creditsUsed = 0;
+          addonRemaining = 0;
+          await supabase
+            .from('partners')
+            .update({ ai_credits_used: 0, ai_credits_addon_remaining: 0 })
+            .eq('id', partnerId);
+        }
+
+        const baseRemaining = Math.max(0, creditLimit - creditsUsed);
+        const totalRemaining = baseRemaining + addonRemaining;
+        if (totalRemaining <= 0) {
+          return {
+            statusCode: 403,
+            headers,
+            body: JSON.stringify({ error: `AI credits exhausted for this cycle. Base allowance (${creditLimit}) and add-on credits are fully used.` }),
+          };
+        }
+      }
+    }
+
     // Strip data-URL prefix if present
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
     const imageBuffer = Buffer.from(base64Data, 'base64');
@@ -197,7 +266,7 @@ exports.handler = async (event) => {
       formData.append('quality', quality);
 
       const controller = new AbortController();
-      const timeoutMs = 28000;
+      const timeoutMs = 22000;
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       const response = await fetch('https://api.openai.com/v1/images/edits', {
@@ -245,6 +314,26 @@ exports.handler = async (event) => {
 
     if (!b64Image) {
       throw new Error('No image returned from OpenAI');
+    }
+
+    if (partnerId && supabase) {
+      const { data: p } = await supabase
+        .from('partners')
+        .select('ai_credits_addon_remaining, ai_credits_used')
+        .eq('id', partnerId)
+        .single();
+
+      if ((p?.ai_credits_addon_remaining || 0) > 0) {
+        await supabase
+          .from('partners')
+          .update({ ai_credits_addon_remaining: (p.ai_credits_addon_remaining || 0) - 1 })
+          .eq('id', partnerId);
+      } else {
+        await supabase
+          .from('partners')
+          .update({ ai_credits_used: (p?.ai_credits_used || 0) + 1 })
+          .eq('id', partnerId);
+      }
     }
 
     return {

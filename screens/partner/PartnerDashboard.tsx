@@ -1627,13 +1627,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
       base64Data = await compressImageForAI(base64Data);
 
-      const jobId = crypto.randomUUID();
-
-      const kickoffBody = JSON.stringify({ imageBase64: base64Data, jobId, partnerId: partnerData?.id });
+      const kickoffBody = JSON.stringify({ imageBase64: base64Data, partnerId: partnerData?.id });
       let kickoffRes: Response | null = null;
 
       for (let attempt = 0; attempt < 3; attempt++) {
-        kickoffRes = await fetch('/.netlify/functions/enhance-photo-background', {
+        kickoffRes = await fetch('/.netlify/functions/enhance-photo', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: kickoffBody,
@@ -1657,61 +1655,10 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         throw new Error(kickoffData?.error || 'Enhancement request was rejected.');
       }
 
-      const enhancedImage = await new Promise<string>((resolve, reject) => {
-        enhancePromiseRejectRef.current = reject;
-        let attempts = 0;
-        const maxAttempts = 120;
-        let transientStatusErrors = 0;
-
-        enhancePollRef.current = setInterval(async () => {
-          if (enhanceCanceledRef.current) {
-            if (enhancePollRef.current) clearInterval(enhancePollRef.current);
-            enhancePollRef.current = null;
-            reject(new Error('Enhancement canceled'));
-            return;
-          }
-
-          attempts++;
-          setEnhanceProgress(prev => Math.max(prev, Math.min(97, Math.round((attempts / maxAttempts) * 97))));
-          if (attempts > maxAttempts) {
-            if (enhancePollRef.current) clearInterval(enhancePollRef.current);
-            enhancePollRef.current = null;
-            reject(new Error('Enhancement timed out. Please try again.'));
-            return;
-          }
-          try {
-            const res = await fetch(`/.netlify/functions/enhance-photo-status?jobId=${jobId}`);
-            if (!res.ok) {
-              transientStatusErrors++;
-              if (transientStatusErrors >= 3) {
-                if (enhancePollRef.current) clearInterval(enhancePollRef.current);
-                enhancePollRef.current = null;
-                reject(new Error(`Status check failed (${res.status}).`));
-              }
-              return;
-            }
-
-            const data = await res.json();
-            transientStatusErrors = 0;
-            if (data.status === 'done') {
-              if (enhancePollRef.current) clearInterval(enhancePollRef.current);
-              enhancePollRef.current = null;
-              resolve(data.enhancedImage);
-            } else if (data.status === 'error') {
-              if (enhancePollRef.current) clearInterval(enhancePollRef.current);
-              enhancePollRef.current = null;
-              reject(new Error(data.error || 'Enhancement failed'));
-            }
-          } catch {
-            transientStatusErrors++;
-            if (transientStatusErrors >= 3) {
-              if (enhancePollRef.current) clearInterval(enhancePollRef.current);
-              enhancePollRef.current = null;
-              reject(new Error('Could not check enhancement status. Please try again.'));
-            }
-          }
-        }, 3000);
-      });
+      const enhancedImage = kickoffData?.enhancedImage as string | undefined;
+      if (!enhancedImage) {
+        throw new Error('Enhancement succeeded but no image was returned.');
+      }
 
       setEnhanceProgress(100);
       setEnhanceOriginalPreview(sourcePhoto);
