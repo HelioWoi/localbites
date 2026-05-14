@@ -1581,15 +1581,6 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         img.src = dataUrl;
       });
 
-    const dataUrlToBlob = (dataUrl: string): Blob => {
-      const [meta, payload] = dataUrl.split(',');
-      const mime = (meta.match(/data:(.*?);base64/) || [])[1] || 'image/jpeg';
-      const binary = atob(payload || '');
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      return new Blob([bytes], { type: mime });
-    };
-
     const extractApiErrorMessage = async (response: Response): Promise<string> => {
       const requestId =
         response.headers.get('x-nf-request-id') ||
@@ -1643,69 +1634,34 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       }
 
       base64Data = await compressImageForAI(base64Data);
-      const imageBlob = dataUrlToBlob(base64Data);
-      if (imageBlob.size > 8 * 1024 * 1024) {
-        throw new Error('Image too large. Please use a smaller image.');
-      }
-
-      const tempPath = `ai-temp/${partnerData?.id || user.id}/${crypto.randomUUID()}.jpg`;
-      const { error: uploadErr } = await supabase.storage
-        .from('menu-videos')
-        .upload(tempPath, imageBlob, { contentType: 'image/jpeg', upsert: false });
-
-      if (uploadErr) {
-        throw new Error(uploadErr.message || 'Could not upload image for AI processing.');
-      }
-
-      const {
-        data: { publicUrl: originalImageUrl },
-      } = supabase.storage.from('menu-videos').getPublicUrl(tempPath);
-
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token;
-      if (!accessToken) {
-        throw new Error('Session expired. Please log in again.');
-      }
-
-      const authHeaders: HeadersInit = {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      };
-
-      const createRes = await fetch('/.netlify/functions/create-photo-job', {
+      const jobId = crypto.randomUUID();
+      const kickoffRes = await fetch('/.netlify/functions/enhance-photo-background', {
         method: 'POST',
-        headers: authHeaders,
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          originalImageUrl,
-          restaurantId: partnerData?.id,
-          itemId: editingMenuItem?.id,
-          creditsUsed: 1,
+          imageBase64: base64Data,
+          mimeType: 'image/jpeg',
+          jobId,
+          partnerId: partnerData?.id,
         }),
       });
 
-      if (!createRes.ok) {
-        const createError = await extractApiErrorMessage(createRes);
-        throw new Error(createError);
+      if (!kickoffRes.ok) {
+        const kickoffError = await extractApiErrorMessage(kickoffRes);
+        throw new Error(kickoffError);
       }
 
-      const createData = await createRes.json().catch(() => ({} as { jobId?: string }));
-      const jobId = createData?.jobId;
-      if (!jobId) {
-        throw new Error('Could not create photo enhancement job.');
+      const kickoffData = await kickoffRes.json().catch(() => ({} as { status?: string; error?: string }));
+      if (kickoffData?.status === 'error') {
+        throw new Error(kickoffData?.error || 'Enhancement request was rejected.');
       }
 
       setEnhanceProgress(15);
 
-      fetch('/.netlify/functions/process-photo-jobs-background', {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({ jobId }),
-      }).catch(() => undefined);
-
       const enhancedImage = await new Promise<string>((resolve, reject) => {
         enhancePromiseRejectRef.current = reject;
         let attempts = 0;
-        const maxAttempts = 240;
+        const maxAttempts = 180;
         let transientStatusErrors = 0;
         let pollInFlight = false;
 
@@ -1727,19 +1683,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             return;
           }
 
-          if (attempts === 1 || attempts % 4 === 0) {
-            fetch('/.netlify/functions/process-photo-jobs-background', {
-              method: 'POST',
-              headers: authHeaders,
-              body: JSON.stringify({ jobId }),
-            }).catch(() => undefined);
-          }
-
           pollInFlight = true;
           try {
-            const statusRes = await fetch(`/.netlify/functions/photo-job-status?jobId=${encodeURIComponent(jobId)}`, {
-              headers: { Authorization: `Bearer ${accessToken}` },
-            });
+            const statusRes = await fetch(`/.netlify/functions/enhance-photo-status?jobId=${encodeURIComponent(jobId)}`);
 
             if (!statusRes.ok) {
               transientStatusErrors++;
@@ -1768,14 +1714,14 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
             if (statusData?.status === 'done') {
               if (enhancePollRef.current) clearInterval(enhancePollRef.current);
               enhancePollRef.current = null;
-              resolve(statusData?.enhancedImageUrl || statusData?.enhanced_image_url);
+              resolve(statusData?.enhancedImage);
               return;
             }
 
-            if (statusData?.status === 'failed') {
+            if (statusData?.status === 'error' || statusData?.status === 'failed') {
               if (enhancePollRef.current) clearInterval(enhancePollRef.current);
               enhancePollRef.current = null;
-              reject(new Error(mapJobFailureMessage(statusData?.errorMessage || statusData?.error_message || 'Processing failed.')));
+              reject(new Error(mapJobFailureMessage(statusData?.error || statusData?.errorMessage || statusData?.error_message || 'Processing failed.')));
             }
           } catch {
             transientStatusErrors++;
@@ -1787,7 +1733,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           } finally {
             pollInFlight = false;
           }
-        }, 3000);
+        }, 2500);
       });
 
       if (!enhancedImage) {
