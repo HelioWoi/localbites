@@ -96,6 +96,14 @@ exports.handler = async (event) => {
 
   const { imageBase64, mimeType = 'image/jpeg', jobId, partnerId } = parsedBody;
 
+  if (event.httpMethod && event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ error: 'Method Not Allowed' }),
+    };
+  }
+
   if (!jobId || !imageBase64) {
     return {
       statusCode: 400,
@@ -150,55 +158,8 @@ exports.handler = async (event) => {
     };
   }
 
-  // Credit check when partnerId is provided
-  if (partnerId) {
-    const { data: partner } = await supabase
-      .from('partners')
-      .select('subscription_plan, ai_credits_used, ai_credits_reset_at, ai_credits_addon_remaining, subscription_status, lifetime_access')
-      .eq('id', partnerId)
-      .single();
-
-    if (partner) {
-      const isActive = partner.lifetime_access ||
-        partner.subscription_status === 'active' ||
-        partner.subscription_status === 'trialing';
-
-      const rawPlan = (partner.subscription_plan || '').toLowerCase();
-      const planTier = partner.lifetime_access ? 'pro'
-        : rawPlan === 'pro' ? 'pro'
-        : (rawPlan === 'basic' || rawPlan === 'monthly' || rawPlan === 'annual') ? 'basic'
-        : 'free';
-
-      const creditLimit = isActive ? (PLAN_AI_CREDITS[planTier] || 0) : 0;
-
-      if (creditLimit === 0) {
-        await saveJob({ status: 'error', error: 'AI credits not available on your current plan.' });
-        return { statusCode: 200, headers, body: JSON.stringify({ status: 'error', error: 'AI credits not available on your current plan.' }) };
-      }
-
-      // Auto-reset credits if billing period rolled over
-      let creditsUsed = partner.ai_credits_used || 0;
-      let addonRemaining = partner.ai_credits_addon_remaining || 0;
-      if (partner.ai_credits_reset_at && new Date(partner.ai_credits_reset_at) < new Date()) {
-        creditsUsed = 0;
-        addonRemaining = 0;
-        await supabase.from('partners').update({ ai_credits_used: 0, ai_credits_addon_remaining: 0 }).eq('id', partnerId);
-      }
-
-      const baseRemaining = Math.max(0, creditLimit - creditsUsed);
-      const totalRemaining = baseRemaining + addonRemaining;
-
-      if (totalRemaining <= 0) {
-        await saveJob({ status: 'error', error: `AI credits exhausted for this cycle. Base allowance (${creditLimit}) and add-on credits are fully used.` });
-        return { statusCode: 200, headers, body: JSON.stringify({ status: 'error', error: `AI credits exhausted for this cycle. Base allowance (${creditLimit}) and add-on credits are fully used.` }) };
-      }
-    }
-  }
-
-  const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-  const originalBuffer = Buffer.from(base64Data, 'base64');
-  const originalBlob = new Blob([originalBuffer], { type: mimeType });
-  const originalDataUrl = `data:${mimeType};base64,${base64Data}`;
+  let originalBlob;
+  let originalDataUrl;
 
   const detectImageType = async () => {
     const response = await fetch('https://api.openai.com/v1/responses', {
@@ -261,6 +222,59 @@ exports.handler = async (event) => {
 
   try {
     if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
+
+    // Credit check when partnerId is provided
+    if (partnerId) {
+      const { data: partner, error: partnerError } = await supabase
+        .from('partners')
+        .select('subscription_plan, ai_credits_used, ai_credits_reset_at, ai_credits_addon_remaining, subscription_status, lifetime_access')
+        .eq('id', partnerId)
+        .single();
+
+      if (partnerError) {
+        throw new Error(`Could not validate AI credits: ${partnerError.message}`);
+      }
+
+      if (partner) {
+        const isActive = partner.lifetime_access ||
+          partner.subscription_status === 'active' ||
+          partner.subscription_status === 'trialing';
+
+        const rawPlan = (partner.subscription_plan || '').toLowerCase();
+        const planTier = partner.lifetime_access ? 'pro'
+          : rawPlan === 'pro' ? 'pro'
+          : (rawPlan === 'basic' || rawPlan === 'monthly' || rawPlan === 'annual') ? 'basic'
+          : 'free';
+
+        const creditLimit = isActive ? (PLAN_AI_CREDITS[planTier] || 0) : 0;
+
+        if (creditLimit === 0) {
+          await saveJob({ status: 'error', error: 'AI credits not available on your current plan.' });
+          return { statusCode: 200, headers, body: JSON.stringify({ status: 'error', error: 'AI credits not available on your current plan.' }) };
+        }
+
+        let creditsUsed = partner.ai_credits_used || 0;
+        let addonRemaining = partner.ai_credits_addon_remaining || 0;
+        if (partner.ai_credits_reset_at && new Date(partner.ai_credits_reset_at) < new Date()) {
+          creditsUsed = 0;
+          addonRemaining = 0;
+          await supabase.from('partners').update({ ai_credits_used: 0, ai_credits_addon_remaining: 0 }).eq('id', partnerId);
+        }
+
+        const baseRemaining = Math.max(0, creditLimit - creditsUsed);
+        const totalRemaining = baseRemaining + addonRemaining;
+
+        if (totalRemaining <= 0) {
+          await saveJob({ status: 'error', error: `AI credits exhausted for this cycle. Base allowance (${creditLimit}) and add-on credits are fully used.` });
+          return { statusCode: 200, headers, body: JSON.stringify({ status: 'error', error: `AI credits exhausted for this cycle. Base allowance (${creditLimit}) and add-on credits are fully used.` }) };
+        }
+      }
+    }
+
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const originalBuffer = Buffer.from(base64Data, 'base64');
+    originalBlob = new Blob([originalBuffer], { type: mimeType });
+    originalDataUrl = `data:${mimeType};base64,${base64Data}`;
 
     let imageType = 'food';
     try {
