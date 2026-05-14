@@ -163,17 +163,20 @@ exports.handler = async (event) => {
     formData.append('quality', quality);
 
     const controller = new AbortController();
-    const timeoutMs = 22000;
+    const timeoutMs = 180000;
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    const response = await fetch('https://api.openai.com/v1/images/edits', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: formData,
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
+    let response;
+    try {
+      response = await fetch('https://api.openai.com/v1/images/edits', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}` },
+        body: formData,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
