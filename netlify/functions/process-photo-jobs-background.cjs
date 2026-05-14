@@ -38,13 +38,6 @@ exports.handler = async (event) => {
   console.log('[process-photo-jobs-background] Worker started');
   console.log('[process-photo-jobs-background] httpMethod:', event.httpMethod || '(scheduled)');
 
-  // Scheduled invocations have httpMethod === '' — allow them through.
-  // Only reject explicit HTTP calls that are not OPTIONS or POST.
-  if (event.httpMethod && event.httpMethod !== 'POST' && event.httpMethod !== 'OPTIONS') {
-    console.log('[process-photo-jobs-background] Rejected non-POST HTTP call:', event.httpMethod);
-    return jsonResponse(405, { error: 'Method Not Allowed' });
-  }
-
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: CORS_HEADERS, body: 'ok' };
   }
@@ -75,6 +68,7 @@ exports.handler = async (event) => {
 
   const requestedJobId = body.jobId || null;
   console.log('[process-photo-jobs-background] requestedJobId:', requestedJobId || '(none — picking oldest pending)');
+  let claimedJobId = null;
 
   try {
     // Recover stuck jobs first
@@ -89,6 +83,15 @@ exports.handler = async (event) => {
       .eq('status', 'processing')
       .lt('started_at', tenMinutesAgo);
     if (stuckErr) console.warn('[process-photo-jobs-background] Stuck-job recovery error:', stuckErr.message);
+
+    const { count: pendingCount, error: pendingCountErr } = await supabase
+      .from('photo_jobs')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending');
+    if (pendingCountErr) {
+      console.error('[process-photo-jobs-background] Pending count query error:', pendingCountErr.message);
+    }
+    console.log('[process-photo-jobs-background] pending jobs found count:', pendingCount ?? 0);
 
     let job = null;
 
@@ -122,6 +125,7 @@ exports.handler = async (event) => {
 
     console.log('[process-photo-jobs-background] Selected job id:', job.id);
     console.log('[process-photo-jobs-background] original_image_url:', job.original_image_url);
+    console.log('[process-photo-jobs-background] before updating to processing');
 
     const { data: claimedJob, error: claimError } = await supabase
       .from('photo_jobs')
@@ -139,6 +143,9 @@ exports.handler = async (event) => {
       console.log('[process-photo-jobs-background] Job already claimed or claim failed:', claimError?.message);
       return jsonResponse(200, { processed: false, reason: 'Job already claimed' });
     }
+
+    claimedJobId = claimedJob.id;
+    console.log('[process-photo-jobs-background] after updating to processing:', claimedJob.id);
 
     console.log('[process-photo-jobs-background] Job claimed, status now processing:', claimedJob.id);
     console.log('[process-photo-jobs-background] Downloading source image...');
@@ -177,6 +184,7 @@ exports.handler = async (event) => {
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     console.log('[process-photo-jobs-background] Calling OpenAI images/edits...');
+    console.log('[process-photo-jobs-background] before OpenAI call');
     let aiResponse;
     try {
       aiResponse = await fetch('https://api.openai.com/v1/images/edits', {
@@ -189,6 +197,7 @@ exports.handler = async (event) => {
       clearTimeout(timeoutId);
     }
 
+    console.log('[process-photo-jobs-background] after OpenAI call');
     console.log('[process-photo-jobs-background] OpenAI response status:', aiResponse.status);
 
     if (!aiResponse.ok) {
@@ -243,6 +252,7 @@ exports.handler = async (event) => {
       .eq('id', claimedJob.id);
 
     if (doneErr) console.error('[process-photo-jobs-background] Failed to mark job done:', doneErr.message);
+    console.log('[process-photo-jobs-background] final status update:', doneErr ? 'done-update-error' : 'done');
 
     return jsonResponse(200, {
       processed: true,
@@ -253,6 +263,14 @@ exports.handler = async (event) => {
   } catch (error) {
     const isTimeout = error?.name === 'AbortError';
     console.error('[process-photo-jobs-background] Caught error:', error?.message || error);
+    if (claimedJobId) {
+      await markFailed(
+        supabase,
+        claimedJobId,
+        isTimeout ? 'Worker timed out while processing AI image' : (error?.message || 'Unexpected worker error')
+      );
+      console.log('[process-photo-jobs-background] final status update: failed');
+    }
     return jsonResponse(500, {
       error: isTimeout ? 'Worker timed out while processing AI image' : (error.message || 'Unexpected worker error'),
     });
