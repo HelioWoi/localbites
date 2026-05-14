@@ -12,6 +12,12 @@
 [functions."enhance-photo"]
   timeout = 26
 
+[functions."enhance-photo-background"]
+  timeout = 26
+
+[functions."enhance-photo-demo-background"]
+  timeout = 26
+
 # Edge Functions for dynamic Open Graph tags
 [[edge_functions]]
   function = "og-tags"

@@ -108,6 +108,14 @@ exports.handler = async (event) => {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+  if (!apiKey) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'OPENAI_API_KEY is not configured on the server.' }),
+    };
+  }
+
   if (!supabaseUrl || !supabaseServiceKey) {
     return {
       statusCode: 500,
