@@ -1014,24 +1014,13 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                                     gridVideoRefs.current[feedIndex >= 0 ? feedIndex : index] = el;
                                   }}
                                   src={getCDNUrl(dish.videoUrl)}
-                                  className={`absolute inset-0 w-full h-full object-cover group-active:scale-105 transition-all duration-300 ${gridMediaLoaded.has(dish.id) ? 'opacity-100' : 'opacity-0'}`}
+                                  className="absolute inset-0 w-full h-full object-cover group-active:scale-105 transition-all duration-300"
                                   muted
                                   playsInline
                                   preload="auto"
                                   poster={dish.photoUrl || dish.thumbnailUrl || ''}
-                                  onLoadedMetadata={() => {
-                                    setGridMediaLoaded(prev => new Set(prev).add(dish.id));
-                                  }}
                                   onLoadedData={(e) => {
                                     e.currentTarget.currentTime = 0.1;
-                                    setGridMediaLoaded(prev => new Set(prev).add(dish.id));
-                                  }}
-                                  onError={() => {
-                                    setGridMediaLoaded(prev => {
-                                      const next = new Set(prev);
-                                      next.delete(dish.id);
-                                      return next;
-                                    });
                                   }}
                                 />
                               </>
@@ -1096,24 +1085,13 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                                     gridVideoRefs.current[feedIndex >= 0 ? feedIndex : 0] = el;
                                   }}
                                   src={getCDNUrl(dish.videoUrl)}
-                                  className={`absolute inset-0 w-full h-full object-cover group-active:scale-105 transition-all duration-300 ${gridMediaLoaded.has(dish.id) ? 'opacity-100' : 'opacity-0'}`}
+                                  className="absolute inset-0 w-full h-full object-cover group-active:scale-105 transition-all duration-300"
                                   muted
                                   playsInline
                                   preload="auto"
                                   poster={dish.photoUrl || dish.thumbnailUrl || ''}
-                                  onLoadedMetadata={() => {
-                                    setGridMediaLoaded(prev => new Set(prev).add(dish.id));
-                                  }}
                                   onLoadedData={(e) => {
                                     e.currentTarget.currentTime = 0.1;
-                                    setGridMediaLoaded(prev => new Set(prev).add(dish.id));
-                                  }}
-                                  onError={() => {
-                                    setGridMediaLoaded(prev => {
-                                      const next = new Set(prev);
-                                      next.delete(dish.id);
-                                      return next;
-                                    });
                                   }}
                                 />
                               </>
