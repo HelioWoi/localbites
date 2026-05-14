@@ -1598,11 +1598,23 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
       const jobId = crypto.randomUUID();
 
-      const kickoffRes = await fetch('/.netlify/functions/enhance-photo-background', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64Data, jobId, partnerId: partnerData?.id }),
-      });
+      const kickoffBody = JSON.stringify({ imageBase64: base64Data, jobId, partnerId: partnerData?.id });
+      let kickoffRes: Response | null = null;
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        kickoffRes = await fetch('/.netlify/functions/enhance-photo-background', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: kickoffBody,
+        });
+
+        if (kickoffRes.ok) break;
+
+        const isTransientServerError = kickoffRes.status >= 500;
+        if (!isTransientServerError || attempt === 2) break;
+
+        await new Promise(resolve => setTimeout(resolve, 600 * (attempt + 1)));
+      }
 
       if (!kickoffRes.ok) {
         const kickoffPayload = await kickoffRes.json().catch(() => ({} as { error?: string }));
@@ -3572,7 +3584,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
                   {isUploading ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      <span className="text-sm">{editingMenuItem ? 'Updating...' : 'Uploading...'} {uploadProgress}%</span>
+                      <span className="text-sm">{editingMenuItem ? 'Updating...' : 'Uploading...'} {Math.round(uploadProgress)}%</span>
                     </>
                   ) : (
                     <>

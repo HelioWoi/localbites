@@ -1016,8 +1016,11 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                                   className={`absolute inset-0 w-full h-full object-cover group-active:scale-105 transition-all duration-300 ${gridMediaLoaded.has(dish.id) ? 'opacity-100' : 'opacity-0'}`}
                                   muted
                                   playsInline
-                                  preload="metadata"
+                                  preload="auto"
                                   poster={dish.photoUrl || dish.thumbnailUrl || restaurant.mainPhotoUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'}
+                                  onLoadedMetadata={() => {
+                                    setGridMediaLoaded(prev => new Set(prev).add(dish.id));
+                                  }}
                                   onLoadedData={(e) => {
                                     e.currentTarget.currentTime = 0.1;
                                     setGridMediaLoaded(prev => new Set(prev).add(dish.id));
@@ -1094,8 +1097,11 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                                   className={`absolute inset-0 w-full h-full object-cover group-active:scale-105 transition-all duration-300 ${gridMediaLoaded.has(dish.id) ? 'opacity-100' : 'opacity-0'}`}
                                   muted
                                   playsInline
-                                  preload="metadata"
+                                  preload="auto"
                                   poster={dish.photoUrl || dish.thumbnailUrl || restaurant.mainPhotoUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'}
+                                  onLoadedMetadata={() => {
+                                    setGridMediaLoaded(prev => new Set(prev).add(dish.id));
+                                  }}
                                   onLoadedData={(e) => {
                                     e.currentTarget.currentTime = 0.1;
                                     setGridMediaLoaded(prev => new Set(prev).add(dish.id));
