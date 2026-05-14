@@ -35,20 +35,33 @@ const markFailed = async (supabase, jobId, message) => {
 };
 
 exports.handler = async (event) => {
+  console.log('[process-photo-jobs-background] Worker started');
+  console.log('[process-photo-jobs-background] httpMethod:', event.httpMethod || '(scheduled)');
+
+  // Scheduled invocations have httpMethod === '' — allow them through.
+  // Only reject explicit HTTP calls that are not OPTIONS or POST.
+  if (event.httpMethod && event.httpMethod !== 'POST' && event.httpMethod !== 'OPTIONS') {
+    console.log('[process-photo-jobs-background] Rejected non-POST HTTP call:', event.httpMethod);
+    return jsonResponse(405, { error: 'Method Not Allowed' });
+  }
+
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: CORS_HEADERS, body: 'ok' };
   }
 
-  if (event.httpMethod !== 'POST') {
-    return jsonResponse(405, { error: 'Method Not Allowed' });
-  }
-
   const apiKey = process.env.OPENAI_API_KEY;
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Prefer the service role key (bypasses RLS). Accept both naming conventions.
+  const supabaseServiceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_KEY;
+
+  console.log('[process-photo-jobs-background] Env check — SUPABASE_URL:', !!supabaseUrl, '| SERVICE_KEY:', !!supabaseServiceKey, '| OPENAI_API_KEY:', !!apiKey);
 
   if (!apiKey || !supabaseUrl || !supabaseServiceKey) {
-    return jsonResponse(500, { error: 'Required environment variables are not configured' });
+    const missing = [!apiKey && 'OPENAI_API_KEY', !supabaseUrl && 'SUPABASE_URL', !supabaseServiceKey && 'SUPABASE_SERVICE_ROLE_KEY'].filter(Boolean).join(', ');
+    console.error('[process-photo-jobs-background] Missing env vars:', missing);
+    return jsonResponse(500, { error: `Missing environment variables: ${missing}` });
   }
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -57,49 +70,58 @@ exports.handler = async (event) => {
   try {
     body = JSON.parse(event.body || '{}');
   } catch {
-    return jsonResponse(400, { error: 'Invalid JSON body' });
+    body = {};
   }
 
   const requestedJobId = body.jobId || null;
+  console.log('[process-photo-jobs-background] requestedJobId:', requestedJobId || '(none — picking oldest pending)');
 
   try {
+    // Recover stuck jobs first
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    await supabase
+    const { error: stuckErr } = await supabase
       .from('photo_jobs')
       .update({
         status: 'failed',
-        error_message: 'Processing timeout',
+        error_message: 'Processing timeout (stuck in processing)',
         completed_at: new Date().toISOString(),
       })
       .eq('status', 'processing')
       .lt('started_at', tenMinutesAgo);
+    if (stuckErr) console.warn('[process-photo-jobs-background] Stuck-job recovery error:', stuckErr.message);
 
     let job = null;
 
     if (requestedJobId) {
-      const { data } = await supabase
+      const { data, error: qErr } = await supabase
         .from('photo_jobs')
         .select('*')
         .eq('id', requestedJobId)
-        .in('status', ['pending', 'failed'])
-        .order('created_at', { ascending: true })
-        .limit(1)
+        .eq('status', 'pending')
         .maybeSingle();
+      if (qErr) console.error('[process-photo-jobs-background] Query error (specific job):', qErr.message);
+      console.log('[process-photo-jobs-background] Specific job lookup result:', data ? data.id : 'null');
       job = data;
     } else {
-      const { data } = await supabase
+      const { data, error: qErr } = await supabase
         .from('photo_jobs')
         .select('*')
         .eq('status', 'pending')
         .order('created_at', { ascending: true })
         .limit(1)
         .maybeSingle();
+      if (qErr) console.error('[process-photo-jobs-background] Query error (oldest pending):', qErr.message);
+      console.log('[process-photo-jobs-background] Oldest pending job:', data ? data.id : 'none found');
       job = data;
     }
 
     if (!job) {
+      console.log('[process-photo-jobs-background] No pending jobs to process. Exiting.');
       return jsonResponse(200, { processed: false, reason: 'No pending jobs' });
     }
+
+    console.log('[process-photo-jobs-background] Selected job id:', job.id);
+    console.log('[process-photo-jobs-background] original_image_url:', job.original_image_url);
 
     const { data: claimedJob, error: claimError } = await supabase
       .from('photo_jobs')
@@ -114,19 +136,29 @@ exports.handler = async (event) => {
       .maybeSingle();
 
     if (claimError || !claimedJob) {
+      console.log('[process-photo-jobs-background] Job already claimed or claim failed:', claimError?.message);
       return jsonResponse(200, { processed: false, reason: 'Job already claimed' });
     }
 
+    console.log('[process-photo-jobs-background] Job claimed, status now processing:', claimedJob.id);
+    console.log('[process-photo-jobs-background] Downloading source image...');
+
     const sourceImageRes = await fetch(claimedJob.original_image_url);
     if (!sourceImageRes.ok) {
-      await markFailed(supabase, claimedJob.id, `Could not load original image (${sourceImageRes.status})`);
+      const msg = `Could not load original image (${sourceImageRes.status})`;
+      console.error('[process-photo-jobs-background]', msg);
+      await markFailed(supabase, claimedJob.id, msg);
       return jsonResponse(200, { processed: true, jobId: claimedJob.id, status: 'failed' });
     }
 
     const sourceArrayBuffer = await sourceImageRes.arrayBuffer();
     const sourceBuffer = Buffer.from(sourceArrayBuffer);
+    console.log('[process-photo-jobs-background] Source image size (bytes):', sourceBuffer.length);
+
     if (sourceBuffer.length > 8 * 1024 * 1024) {
-      await markFailed(supabase, claimedJob.id, 'Image too large for processing');
+      const msg = 'Image too large for processing';
+      console.error('[process-photo-jobs-background]', msg);
+      await markFailed(supabase, claimedJob.id, msg);
       return jsonResponse(200, { processed: true, jobId: claimedJob.id, status: 'failed' });
     }
 
@@ -139,10 +171,12 @@ exports.handler = async (event) => {
     formData.append('size', '1024x1536');
     formData.append('quality', 'low');
 
+    // Background functions have up to 15 minutes — use a generous timeout
     const controller = new AbortController();
-    const timeoutMs = 24000;
+    const timeoutMs = 180000; // 3 minutes
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+    console.log('[process-photo-jobs-background] Calling OpenAI images/edits...');
     let aiResponse;
     try {
       aiResponse = await fetch('https://api.openai.com/v1/images/edits', {
@@ -155,9 +189,12 @@ exports.handler = async (event) => {
       clearTimeout(timeoutId);
     }
 
+    console.log('[process-photo-jobs-background] OpenAI response status:', aiResponse.status);
+
     if (!aiResponse.ok) {
       const errorPayload = await aiResponse.json().catch(() => ({}));
       const errorMessage = errorPayload?.error?.message || `OpenAI error ${aiResponse.status}`;
+      console.error('[process-photo-jobs-background] OpenAI error:', errorMessage);
       await markFailed(supabase, claimedJob.id, errorMessage);
       return jsonResponse(200, { processed: true, jobId: claimedJob.id, status: 'failed' });
     }
@@ -165,10 +202,13 @@ exports.handler = async (event) => {
     const aiData = await aiResponse.json();
     const b64 = aiData?.data?.[0]?.b64_json;
     if (!b64) {
-      await markFailed(supabase, claimedJob.id, 'No image returned from AI');
+      const msg = 'No image returned from AI';
+      console.error('[process-photo-jobs-background]', msg);
+      await markFailed(supabase, claimedJob.id, msg);
       return jsonResponse(200, { processed: true, jobId: claimedJob.id, status: 'failed' });
     }
 
+    console.log('[process-photo-jobs-background] AI image received, uploading to storage...');
     const outputBuffer = Buffer.from(b64, 'base64');
     const outputPath = `ai-enhanced/${claimedJob.id}.png`;
 
@@ -180,7 +220,9 @@ exports.handler = async (event) => {
       });
 
     if (uploadError) {
-      await markFailed(supabase, claimedJob.id, `Image upload failed: ${uploadError.message}`);
+      const msg = `Image upload failed: ${uploadError.message}`;
+      console.error('[process-photo-jobs-background]', msg);
+      await markFailed(supabase, claimedJob.id, msg);
       return jsonResponse(200, { processed: true, jobId: claimedJob.id, status: 'failed' });
     }
 
@@ -188,7 +230,9 @@ exports.handler = async (event) => {
       data: { publicUrl },
     } = supabase.storage.from('menu-videos').getPublicUrl(outputPath);
 
-    await supabase
+    console.log('[process-photo-jobs-background] Upload complete. Updating job to done. publicUrl:', publicUrl);
+
+    const { error: doneErr } = await supabase
       .from('photo_jobs')
       .update({
         status: 'done',
@@ -198,6 +242,8 @@ exports.handler = async (event) => {
       })
       .eq('id', claimedJob.id);
 
+    if (doneErr) console.error('[process-photo-jobs-background] Failed to mark job done:', doneErr.message);
+
     return jsonResponse(200, {
       processed: true,
       jobId: claimedJob.id,
@@ -206,6 +252,7 @@ exports.handler = async (event) => {
     });
   } catch (error) {
     const isTimeout = error?.name === 'AbortError';
+    console.error('[process-photo-jobs-background] Caught error:', error?.message || error);
     return jsonResponse(500, {
       error: isTimeout ? 'Worker timed out while processing AI image' : (error.message || 'Unexpected worker error'),
     });
