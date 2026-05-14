@@ -1002,12 +1002,13 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                           >
                             {dish.videoUrl ? (
                               <>
-                                <img
-                                  src={dish.photoUrl || dish.thumbnailUrl || restaurant.mainPhotoUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'}
-                                  className="absolute inset-0 w-full h-full object-cover"
-                                  alt={dish.name}
-                                  onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'; }}
-                                />
+                                {(dish.photoUrl || dish.thumbnailUrl) && (
+                                  <img
+                                    src={dish.photoUrl || dish.thumbnailUrl!}
+                                    className="absolute inset-0 w-full h-full object-cover"
+                                    alt={dish.name}
+                                  />
+                                )}
                                 <video
                                   ref={(el) => {
                                     gridVideoRefs.current[feedIndex >= 0 ? feedIndex : index] = el;
@@ -1017,7 +1018,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                                   muted
                                   playsInline
                                   preload="auto"
-                                  poster={dish.photoUrl || dish.thumbnailUrl || restaurant.mainPhotoUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'}
+                                  poster={dish.photoUrl || dish.thumbnailUrl || ''}
                                   onLoadedMetadata={() => {
                                     setGridMediaLoaded(prev => new Set(prev).add(dish.id));
                                   }}
@@ -1083,12 +1084,13 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                           >
                             {dish.videoUrl ? (
                               <>
-                                <img
-                                  src={dish.photoUrl || dish.thumbnailUrl || restaurant.mainPhotoUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'}
-                                  className="absolute inset-0 w-full h-full object-cover"
-                                  alt={dish.name}
-                                  onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'; }}
-                                />
+                                {(dish.photoUrl || dish.thumbnailUrl) && (
+                                  <img
+                                    src={dish.photoUrl || dish.thumbnailUrl!}
+                                    className="absolute inset-0 w-full h-full object-cover"
+                                    alt={dish.name}
+                                  />
+                                )}
                                 <video
                                   ref={(el) => {
                                     gridVideoRefs.current[feedIndex >= 0 ? feedIndex : 0] = el;
@@ -1098,7 +1100,7 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                                   muted
                                   playsInline
                                   preload="auto"
-                                  poster={dish.photoUrl || dish.thumbnailUrl || restaurant.mainPhotoUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'}
+                                  poster={dish.photoUrl || dish.thumbnailUrl || ''}
                                   onLoadedMetadata={() => {
                                     setGridMediaLoaded(prev => new Set(prev).add(dish.id));
                                   }}
