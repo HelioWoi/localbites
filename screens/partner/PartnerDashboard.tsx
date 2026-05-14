@@ -1582,6 +1582,37 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         img.src = dataUrl;
       });
 
+    const extractKickoffErrorMessage = async (response: Response): Promise<string> => {
+      const requestId =
+        response.headers.get('x-nf-request-id') ||
+        response.headers.get('x-request-id') ||
+        '';
+
+      const withRequestId = (message: string) =>
+        requestId ? `${message} [request: ${requestId}]` : message;
+
+      const payload = await response
+        .clone()
+        .json()
+        .catch(() => null as { error?: string } | null);
+
+      if (payload?.error) {
+        return withRequestId(String(payload.error));
+      }
+
+      const rawBody = await response.text().catch(() => '');
+      const compactBody = rawBody
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      if (compactBody) {
+        return withRequestId(compactBody.slice(0, 240));
+      }
+
+      return withRequestId(`Could not start enhancement (${response.status}).`);
+    };
+
     try {
       let base64Data = sourcePhoto;
       if (!sourcePhoto.startsWith('data:')) {
@@ -1617,8 +1648,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       }
 
       if (!kickoffRes.ok) {
-        const kickoffPayload = await kickoffRes.json().catch(() => ({} as { error?: string }));
-        throw new Error(kickoffPayload?.error || `Could not start enhancement (${kickoffRes.status}).`);
+        const kickoffError = await extractKickoffErrorMessage(kickoffRes);
+        throw new Error(kickoffError);
       }
 
       const kickoffData = await kickoffRes.json().catch(() => ({} as { status?: string; error?: string }));
