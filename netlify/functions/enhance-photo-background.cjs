@@ -71,14 +71,6 @@ const FOOD_PROMPT = PARTNER_VERTICAL_PROMPT;
 
 const DRINK_PROMPT = PARTNER_VERTICAL_PROMPT;
 
-const CLASSIFIER_PROMPT = `Classify the uploaded menu photo.
-
-Rules:
-- Return only one token: DRINK or FOOD.
-- Return DRINK when the main subject is any beverage (coffee, tea, juice, soda, cocktail, beer, wine, smoothie, milkshake, etc.).
-- Return FOOD for everything else.
-- Do not output explanations.`;
-
 const PLAN_AI_CREDITS = { free: 0, basic: 30, pro: 100 };
 
 exports.handler = async (event) => {
@@ -161,42 +153,6 @@ exports.handler = async (event) => {
   let originalBlob;
   let originalDataUrl;
 
-  const detectImageType = async () => {
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4.1-mini',
-        max_output_tokens: 8,
-        input: [
-          {
-            role: 'system',
-            content: [{ type: 'input_text', text: CLASSIFIER_PROMPT }],
-          },
-          {
-            role: 'user',
-            content: [
-              { type: 'input_text', text: 'Classify this uploaded menu image.' },
-              { type: 'input_image', image_url: originalDataUrl },
-            ],
-          },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || `Classifier error ${response.status}`);
-    }
-
-    const data = await response.json();
-    const outputText = String(data.output_text || '').toUpperCase();
-    return outputText.includes('DRINK') ? 'drink' : 'food';
-  };
-
   const callOpenAI = async (model, size, quality, prompt) => {
     const formData = new FormData();
     formData.append('image', originalBlob, 'photo.jpg');
@@ -205,11 +161,20 @@ exports.handler = async (event) => {
     formData.append('n', '1');
     formData.append('size', size);
     formData.append('quality', quality);
+
+    const controller = new AbortController();
+    const timeoutMs = 22000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
     const response = await fetch('https://api.openai.com/v1/images/edits', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}` },
       body: formData,
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       const msg = errorData.error?.message || `OpenAI error ${response.status}`;
@@ -276,13 +241,7 @@ exports.handler = async (event) => {
     originalBlob = new Blob([originalBuffer], { type: mimeType });
     originalDataUrl = `data:${mimeType};base64,${base64Data}`;
 
-    let imageType = 'food';
-    try {
-      imageType = await detectImageType();
-    } catch (classifyError) {
-      console.warn('[enhance-photo-background] classifier failed, defaulting to food prompt:', classifyError.message || classifyError);
-    }
-    const selectedPrompt = imageType === 'drink' ? DRINK_PROMPT : FOOD_PROMPT;
+    const selectedPrompt = FOOD_PROMPT;
 
     let usedModel = 'gpt-image-2';
     let b64Image = null;
@@ -311,7 +270,7 @@ exports.handler = async (event) => {
     });
     const { data: { publicUrl } } = supabase.storage.from('menu-videos').getPublicUrl(outputPath);
 
-    await saveJob({ status: 'done', enhancedImage: publicUrl, modelUsed: usedModel, detectedType: imageType });
+    await saveJob({ status: 'done', enhancedImage: publicUrl, modelUsed: usedModel, detectedType: 'unified' });
 
     // Consume one AI credit (add-on first, then base)
     if (partnerId) {
@@ -336,15 +295,26 @@ exports.handler = async (event) => {
 
   } catch (error) {
     console.error('[enhance-photo-background] error:', error);
+    const isTimeout = error?.name === 'AbortError';
     try {
-      await saveJob({ status: 'error', error: error.message || 'Enhancement failed' });
+      await saveJob({
+        status: 'error',
+        error: isTimeout
+          ? 'AI request timed out before processing completed. Please try again.'
+          : (error.message || 'Enhancement failed'),
+      });
     } catch (saveErr) {
       console.error('[enhance-photo-background] saveJob also failed:', saveErr.message || saveErr);
     }
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ status: 'error', error: error.message || 'Enhancement failed' }),
+      body: JSON.stringify({
+        status: 'error',
+        error: isTimeout
+          ? 'AI request timed out before processing completed. Please try again.'
+          : (error.message || 'Enhancement failed'),
+      }),
     };
   }
 
