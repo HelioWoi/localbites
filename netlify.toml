@@ -18,9 +18,8 @@
 [functions."enhance-photo-demo-background"]
   timeout = 26
 
-[functions."process-photo-jobs"]
-  timeout = 26
-  schedule = "*/1 * * * *"
+[functions."process-photo-jobs-background"]
+  schedule = "*/2 * * * *"
 
 # Edge Functions for dynamic Open Graph tags
 [[edge_functions]]

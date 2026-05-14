@@ -1696,7 +1696,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
 
       setEnhanceProgress(15);
 
-      fetch('/.netlify/functions/process-photo-jobs', {
+      fetch('/.netlify/functions/process-photo-jobs-background', {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({ jobId }),
@@ -1728,7 +1728,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
           }
 
           if (attempts === 1 || attempts % 4 === 0) {
-            fetch('/.netlify/functions/process-photo-jobs', {
+            fetch('/.netlify/functions/process-photo-jobs-background', {
               method: 'POST',
               headers: authHeaders,
               body: JSON.stringify({ jobId }),
