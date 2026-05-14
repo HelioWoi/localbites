@@ -1002,25 +1002,34 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                           >
                             {dish.videoUrl ? (
                               <>
-                                {(dish.photoUrl || dish.thumbnailUrl) && (
-                                  <img
-                                    src={dish.photoUrl || dish.thumbnailUrl!}
-                                    className="absolute inset-0 w-full h-full object-cover"
-                                    alt={dish.name}
-                                  />
-                                )}
+                                <img
+                                  src={dish.photoUrl || dish.thumbnailUrl || restaurant.mainPhotoUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'}
+                                  className="absolute inset-0 w-full h-full object-cover"
+                                  alt={dish.name}
+                                  onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'; }}
+                                />
                                 <video
                                   ref={(el) => {
                                     gridVideoRefs.current[feedIndex >= 0 ? feedIndex : index] = el;
                                   }}
                                   src={getCDNUrl(dish.videoUrl)}
-                                  className="absolute inset-0 w-full h-full object-cover group-active:scale-105 transition-all duration-300"
+                                  className={`absolute inset-0 w-full h-full object-cover group-active:scale-105 transition-all duration-300 ${gridMediaLoaded.has(dish.id) ? 'opacity-100' : 'opacity-0'}`}
+                                  autoPlay
                                   muted
                                   playsInline
                                   preload="auto"
-                                  poster={dish.photoUrl || dish.thumbnailUrl || ''}
+                                  poster={dish.photoUrl || dish.thumbnailUrl || restaurant.mainPhotoUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'}
+                                  onPlay={(e) => {
+                                    e.currentTarget.pause();
+                                    e.currentTarget.currentTime = 0.1;
+                                    setGridMediaLoaded(prev => new Set(prev).add(dish.id));
+                                  }}
                                   onLoadedData={(e) => {
                                     e.currentTarget.currentTime = 0.1;
+                                    setGridMediaLoaded(prev => new Set(prev).add(dish.id));
+                                  }}
+                                  onError={() => {
+                                    setGridMediaLoaded(prev => { const n = new Set(prev); n.delete(dish.id); return n; });
                                   }}
                                 />
                               </>
@@ -1073,25 +1082,34 @@ const RestaurantProfile: React.FC<RestaurantProfileProps> = ({ restaurant, onBac
                           >
                             {dish.videoUrl ? (
                               <>
-                                {(dish.photoUrl || dish.thumbnailUrl) && (
-                                  <img
-                                    src={dish.photoUrl || dish.thumbnailUrl!}
-                                    className="absolute inset-0 w-full h-full object-cover"
-                                    alt={dish.name}
-                                  />
-                                )}
+                                <img
+                                  src={dish.photoUrl || dish.thumbnailUrl || restaurant.mainPhotoUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'}
+                                  className="absolute inset-0 w-full h-full object-cover"
+                                  alt={dish.name}
+                                  onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'; }}
+                                />
                                 <video
                                   ref={(el) => {
                                     gridVideoRefs.current[feedIndex >= 0 ? feedIndex : 0] = el;
                                   }}
                                   src={getCDNUrl(dish.videoUrl)}
-                                  className="absolute inset-0 w-full h-full object-cover group-active:scale-105 transition-all duration-300"
+                                  className={`absolute inset-0 w-full h-full object-cover group-active:scale-105 transition-all duration-300 ${gridMediaLoaded.has(dish.id) ? 'opacity-100' : 'opacity-0'}`}
+                                  autoPlay
                                   muted
                                   playsInline
                                   preload="auto"
-                                  poster={dish.photoUrl || dish.thumbnailUrl || ''}
+                                  poster={dish.photoUrl || dish.thumbnailUrl || restaurant.mainPhotoUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'}
+                                  onPlay={(e) => {
+                                    e.currentTarget.pause();
+                                    e.currentTarget.currentTime = 0.1;
+                                    setGridMediaLoaded(prev => new Set(prev).add(dish.id));
+                                  }}
                                   onLoadedData={(e) => {
                                     e.currentTarget.currentTime = 0.1;
+                                    setGridMediaLoaded(prev => new Set(prev).add(dish.id));
+                                  }}
+                                  onError={() => {
+                                    setGridMediaLoaded(prev => { const n = new Set(prev); n.delete(dish.id); return n; });
                                   }}
                                 />
                               </>
