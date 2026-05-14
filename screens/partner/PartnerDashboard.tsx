@@ -1556,17 +1556,16 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
     enhanceCanceledRef.current = false;
     setIsEnhancing(true);
     setEnhanceElapsed(0);
-    setEnhanceProgress(2);
+    setEnhanceProgress(5);
     enhanceTimerRef.current = setInterval(() => {
       setEnhanceElapsed(s => s + 1);
-      setEnhanceProgress(prev => Math.min(95, prev + (prev < 80 ? 2 : 1)));
     }, 1000);
 
     const compressImageForAI = (dataUrl: string): Promise<string> =>
       new Promise((resolve) => {
         const img = document.createElement('img') as HTMLImageElement;
         img.onload = () => {
-          const MAX_DIM = 1024;
+          const MAX_DIM = 1600;
           let { width, height } = img;
           if (width > MAX_DIM || height > MAX_DIM) {
             if (width >= height) { height = Math.round((height * MAX_DIM) / width); width = MAX_DIM; }
@@ -1582,7 +1581,16 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
         img.src = dataUrl;
       });
 
-    const extractKickoffErrorMessage = async (response: Response): Promise<string> => {
+    const dataUrlToBlob = (dataUrl: string): Blob => {
+      const [meta, payload] = dataUrl.split(',');
+      const mime = (meta.match(/data:(.*?);base64/) || [])[1] || 'image/jpeg';
+      const binary = atob(payload || '');
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return new Blob([bytes], { type: mime });
+    };
+
+    const extractApiErrorMessage = async (response: Response): Promise<string> => {
       const requestId =
         response.headers.get('x-nf-request-id') ||
         response.headers.get('x-request-id') ||
@@ -1613,6 +1621,15 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       return withRequestId(`Could not start enhancement (${response.status}).`);
     };
 
+    const mapJobFailureMessage = (rawMessage: string): string => {
+      const message = (rawMessage || '').toLowerCase();
+      if (message.includes('timed out') || message.includes('timeout')) return 'AI request timed out. Please try again.';
+      if (message.includes('too large')) return 'Image too large. Please use a smaller image.';
+      if (message.includes('credit')) return 'Credits unavailable for AI enhancement.';
+      if (message.includes('network') || message.includes('fetch')) return 'Network error while processing AI image.';
+      return rawMessage || 'Processing failed. Please try again.';
+    };
+
     try {
       let base64Data = sourcePhoto;
       if (!sourcePhoto.startsWith('data:')) {
@@ -1626,38 +1643,155 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ user, onLogout }) =
       }
 
       base64Data = await compressImageForAI(base64Data);
-
-      const kickoffBody = JSON.stringify({ imageBase64: base64Data, partnerId: partnerData?.id });
-      let kickoffRes: Response | null = null;
-
-      for (let attempt = 0; attempt < 3; attempt++) {
-        kickoffRes = await fetch('/.netlify/functions/enhance-photo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: kickoffBody,
-        });
-
-        if (kickoffRes.ok) break;
-
-        const isTransientServerError = kickoffRes.status >= 500;
-        if (!isTransientServerError || attempt === 2) break;
-
-        await new Promise(resolve => setTimeout(resolve, 600 * (attempt + 1)));
+      const imageBlob = dataUrlToBlob(base64Data);
+      if (imageBlob.size > 8 * 1024 * 1024) {
+        throw new Error('Image too large. Please use a smaller image.');
       }
 
-      if (!kickoffRes.ok) {
-        const kickoffError = await extractKickoffErrorMessage(kickoffRes);
-        throw new Error(kickoffError);
+      const tempPath = `ai-temp/${partnerData?.id || user.id}/${crypto.randomUUID()}.jpg`;
+      const { error: uploadErr } = await supabase.storage
+        .from('menu-videos')
+        .upload(tempPath, imageBlob, { contentType: 'image/jpeg', upsert: false });
+
+      if (uploadErr) {
+        throw new Error(uploadErr.message || 'Could not upload image for AI processing.');
       }
 
-      const kickoffData = await kickoffRes.json().catch(() => ({} as { status?: string; error?: string }));
-      if (kickoffData?.status === 'error') {
-        throw new Error(kickoffData?.error || 'Enhancement request was rejected.');
+      const {
+        data: { publicUrl: originalImageUrl },
+      } = supabase.storage.from('menu-videos').getPublicUrl(tempPath);
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) {
+        throw new Error('Session expired. Please log in again.');
       }
 
-      const enhancedImage = kickoffData?.enhancedImage as string | undefined;
+      const authHeaders: HeadersInit = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      };
+
+      const createRes = await fetch('/.netlify/functions/create-photo-job', {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          originalImageUrl,
+          restaurantId: partnerData?.id,
+          itemId: editingMenuItem?.id,
+          creditsUsed: 1,
+        }),
+      });
+
+      if (!createRes.ok) {
+        const createError = await extractApiErrorMessage(createRes);
+        throw new Error(createError);
+      }
+
+      const createData = await createRes.json().catch(() => ({} as { jobId?: string }));
+      const jobId = createData?.jobId;
+      if (!jobId) {
+        throw new Error('Could not create photo enhancement job.');
+      }
+
+      setEnhanceProgress(15);
+
+      fetch('/.netlify/functions/process-photo-jobs', {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ jobId }),
+      }).catch(() => undefined);
+
+      const enhancedImage = await new Promise<string>((resolve, reject) => {
+        enhancePromiseRejectRef.current = reject;
+        let attempts = 0;
+        const maxAttempts = 240;
+        let transientStatusErrors = 0;
+        let pollInFlight = false;
+
+        enhancePollRef.current = setInterval(async () => {
+          if (pollInFlight) return;
+
+          if (enhanceCanceledRef.current) {
+            if (enhancePollRef.current) clearInterval(enhancePollRef.current);
+            enhancePollRef.current = null;
+            reject(new Error('Enhancement canceled'));
+            return;
+          }
+
+          attempts++;
+          if (attempts > maxAttempts) {
+            if (enhancePollRef.current) clearInterval(enhancePollRef.current);
+            enhancePollRef.current = null;
+            reject(new Error('Processing is taking longer than expected. Please try again.'));
+            return;
+          }
+
+          if (attempts === 1 || attempts % 4 === 0) {
+            fetch('/.netlify/functions/process-photo-jobs', {
+              method: 'POST',
+              headers: authHeaders,
+              body: JSON.stringify({ jobId }),
+            }).catch(() => undefined);
+          }
+
+          pollInFlight = true;
+          try {
+            const statusRes = await fetch(`/.netlify/functions/photo-job-status?jobId=${encodeURIComponent(jobId)}`, {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+
+            if (!statusRes.ok) {
+              transientStatusErrors++;
+              if (transientStatusErrors >= 3) {
+                if (enhancePollRef.current) clearInterval(enhancePollRef.current);
+                enhancePollRef.current = null;
+                const statusError = await extractApiErrorMessage(statusRes);
+                reject(new Error(statusError));
+              }
+              return;
+            }
+
+            const statusData = await statusRes.json();
+            transientStatusErrors = 0;
+
+            if (statusData?.status === 'pending') {
+              setEnhanceProgress(prev => Math.min(35, Math.max(prev, prev + 2)));
+              return;
+            }
+
+            if (statusData?.status === 'processing') {
+              setEnhanceProgress(prev => Math.min(92, Math.max(prev, prev + 4)));
+              return;
+            }
+
+            if (statusData?.status === 'done') {
+              if (enhancePollRef.current) clearInterval(enhancePollRef.current);
+              enhancePollRef.current = null;
+              resolve(statusData?.enhancedImageUrl || statusData?.enhanced_image_url);
+              return;
+            }
+
+            if (statusData?.status === 'failed') {
+              if (enhancePollRef.current) clearInterval(enhancePollRef.current);
+              enhancePollRef.current = null;
+              reject(new Error(mapJobFailureMessage(statusData?.errorMessage || statusData?.error_message || 'Processing failed.')));
+            }
+          } catch {
+            transientStatusErrors++;
+            if (transientStatusErrors >= 3) {
+              if (enhancePollRef.current) clearInterval(enhancePollRef.current);
+              enhancePollRef.current = null;
+              reject(new Error('Network error while checking AI status.'));
+            }
+          } finally {
+            pollInFlight = false;
+          }
+        }, 3000);
+      });
+
       if (!enhancedImage) {
-        throw new Error('Enhancement succeeded but no image was returned.');
+        throw new Error('Enhancement completed but no image was returned.');
       }
 
       setEnhanceProgress(100);
