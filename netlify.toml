@@ -2,6 +2,12 @@
   command = "npm run build"
   publish = "dist"
 
+[dev]
+  command = "npm run dev"
+  targetPort = 3000
+  port = 8888
+  publish = "dist"
+
 [build.environment]
   SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL,SUPABASE_SERVICE_KEY"
 
