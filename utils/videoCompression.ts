@@ -25,11 +25,9 @@ export async function compressVideo(
     const video = document.createElement('video');
     video.preload = 'metadata';
     video.playsInline = true;
-    video.volume = 0; // Silent playback but audio is still captured
+    video.volume = 0; // Silence speaker output — muted=true would strip audio from captureStream()
 
     video.onloadedmetadata = async () => {
-      let audioContext: AudioContext | null = null;
-      
       try {
         // Calculate dimensions maintaining aspect ratio
         let width = video.videoWidth;
@@ -57,29 +55,30 @@ export async function compressVideo(
           return;
         }
 
-        // Setup MediaRecorder with audio
+        // Canvas stream for resized video frames
         const canvasStream = canvas.captureStream(30); // 30 FPS
         const chunks: Blob[] = [];
-        
-        // Try to capture audio from video
+
+        // Capture audio directly from video element via captureStream.
+        // AudioContext approach is unreliable (context starts suspended under
+        // browser autoplay policy and unconnected nodes may be skipped).
         let audioTracks: MediaStreamTrack[] = [];
         try {
-          audioContext = new AudioContext();
-          const source = audioContext.createMediaElementSource(video);
-          const destination = audioContext.createMediaStreamDestination();
-          source.connect(destination);
-          audioTracks = destination.stream.getAudioTracks();
+          const elStream: MediaStream | undefined =
+            (video as any).captureStream?.() ?? (video as any).mozCaptureStream?.();
+          if (elStream) {
+            audioTracks = elStream.getAudioTracks();
+          }
         } catch (audioError) {
           console.warn('Could not capture audio, video will be silent:', audioError);
-          // Continue without audio if capture fails
         }
-        
-        // Combine video and audio streams
+
+        // Combine resized video (canvas) + original audio
         const stream = new MediaStream([
           ...canvasStream.getVideoTracks(),
-          ...audioTracks
+          ...audioTracks,
         ]);
-        
+
         // Prefer MP4 for broad playback compatibility (especially iOS Safari)
         const preferredMp4MimeTypes = [
           'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
@@ -92,9 +91,6 @@ export async function compressVideo(
         // that can cause playback issues on iOS devices.
         if (!supportedMp4Mime) {
           console.warn('[VideoCompression] MP4 MediaRecorder not supported, skipping compression to preserve iOS compatibility');
-          if (audioContext) {
-            audioContext.close();
-          }
           URL.revokeObjectURL(video.src);
           onProgress(100);
           resolve(file);
@@ -123,16 +119,12 @@ export async function compressVideo(
             file.name.replace(/\.[^/.]+$/, `.${originalExtension}`),
             { type: mimeType }
           );
-          
-          // Clean up
-          audioContext.close();
           URL.revokeObjectURL(video.src);
           onProgress(100);
           resolve(compressedFile);
         };
 
         recorder.onerror = (e) => {
-          audioContext.close();
           URL.revokeObjectURL(video.src);
           reject(new Error('Recording failed: ' + e));
         };
@@ -172,9 +164,6 @@ export async function compressVideo(
         };
 
       } catch (error) {
-        if (audioContext) {
-          audioContext.close();
-        }
         URL.revokeObjectURL(video.src);
         reject(error);
       }
